@@ -77,8 +77,12 @@ class RaceState(DataClassJSONMixin):
 
     def can_play_distance(self) -> bool:
         """Check if team can play distance cards."""
-        # Right of Way allows playing with any problems
+        # Right of Way only protects against STOP and SPEED_LIMIT
         if self.has_safety(SafetyType.RIGHT_OF_WAY):
+            # Can still be blocked by other problems (accident, flat tire, out of gas)
+            for problem in self.problems:
+                if problem not in (HazardType.STOP, HazardType.SPEED_LIMIT):
+                    return False
             return True
         # Otherwise, can't have any problems (except speed limit doesn't block, just restricts)
         return not self.has_any_problem()
@@ -1715,7 +1719,7 @@ class MileByMileGame(Game):
                 "winner_score": winner_score,
                 "final_scores": final_scores,
                 "rounds_played": self.round,
-                "target_score": self.options.target_distance,
+                "target_score": self.options.round_distance,
                 "team_mode": self.options.team_mode,
             },
         )

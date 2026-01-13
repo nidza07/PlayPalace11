@@ -8,7 +8,9 @@ from server.games.milebymile.game import (
     MileByMileGame,
     MileByMilePlayer,
     MileByMileOptions,
+    RaceState,
 )
+from server.games.milebymile.cards import HazardType, SafetyType
 from server.users.test_user import MockUser
 from server.users.bot import Bot
 
@@ -48,6 +50,72 @@ class TestMileByMileGameUnit:
         game = MileByMileGame(options=options)
         assert game.options.round_distance == 700
         assert game.options.winning_score == 3000
+
+
+class TestRightOfWayBehavior:
+    """Tests for Right of Way safety card behavior."""
+
+    def test_right_of_way_allows_driving_when_stopped(self):
+        """Right of Way should allow playing distance when only STOP is active."""
+        race_state = RaceState()
+        race_state.add_problem(HazardType.STOP)
+        race_state.add_safety(SafetyType.RIGHT_OF_WAY)
+
+        assert race_state.can_play_distance() is True
+
+    def test_right_of_way_allows_driving_with_speed_limit(self):
+        """Right of Way should allow playing distance when SPEED_LIMIT is active."""
+        race_state = RaceState()
+        race_state.add_problem(HazardType.SPEED_LIMIT)
+        race_state.add_safety(SafetyType.RIGHT_OF_WAY)
+
+        assert race_state.can_play_distance() is True
+
+    def test_right_of_way_allows_driving_with_stop_and_speed_limit(self):
+        """Right of Way should allow playing distance with both STOP and SPEED_LIMIT."""
+        race_state = RaceState()
+        race_state.add_problem(HazardType.STOP)
+        race_state.add_problem(HazardType.SPEED_LIMIT)
+        race_state.add_safety(SafetyType.RIGHT_OF_WAY)
+
+        assert race_state.can_play_distance() is True
+
+    def test_right_of_way_does_not_protect_against_accident(self):
+        """Right of Way should NOT allow playing distance when ACCIDENT is active."""
+        race_state = RaceState()
+        race_state.add_problem(HazardType.ACCIDENT)
+        race_state.add_safety(SafetyType.RIGHT_OF_WAY)
+
+        assert race_state.can_play_distance() is False
+
+    def test_right_of_way_does_not_protect_against_flat_tire(self):
+        """Right of Way should NOT allow playing distance when FLAT_TIRE is active."""
+        race_state = RaceState()
+        race_state.add_problem(HazardType.FLAT_TIRE)
+        race_state.add_safety(SafetyType.RIGHT_OF_WAY)
+
+        assert race_state.can_play_distance() is False
+
+    def test_right_of_way_does_not_protect_against_out_of_gas(self):
+        """Right of Way should NOT allow playing distance when OUT_OF_GAS is active."""
+        race_state = RaceState()
+        race_state.add_problem(HazardType.OUT_OF_GAS)
+        race_state.add_safety(SafetyType.RIGHT_OF_WAY)
+
+        assert race_state.can_play_distance() is False
+
+    def test_right_of_way_with_accident_and_stop(self):
+        """Right of Way should NOT allow distance with ACCIDENT even if STOP also present."""
+        race_state = RaceState()
+        race_state.add_problem(HazardType.STOP)
+        race_state.add_problem(HazardType.ACCIDENT)
+        race_state.add_safety(SafetyType.RIGHT_OF_WAY)
+
+        assert race_state.can_play_distance() is False
+
+
+class TestMileByMileSerialization:
+    """Tests for game serialization."""
 
     def test_serialization(self):
         """Test that game state can be serialized and deserialized."""
