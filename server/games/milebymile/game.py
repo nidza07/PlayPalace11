@@ -1526,14 +1526,13 @@ class MileByMileGame(Game):
             self._end_race()
             return
 
-        # Check for deck exhaustion
-        if self.deck.is_empty() and not self.discard_pile:
-            if not self.options.reshuffle_discard_pile:
-                # Check if all hands empty
-                all_empty = all(len(p.hand) == 0 for p in self.get_active_players())
-                if all_empty:
-                    self._end_race()
-                    return
+        # Check for deck exhaustion (when reshuffling is disabled)
+        if self.deck.is_empty() and not self.options.reshuffle_discard_pile:
+            # No cards left to draw and can't reshuffle - check if all hands empty
+            all_empty = all(len(p.hand) == 0 for p in self.get_active_players())
+            if all_empty:
+                self._end_race()
+                return
 
         # Advance to next player
         BotHelper.jolt_bots(self, ticks=random.randint(15, 25))
@@ -1559,7 +1558,7 @@ class MileByMileGame(Game):
 
         # Check for game winner
         game_winner = self._check_game_winner()
-        if game_winner:
+        if game_winner is not None:
             self._end_game(game_winner)
         else:
             # Start next race after delay (silent countdown)
@@ -1886,6 +1885,10 @@ class MileByMileGame(Game):
 
     def bot_think(self, player: MileByMilePlayer) -> str | None:
         """Bot AI decision making."""
+        # Don't act during between-race countdown
+        if self._round_timer.is_active:
+            return None
+
         # Check for dirty trick opportunity first
         if self.dirty_trick_window_team is not None:
             if player.team_index == self.dirty_trick_window_team:

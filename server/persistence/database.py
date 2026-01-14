@@ -209,6 +209,15 @@ class Database:
         )
         self._conn.commit()
 
+    def update_user_password(self, username: str, password_hash: str) -> None:
+        """Update a user's password hash."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "UPDATE users SET password_hash = ? WHERE username = ?",
+            (password_hash, username),
+        )
+        self._conn.commit()
+
     # Table operations
 
     def save_table(self, table: Table) -> None:

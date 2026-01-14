@@ -10,6 +10,7 @@ dependencies = [
     "fluent-compiler>=1.0",
     "babel>=2.14",
     "openskill>=6.1.3",
+    "argon2-cffi>=23.1",
 ]
 
 [project.optional-dependencies]

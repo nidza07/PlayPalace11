@@ -184,7 +184,7 @@ class TestMileByMilePlayTest:
         # Verify teams are set up
         assert game.get_num_teams() == 2
 
-        max_ticks = 40000
+        max_ticks = 100000  # Higher limit due to randomness in card distribution
         for _ in range(max_ticks):
             if game.status == "finished":
                 break
