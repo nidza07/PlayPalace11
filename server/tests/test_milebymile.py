@@ -175,7 +175,7 @@ class TestMileByMilePlayTest:
         game = MileByMileGame()
         game.options.round_distance = 500
         game.options.winning_score = 1000
-        game.options.team_mode = "2 Teams of 2"
+        game.options.team_mode = "2v2"  # Internal format
 
         for i in range(4):
             bot = Bot(f"Bot{i}")

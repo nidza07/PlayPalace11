@@ -246,6 +246,22 @@ class MenuOption(OptionMeta):
 
 
 @dataclass
+class TeamModeOption(MenuOption):
+    """
+    Menu option specifically for team modes.
+
+    Stores team modes in internal format ("individual", "2v2", "2v2v2")
+    but displays them in localized format ("Individual", "2 teams of 2").
+    """
+
+    def get_localized_choice(self, value: str, locale: str) -> str:
+        """Convert internal team mode format to localized display format."""
+        from .teams import TeamManager
+
+        return TeamManager.format_team_mode_for_display(value, locale)
+
+
+@dataclass
 class BoolOption(OptionMeta):
     """Boolean toggle option."""
 

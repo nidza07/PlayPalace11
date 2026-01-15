@@ -14,7 +14,7 @@ from ..registry import register_game
 from ...game_utils.actions import Action, ActionSet, Visibility
 from ...game_utils.bot_helper import BotHelper
 from ...game_utils.game_result import GameResult, PlayerResult
-from ...game_utils.options import IntOption, MenuOption, option_field
+from ...game_utils.options import IntOption, MenuOption, TeamModeOption, option_field
 from ...game_utils.teams import TeamManager
 from ...messages.localization import Localization
 from ...ui.keybinds import KeybindState
@@ -65,7 +65,7 @@ class PigOptions(GameOptions):
         )
     )
     team_mode: str = option_field(
-        MenuOption(
+        TeamModeOption(
             default="individual",
             value_key="mode",
             choices=lambda g, p: TeamManager.get_all_team_modes(2, 4),
@@ -274,7 +274,12 @@ class PigGame(Game):
 
         # Set up teams based on active players
         active_players = self.get_active_players()
-        self._team_manager.team_mode = self.options.team_mode
+        # options.team_mode should be in internal format, but handle old display format for backwards compatibility
+        team_mode = self.options.team_mode
+        # If it contains spaces or uppercase (except 'v'), it's likely old display format
+        if " " in team_mode or any(c.isupper() for c in team_mode if c != "v"):
+            team_mode = TeamManager.parse_display_to_team_mode(team_mode)
+        self._team_manager.team_mode = team_mode
         self._team_manager.setup_teams([p.name for p in active_players])
 
         # Initialize turn order

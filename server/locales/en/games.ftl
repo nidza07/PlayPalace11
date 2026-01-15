@@ -30,6 +30,8 @@ game-option-changed-target = Target score set to { $score }.
 game-set-team-mode = Team mode: { $mode }
 game-select-team-mode = Select team mode
 game-option-changed-team = Team mode set to { $mode }.
+game-team-mode-individual = Individual
+game-team-mode-x-teams-of-y = { $num_teams } teams of { $team_size }
 
 # Boolean option values
 option-on = on

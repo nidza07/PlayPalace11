@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 
 from mashumaro.mixins.json import DataClassJSONMixin
 
+from ..messages.localization import Localization
+
 if TYPE_CHECKING:
     pass
 
@@ -200,15 +202,98 @@ class TeamManager(DataClassJSONMixin):
         return sorted(self.teams, key=key, reverse=descending)
 
     @staticmethod
-    def get_team_modes_for_player_count(num_players: int) -> list[str]:
+    def format_team_mode_for_display(mode: str, locale: str = "en") -> str:
+        """
+        Convert internal team mode format to user-friendly localized display format.
+
+        Examples:
+            "individual" -> "Individual" (en) / "Individual" (pt) / "个人" (zh)
+            "2v2" -> "2 teams of 2" (en) / "2 equipes de 2" (pt) / "2 个 2 人团队" (zh)
+            "3v3" -> "2 teams of 3"
+            "2v2v2" -> "3 teams of 2"
+            "2v2v2v2" -> "4 teams of 2"
+
+        Args:
+            mode: Internal team mode string.
+            locale: Language code for localization (default: "en").
+
+        Returns:
+            User-friendly localized display string.
+        """
+        if mode == "individual":
+            return Localization.get(locale, "game-team-mode-individual")
+
+        # Parse the mode
+        parts = mode.lower().split("v")
+        team_sizes = [int(p) for p in parts if p.isdigit()]
+
+        if not team_sizes:
+            return mode  # Fallback
+
+        # Check if all teams are the same size
+        if len(set(team_sizes)) == 1:
+            # Symmetric teams
+            num_teams = len(team_sizes)
+            team_size = team_sizes[0]
+            return Localization.get(
+                locale,
+                "game-team-mode-x-teams-of-y",
+                num_teams=num_teams,
+                team_size=team_size,
+            )
+        else:
+            # Asymmetric teams (future support)
+            return "v".join(str(s) for s in team_sizes)
+
+    @staticmethod
+    def parse_display_to_team_mode(display: str) -> str:
+        """
+        Convert user-friendly display format to internal team mode format.
+
+        Works with localized strings by extracting numbers from patterns like:
+        - "Individual" / "个人" -> "individual"
+        - "2 teams of 2" / "2 equipes de 2" / "2 个 2 人团队" -> "2v2"
+        - "3 teams of 2" -> "2v2v2"
+        - "4 teams of 2" -> "2v2v2v2"
+
+        Args:
+            display: User-friendly display string (possibly localized).
+
+        Returns:
+            Internal team mode string.
+        """
+        import re
+
+        # Check for "Individual" in any language by checking if it's a known individual string
+        # We'll check against the English version and also check if there are no digits
+        if "individual" in display.lower() or not any(char.isdigit() for char in display):
+            # If it looks like individual mode (no numbers), return individual
+            # This handles "Individual", "个人", etc.
+            return "individual"
+
+        # Extract all numbers from the display string
+        numbers = re.findall(r"\d+", display)
+
+        if len(numbers) >= 2:
+            # Format: "N teams of M" or localized equivalent
+            num_teams = int(numbers[0])
+            team_size = int(numbers[1])
+            return "v".join([str(team_size)] * num_teams)
+
+        # If it doesn't match expected patterns, assume it's already in internal format
+        return display
+
+    @staticmethod
+    def get_team_modes_for_player_count_internal(num_players: int) -> list[str]:
         """
         Get valid team mode options for a given number of players.
+        Returns internal format strings.
 
         Args:
             num_players: Number of players in the game.
 
         Returns:
-            List of valid team mode strings.
+            List of valid team mode strings in internal format.
         """
         modes = ["individual"]
 
@@ -228,20 +313,44 @@ class TeamManager(DataClassJSONMixin):
         return modes
 
     @staticmethod
+    def get_team_modes_for_player_count(
+        num_players: int, locale: str = "en"
+    ) -> list[str]:
+        """
+        Get valid team mode options for a given number of players.
+        Returns localized display strings.
+
+        Args:
+            num_players: Number of players in the game.
+            locale: Language code for localization (default: "en").
+
+        Returns:
+            List of valid team mode strings in user-friendly localized format.
+        """
+        internal_modes = TeamManager.get_team_modes_for_player_count_internal(
+            num_players
+        )
+        return [
+            TeamManager.format_team_mode_for_display(mode, locale)
+            for mode in internal_modes
+        ]
+
+    @staticmethod
     def get_all_team_modes(min_players: int, max_players: int) -> list[str]:
         """
         Get all possible team mode options for a range of player counts.
+        Returns internal format strings.
 
         Args:
             min_players: Minimum number of players.
             max_players: Maximum number of players.
 
         Returns:
-            Sorted list of unique team mode strings.
+            Sorted list of unique team mode strings in internal format.
         """
         all_modes = set()
         for count in range(min_players, max_players + 1):
-            modes = TeamManager.get_team_modes_for_player_count(count)
+            modes = TeamManager.get_team_modes_for_player_count_internal(count)
             all_modes.update(modes)
 
         # Sort: individual first, then by total players, then alphabetically
@@ -249,10 +358,32 @@ class TeamManager(DataClassJSONMixin):
             if mode == "individual":
                 return (0, 0, "")
             parts = mode.split("v")
-            total = sum(int(p) for p in parts)
+            total = sum(int(p) for p in parts if p.isdigit())
             return (1, total, mode)
 
         return sorted(all_modes, key=sort_key)
+
+    @staticmethod
+    def get_all_team_modes_for_display(
+        min_players: int, max_players: int, locale: str = "en"
+    ) -> list[tuple[str, str]]:
+        """
+        Get all possible team mode options for a range of player counts.
+        Returns (display_string, internal_value) tuples for UI.
+
+        Args:
+            min_players: Minimum number of players.
+            max_players: Maximum number of players.
+            locale: Language code for localization (default: "en").
+
+        Returns:
+            List of (display, value) tuples sorted by internal value.
+        """
+        internal_modes = TeamManager.get_all_team_modes(min_players, max_players)
+        return [
+            (TeamManager.format_team_mode_for_display(mode, locale), mode)
+            for mode in internal_modes
+        ]
 
     # ==========================================================================
     # Score Formatting

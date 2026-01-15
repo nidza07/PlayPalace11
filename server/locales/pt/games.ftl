@@ -30,6 +30,8 @@ game-option-changed-target = Pontuação alvo definida para { $score }.
 game-set-team-mode = Modo de equipe: { $mode }
 game-select-team-mode = Selecione o modo de equipe
 game-option-changed-team = Modo de equipe definido para { $mode }.
+game-team-mode-individual = Individual
+game-team-mode-x-teams-of-y = { $num_teams } equipes de { $team_size }
 
 # Valores de opções booleanas
 option-on = ligado

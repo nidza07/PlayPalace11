@@ -21,7 +21,13 @@ from ...game_utils.cards import (
     sort_cards,
 )
 from ...game_utils.game_result import GameResult, PlayerResult
-from ...game_utils.options import IntOption, MenuOption, BoolOption, option_field
+from ...game_utils.options import (
+    IntOption,
+    MenuOption,
+    BoolOption,
+    TeamModeOption,
+    option_field,
+)
 from ...game_utils.teams import TeamManager
 from ...game_utils.round_timer import RoundTimer
 from ...messages.localization import Localization
@@ -118,7 +124,7 @@ class ScopaOptions(GameOptions):
         )
     )
     team_mode: str = option_field(
-        MenuOption(
+        TeamModeOption(
             default="individual",
             value_key="mode",
             choices=lambda g, p: TeamManager.get_all_team_modes(2, 6),
@@ -429,7 +435,12 @@ class ScopaGame(Game):
         # Setup teams
         active_players = self.get_active_players()
         player_names = [p.name for p in active_players]
-        self._team_manager.team_mode = self.options.team_mode
+        # options.team_mode should be in internal format, but handle old display format for backwards compatibility
+        team_mode = self.options.team_mode
+        # If it contains spaces or uppercase (except 'v'), it's likely old display format
+        if " " in team_mode or any(c.isupper() for c in team_mode if c != "v"):
+            team_mode = TeamManager.parse_display_to_team_mode(team_mode)
+        self._team_manager.team_mode = team_mode
         self._team_manager.setup_teams(player_names)
 
         # Initialize turn order

@@ -16,8 +16,15 @@ from ..registry import register_game
 from ...game_utils.actions import Action, ActionSet, MenuInput, Visibility
 from ...game_utils.bot_helper import BotHelper
 from ...game_utils.game_result import GameResult, PlayerResult
-from ...game_utils.options import IntOption, MenuOption, BoolOption, option_field
+from ...game_utils.options import (
+    IntOption,
+    MenuOption,
+    BoolOption,
+    TeamModeOption,
+    option_field,
+)
 from ...game_utils.round_timer import RoundTimer
+from ...game_utils.teams import TeamManager
 from ...messages.localization import Localization
 from ...ui.keybinds import KeybindState
 
@@ -133,10 +140,10 @@ class MileByMileOptions(GameOptions):
         )
     )
     team_mode: str = option_field(
-        MenuOption(
-            default="Individual",
+        TeamModeOption(
+            default="individual",
             value_key="mode",
-            choices=["Individual", "2 Teams of 2", "2 Teams of 3", "3 Teams of 2"],
+            choices=lambda g, p: TeamManager.get_all_team_modes(2, 9),
             label="game-set-team-mode",
             prompt="game-select-team-mode",
             change_msg="game-option-changed-team",
@@ -264,18 +271,12 @@ class MileByMileGame(Game):
         active_players = self.get_active_players()
         player_names = [p.name for p in active_players]
 
-        # Convert team mode to TeamManager format
-        if self.options.team_mode == "Individual":
-            self._team_manager.team_mode = "individual"
-        elif self.options.team_mode == "2 Teams of 2":
-            self._team_manager.team_mode = "2v2"
-        elif self.options.team_mode == "2 Teams of 3":
-            self._team_manager.team_mode = "2v2"  # Will distribute evenly
-        elif self.options.team_mode == "3 Teams of 2":
-            self._team_manager.team_mode = "2v2v2"
-        else:
-            self._team_manager.team_mode = "individual"
-
+        # options.team_mode should be in internal format, but handle old display format for backwards compatibility
+        team_mode = self.options.team_mode
+        # If it contains spaces or uppercase (except 'v'), it's likely old display format
+        if " " in team_mode or any(c.isupper() for c in team_mode if c != "v"):
+            team_mode = TeamManager.parse_display_to_team_mode(team_mode)
+        self._team_manager.team_mode = team_mode
         self._team_manager.setup_teams(player_names)
 
         # Set player team indices
@@ -305,7 +306,7 @@ class MileByMileGame(Game):
 
     def is_individual_mode(self) -> bool:
         """Check if game is in individual mode."""
-        return self.options.team_mode == "Individual"
+        return self.options.team_mode == "individual"
 
     def get_num_teams(self) -> int:
         """Get the number of teams."""
