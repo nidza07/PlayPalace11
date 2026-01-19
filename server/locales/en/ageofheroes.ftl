@@ -93,8 +93,17 @@ ageofheroes-discard-card = { $player } discards { $card }.
 ageofheroes-discard-card-you = You discard { $card }.
 ageofheroes-earthquake = An earthquake strikes { $player }'s tribe; their armies go into recovery.
 ageofheroes-earthquake-you = An earthquake strikes your tribe; your armies go into recovery.
-ageofheroes-eruption = Aneruption destroys one of { $player }'s cities.
+ageofheroes-eruption = An eruption destroys one of { $player }'s cities.
 ageofheroes-eruption-you = An eruption destroys one of your cities.
+
+# Disaster effects
+ageofheroes-hunger-strikes = Hunger strikes the land!
+ageofheroes-lose-card-hunger = You lose { $card } to hunger.
+ageofheroes-barbarians-attack = Barbarians attack { $player }!
+ageofheroes-barbarians-attack-you = Barbarians attack you!
+ageofheroes-lose-card-barbarians = You lose { $card } to barbarians.
+ageofheroes-block-with-card = { $player } blocks the disaster using { $card }.
+ageofheroes-block-with-card-you = You block the disaster using { $card }.
 
 # Fair phase
 ageofheroes-fair-start = The day dawns at the marketplace. Players draw cards based on their road network.
@@ -219,12 +228,18 @@ ageofheroes-battle-continue = Continue the battle.
 ageofheroes-battle-end = The battle is over.
 
 # War outcomes
-ageofheroes-conquest-success = { $attacker } conquers one of { $defender }'s cities.
+ageofheroes-conquest-success = { $attacker } conquers { $count } { $count ->
+    [one] city
+    *[other] cities
+} from { $defender }.
 ageofheroes-plunder-success = { $attacker } plunders { $count } { $count ->
     [one] card
     *[other] cards
 } from { $defender }.
-ageofheroes-destruction-success = { $attacker } destroys { $defender }'s monument progress.
+ageofheroes-destruction-success = { $attacker } destroys { $count } of { $defender }'s monument { $count ->
+    [one] resource
+    *[other] resources
+}.
 ageofheroes-army-losses = { $player } loses { $count } { $count ->
     [one] army
     *[other] armies

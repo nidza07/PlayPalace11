@@ -154,50 +154,71 @@ class Deck(DataClassJSONMixin):
     def build_standard_deck(self, num_players: int = 6) -> None:
         """Build a standard Age of Heroes deck.
 
-        The deck composition is based on the original game:
-        - 6 of each standard resource (Iron, Wood, Grain, Stone, Gold) = 30 cards
-        - Variable special resources based on player count (only those in use)
-        - Event cards distributed throughout
+        The deck composition matches the original Pascal version (108 cards):
+        - 12 of each standard resource (Iron, Wood, Grain, Stone) = 48 cards
+        - 6 Gold cards
+        - 6 of each special resource (all 6 types) = 36 cards
+        - Event cards (18 total)
         """
         self.cards = []
 
-        # Standard resources - 6 of each = 30 cards
-        for resource in ResourceType:
-            for _ in range(6):
+        # Standard resources (Iron, Wood, Grain, Stone) - 12 of each = 48 cards
+        standard_resources = [
+            ResourceType.IRON,
+            ResourceType.WOOD,
+            ResourceType.GRAIN,
+            ResourceType.STONE,
+        ]
+        for resource in standard_resources:
+            for _ in range(12):
                 self.cards.append(self._create_card(CardType.RESOURCE, resource))
 
+        # Gold - 6 cards (separate from other standard resources)
+        for _ in range(6):
+            self.cards.append(self._create_card(CardType.RESOURCE, ResourceType.GOLD))
+
         # Special resources - only include those for tribes in the game
-        # Each tribe's special resource has 5 cards (for monument completion)
+        # 6 copies each (for monument completion requiring 5)
         from .state import Tribe, TRIBE_SPECIAL_RESOURCE
 
         tribes = list(Tribe)[:num_players]
         for tribe in tribes:
             special = TRIBE_SPECIAL_RESOURCE[tribe]
-            for _ in range(5):
+            for _ in range(6):
                 self.cards.append(self._create_card(CardType.SPECIAL, special))
 
-        # Event cards
-        # Population Growth - 4 copies (beneficial)
-        for _ in range(4):
+        # Event cards (18 total)
+        # Population Growth - 2 copies
+        for _ in range(2):
             self.cards.append(
                 self._create_card(CardType.EVENT, EventType.POPULATION_GROWTH)
             )
 
-        # Disasters - 2-3 copies each
-        for _ in range(3):
+        # Earthquake - 2 copies
+        for _ in range(2):
             self.cards.append(self._create_card(CardType.EVENT, EventType.EARTHQUAKE))
+
+        # Eruption - 2 copies
         for _ in range(2):
             self.cards.append(self._create_card(CardType.EVENT, EventType.ERUPTION))
+
+        # Hunger - 2 copies
         for _ in range(2):
             self.cards.append(self._create_card(CardType.EVENT, EventType.HUNGER))
-        for _ in range(2):
+
+        # Barbarians - 3 copies
+        for _ in range(3):
             self.cards.append(self._create_card(CardType.EVENT, EventType.BARBARIANS))
 
-        # Strategic events
+        # Olympics - 2 copies
         for _ in range(2):
             self.cards.append(self._create_card(CardType.EVENT, EventType.OLYMPICS))
+
+        # Hero - 3 copies
         for _ in range(3):
             self.cards.append(self._create_card(CardType.EVENT, EventType.HERO))
+
+        # Fortune - 2 copies
         for _ in range(2):
             self.cards.append(self._create_card(CardType.EVENT, EventType.FORTUNE))
 

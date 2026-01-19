@@ -250,12 +250,14 @@ def roll_battle_dice(
     bonus = 0
 
     if is_attacker:
-        # Attacker bonus: +1 per general
-        bonus += war.get_attacker_total_generals()
+        # Attacker bonus: +2 if has at least 1 general (Pascal: SetStore)
+        if war.get_attacker_total_generals() > 0:
+            bonus += 2
         war.attacker_dice = [die1, die2]
     else:
-        # Defender bonus: +1 per general, +1 per fortress
-        bonus += war.get_defender_total_generals()
+        # Defender bonus: +2 if has general, +fortresses
+        if war.get_defender_total_generals() > 0:
+            bonus += 2
 
         defender_index = war.defender_index
         if defender_index < len(active_players):
@@ -443,21 +445,35 @@ def apply_war_outcome(game: AgeOfHeroesGame) -> None:
     if not hasattr(defender, "tribe_state") or not defender.tribe_state:
         return
 
+    # Get attacker's remaining army strength for calculating spoils
+    attacker_strength = war.attacker_armies + war.attacker_heroes
+
     if war.goal == WarGoal.CONQUEST:
-        # Take a city
-        if defender.tribe_state.cities > 0:
-            defender.tribe_state.cities -= 1
-            attacker.tribe_state.cities += 1
+        # Take cities based on army strength (Pascal: wgsConquest)
+        # 4+ armies: 2 cities, 2-3 armies: 1 city
+        if attacker_strength >= 4:
+            cities_to_take = 2
+        elif attacker_strength >= 2:
+            cities_to_take = 1
+        else:
+            cities_to_take = 0
+
+        cities_to_take = min(cities_to_take, defender.tribe_state.cities)
+
+        if cities_to_take > 0:
+            defender.tribe_state.cities -= cities_to_take
+            attacker.tribe_state.cities += cities_to_take
             game.broadcast_l(
                 "ageofheroes-conquest-success",
                 attacker=attacker.name,
                 defender=defender.name,
+                count=cities_to_take,
             )
             game.play_sound("game_ageofheroes/conquest.ogg")
 
     elif war.goal == WarGoal.PLUNDER:
-        # Steal cards
-        cards_to_steal = min(2, len(defender.hand))
+        # Steal cards: 2 × army strength (Pascal: wgsPlunder)
+        cards_to_steal = min(2 * attacker_strength, len(defender.hand))
         if cards_to_steal > 0:
             stolen = []
             for _ in range(cards_to_steal):
@@ -477,13 +493,24 @@ def apply_war_outcome(game: AgeOfHeroesGame) -> None:
             game.play_sound("game_ageofheroes/plunder.ogg")
 
     elif war.goal == WarGoal.DESTRUCTION:
-        # Destroy monument progress
-        if defender.tribe_state.monument_progress > 0:
-            defender.tribe_state.monument_progress -= 1
+        # Destroy monument progress based on army strength (Pascal: wgsDestruction)
+        # 3+ armies: 2 resources, 1-2 armies: 1 resource
+        if attacker_strength >= 3:
+            resources_to_destroy = 2
+        else:
+            resources_to_destroy = 1
+
+        resources_to_destroy = min(
+            resources_to_destroy, defender.tribe_state.monument_progress
+        )
+
+        if resources_to_destroy > 0:
+            defender.tribe_state.monument_progress -= resources_to_destroy
             game.broadcast_l(
                 "ageofheroes-destruction-success",
                 attacker=attacker.name,
                 defender=defender.name,
+                count=resources_to_destroy,
             )
             game.play_sound("game_ageofheroes/destruction.ogg")
 

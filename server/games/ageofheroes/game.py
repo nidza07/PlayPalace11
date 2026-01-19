@@ -714,9 +714,18 @@ class AgeOfHeroesGame(Game):
         self._start_fair_phase()
 
     def _process_player_events(self, player: AgeOfHeroesPlayer) -> None:
-        """Process mandatory events for a player."""
+        """Process mandatory events for a player.
+
+        Pascal behavior:
+        - Round 1: Only Population Growth has effect, other disasters just discard
+        - Round 2+: Population Growth effect, Hunger/Barbarians effects apply,
+          Earthquake/Eruption are targetable (just discard here, play later)
+        """
         if not player.tribe_state:
             return
+
+        # Check if disaster effects should apply (round 2+ or during play phase)
+        effects_active = self.current_day > 1 or self.phase == GamePhase.PLAY
 
         # Find and process mandatory events
         cards_to_remove = []
@@ -725,7 +734,7 @@ class AgeOfHeroesGame(Game):
                 continue
 
             if card.subtype == EventType.POPULATION_GROWTH:
-                # Build a free city
+                # Build a free city (always applies)
                 if self.city_supply > 0:
                     player.tribe_state.cities += 1
                     self.city_supply -= 1
@@ -738,32 +747,49 @@ class AgeOfHeroesGame(Game):
                 cards_to_remove.append(i)
 
             elif card.subtype == EventType.EARTHQUAKE:
-                # Disable armies
-                player.tribe_state.earthquaked_armies = player.tribe_state.armies
-                self.broadcast_personal_l(
-                    player, "ageofheroes-earthquake-you", "ageofheroes-earthquake"
-                )
-                self.play_sound("game_ageofheroes/disaster.ogg")
-                cards_to_remove.append(i)
-
-            elif card.subtype == EventType.ERUPTION:
-                # Lose a city
-                if player.tribe_state.cities > 0:
-                    player.tribe_state.cities -= 1
-                    self.city_supply += 1
-                self.broadcast_personal_l(
-                    player, "ageofheroes-eruption-you", "ageofheroes-eruption"
-                )
-                self.play_sound("game_ageofheroes/disaster.ogg")
-                cards_to_remove.append(i)
-
-            elif card.subtype in (EventType.HUNGER, EventType.BARBARIANS):
-                # Just discard
+                # Earthquake is targetable at other players in round 2+
+                # For now, just discard (could be enhanced to allow targeting)
                 user = self.get_user(player)
                 if user:
                     card_name = get_card_name(card, user.locale)
                     user.speak_l("ageofheroes-discard-card-you", card=card_name)
                 self._broadcast_discard(player, card)
+                cards_to_remove.append(i)
+
+            elif card.subtype == EventType.ERUPTION:
+                # Eruption is targetable at other players in round 2+
+                # For now, just discard (could be enhanced to allow targeting)
+                user = self.get_user(player)
+                if user:
+                    card_name = get_card_name(card, user.locale)
+                    user.speak_l("ageofheroes-discard-card-you", card=card_name)
+                self._broadcast_discard(player, card)
+                cards_to_remove.append(i)
+
+            elif card.subtype == EventType.HUNGER:
+                if effects_active:
+                    # ALL players lose 1 Grain (unless blocked by Fortune)
+                    self._apply_hunger_effect(player)
+                else:
+                    # Round 1: just discard
+                    user = self.get_user(player)
+                    if user:
+                        card_name = get_card_name(card, user.locale)
+                        user.speak_l("ageofheroes-discard-card-you", card=card_name)
+                    self._broadcast_discard(player, card)
+                cards_to_remove.append(i)
+
+            elif card.subtype == EventType.BARBARIANS:
+                if effects_active:
+                    # Playing player loses 2 conventional resources (unless blocked)
+                    self._apply_barbarians_effect(player)
+                else:
+                    # Round 1: just discard
+                    user = self.get_user(player)
+                    if user:
+                        card_name = get_card_name(card, user.locale)
+                        user.speak_l("ageofheroes-discard-card-you", card=card_name)
+                    self._broadcast_discard(player, card)
                 cards_to_remove.append(i)
 
         # Remove processed cards (in reverse order to preserve indices)
@@ -773,6 +799,141 @@ class AgeOfHeroesGame(Game):
 
         # Check for elimination
         self._check_elimination(player)
+
+    def _player_has_card(self, player: AgeOfHeroesPlayer, event_type: str) -> bool:
+        """Check if player has a specific event card."""
+        for card in player.hand:
+            if card.card_type == CardType.EVENT and card.subtype == event_type:
+                return True
+        return False
+
+    def _discard_player_card(self, player: AgeOfHeroesPlayer, event_type: str) -> bool:
+        """Discard a specific event card from player's hand. Returns True if found."""
+        for i, card in enumerate(player.hand):
+            if card.card_type == CardType.EVENT and card.subtype == event_type:
+                removed = player.hand.pop(i)
+                self.discard_pile.append(removed)
+
+                # Announce the block
+                user = self.get_user(player)
+                if user:
+                    card_name = get_card_name(removed, user.locale)
+                    user.speak_l("ageofheroes-block-with-card-you", card=card_name)
+
+                for p in self.players:
+                    if p != player:
+                        other_user = self.get_user(p)
+                        if other_user:
+                            card_name = get_card_name(removed, other_user.locale)
+                            other_user.speak_l(
+                                "ageofheroes-block-with-card",
+                                player=player.name,
+                                card=card_name,
+                            )
+                return True
+        return False
+
+    def _apply_hunger_effect(self, source_player: AgeOfHeroesPlayer) -> None:
+        """Apply Hunger effect: ALL players lose 1 Grain card.
+
+        Can be blocked by Fortune card.
+        """
+        self.broadcast_l("ageofheroes-hunger-strikes")
+        self.play_sound("game_ageofheroes/disaster.ogg")
+
+        for player in self.get_active_players():
+            if not isinstance(player, AgeOfHeroesPlayer):
+                continue
+            if not player.tribe_state:
+                continue
+
+            # Check for Fortune block
+            if self._player_has_card(player, EventType.FORTUNE):
+                self._discard_player_card(player, EventType.FORTUNE)
+                continue
+
+            # Find and discard one Grain
+            for i, card in enumerate(player.hand):
+                if card.card_type == CardType.RESOURCE and card.subtype == ResourceType.GRAIN:
+                    removed = player.hand.pop(i)
+                    self.discard_pile.append(removed)
+
+                    user = self.get_user(player)
+                    if user:
+                        card_name = get_card_name(removed, user.locale)
+                        user.speak_l("ageofheroes-lose-card-hunger", card=card_name)
+                    break
+
+    def _apply_barbarians_effect(self, player: AgeOfHeroesPlayer) -> None:
+        """Apply Barbarians effect: player loses 2 conventional resource cards.
+
+        Can be blocked by Fortune or Olympics card.
+        """
+        if not player.tribe_state:
+            return
+
+        self.broadcast_personal_l(
+            player, "ageofheroes-barbarians-attack-you", "ageofheroes-barbarians-attack"
+        )
+        self.play_sound("game_ageofheroes/disaster.ogg")
+
+        # Check for Fortune block
+        if self._player_has_card(player, EventType.FORTUNE):
+            self._discard_player_card(player, EventType.FORTUNE)
+            return
+
+        # Check for Olympics block
+        if self._player_has_card(player, EventType.OLYMPICS):
+            self._discard_player_card(player, EventType.OLYMPICS)
+            return
+
+        # Lose up to 2 conventional resources
+        lost_count = 0
+        while lost_count < 2:
+            found = False
+            for i, card in enumerate(player.hand):
+                if card.card_type == CardType.RESOURCE and card.subtype != ResourceType.GOLD:
+                    removed = player.hand.pop(i)
+                    self.discard_pile.append(removed)
+                    lost_count += 1
+
+                    user = self.get_user(player)
+                    if user:
+                        card_name = get_card_name(removed, user.locale)
+                        user.speak_l("ageofheroes-lose-card-barbarians", card=card_name)
+                    found = True
+                    break
+            if not found:
+                break
+
+    def _check_drawn_card_event(
+        self, player: AgeOfHeroesPlayer, card: Card
+    ) -> None:
+        """Check if a drawn card triggers an immediate event.
+
+        Pascal behavior: Hunger and Barbarians trigger immediately when drawn
+        during Play phase or after round 1.
+        """
+        if card.card_type != CardType.EVENT:
+            return
+
+        # Only trigger during play phase or round 2+
+        if self.phase != GamePhase.PLAY and self.current_day <= 1:
+            return
+
+        if card.subtype == EventType.HUNGER:
+            self._apply_hunger_effect(player)
+            # Remove the drawn card
+            if card in player.hand:
+                player.hand.remove(card)
+                self.discard_pile.append(card)
+
+        elif card.subtype == EventType.BARBARIANS:
+            self._apply_barbarians_effect(player)
+            # Remove the drawn card
+            if card in player.hand:
+                player.hand.remove(card)
+                self.discard_pile.append(card)
 
     def _broadcast_discard(self, player: AgeOfHeroesPlayer, card: Card) -> None:
         """Broadcast card discard to other players."""
@@ -1199,6 +1360,9 @@ class AgeOfHeroesGame(Game):
                     other_user = self.get_user(p)
                     if other_user:
                         other_user.speak_l("ageofheroes-draw-card", player=player.name)
+
+            # Check for immediate event triggers (Hunger/Barbarians)
+            self._check_drawn_card_event(player, drawn)
 
         # Auto-collect special resources for monument
         self._collect_special_resources(player)
