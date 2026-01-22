@@ -20,6 +20,7 @@ from ...game_utils.poker_actions import compute_pot_limit_caps, clamp_total_to_c
 from ...game_utils import poker_log
 from ...game_utils.poker_state import order_after_button
 from ...game_utils.poker_showdown import order_winners_by_button
+from ...game_utils.poker_payout import resolve_pot
 from ...messages.localization import Localization
 from ...ui.keybinds import KeybindState
 from .bot import bot_think
@@ -749,24 +750,21 @@ class FiveCardDrawGame(Game):
             eligible_players = [p for p in eligible_players if isinstance(p, FiveCardDrawPlayer)]
             if not eligible_players:
                 continue
-            best_score = None
-            winners: list[FiveCardDrawPlayer] = []
-            for p in eligible_players:
-                score, _ = best_hand(p.hand)
-                if best_score is None or score > best_score:
-                    best_score = score
-                    winners = [p]
-                elif score == best_score:
-                    winners.append(p)
-            if not best_score:
+            active_ids = [p.id for p in self.get_active_players()]
+            winners, best_score, share, remainder = resolve_pot(
+                pot.amount,
+                eligible_players,
+                active_ids,
+                self.table_state.get_button_id(active_ids),
+                lambda p: p.id,
+                lambda p: best_hand(p.hand)[0],
+            )
+            if not winners or not best_score:
                 continue
-            share = pot.amount // len(winners)
-            remainder = pot.amount % len(winners)
-            ordered_winners = self._order_winners_by_button(winners)
-            for w in ordered_winners:
+            for w in winners:
                 w.chips += share
             if remainder > 0:
-                ordered_winners[0].chips += remainder
+                winners[0].chips += remainder
             desc = describe_hand(best_score, "en")
             if len(winners) == 1:
                 self.play_sound(random.choice(["game_blackjack/win1.ogg", "game_blackjack/win2.ogg", "game_blackjack/win3.ogg"]))

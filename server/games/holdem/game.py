@@ -17,7 +17,8 @@ from ...game_utils.poker_table import PokerTableState
 from ...game_utils.poker_timer import PokerTurnTimer
 from ...game_utils.poker_evaluator import best_hand, describe_hand, describe_partial_hand
 from ...game_utils.poker_actions import compute_pot_limit_caps, clamp_total_to_cap
-from ...game_utils.poker_showdown import order_winners_by_button, sort_players_for_showdown
+from ...game_utils.poker_showdown import order_winners_by_button, format_showdown_lines
+from ...game_utils.poker_payout import resolve_pot
 from ...game_utils import poker_log
 from ...messages.localization import Localization
 from ...ui.keybinds import KeybindState
@@ -901,24 +902,21 @@ class HoldemGame(Game):
             eligible_players = [p for p in eligible_players if isinstance(p, HoldemPlayer)]
             if not eligible_players:
                 continue
-            best_score = None
-            winners: list[HoldemPlayer] = []
-            for p in eligible_players:
-                score, _ = best_hand(p.hand + self.community)
-                if best_score is None or score > best_score:
-                    best_score = score
-                    winners = [p]
-                elif score == best_score:
-                    winners.append(p)
-            if not best_score:
+            active_ids = [p.id for p in self.get_active_players()]
+            winners, best_score, share, remainder = resolve_pot(
+                pot.amount,
+                eligible_players,
+                active_ids,
+                self.table_state.get_button_id(active_ids),
+                lambda p: p.id,
+                lambda p: best_hand(p.hand + self.community)[0],
+            )
+            if not winners or not best_score:
                 continue
-            share = pot.amount // len(winners)
-            remainder = pot.amount % len(winners)
-            ordered_winners = self._order_winners_by_button(winners)
-            for w in ordered_winners:
+            for w in winners:
                 w.chips += share
             if remainder > 0:
-                ordered_winners[0].chips += remainder
+                winners[0].chips += remainder
             desc = describe_hand(best_score, "en")
             if len(winners) == 1:
                 self.play_sound(random.choice(["game_blackjack/win1.ogg", "game_blackjack/win2.ogg", "game_blackjack/win3.ogg"]))
@@ -934,16 +932,18 @@ class HoldemGame(Game):
         if len(active) <= 1:
             return
         active_ids = [p.id for p in active]
-        ordered = sort_players_for_showdown(active, active_ids, self.table_state.get_button_id(active_ids), lambda p: p.id)
-        scored: list[tuple[tuple[int, tuple[int, ...]], HoldemPlayer]] = []
-        for p in ordered:
-            score, _ = best_hand(p.hand + self.community)
-            scored.append((score, p))
-        scored.sort(key=lambda item: (item[0], -ordered.index(item[1])), reverse=True)
-        for score, p in scored:
-            cards = read_cards(p.hand, "en")
-            desc = describe_hand(score, "en")
-            self.broadcast_l("poker-show-hand", player=p.name, cards=cards, hand=desc)
+        lines = format_showdown_lines(
+            active,
+            active_ids,
+            self.table_state.get_button_id(active_ids),
+            lambda p: p.id,
+            lambda p: (
+                ("poker-show-hand", {"player": p.name, "cards": read_cards(p.hand, "en"), "hand": describe_hand(best_hand(p.hand + self.community)[0], "en")}),
+                best_hand(p.hand + self.community)[0],
+            ),
+        )
+        for (message_id, kwargs), _score in lines:
+            self.broadcast_l(message_id, **kwargs)
 
     def _order_winners_by_button(self, winners: list[HoldemPlayer]) -> list[HoldemPlayer]:
         if len(winners) <= 1:
