@@ -700,7 +700,9 @@ class FiveCardDrawGame(Game):
         if self.current_player != player:
             return
         self.advance_turn(announce=False)
-        if self.current_player is None or self.current_player == self.turn_player_ids[0]:
+        if self.current_player is None or (
+            self.current_player and self.current_player.id == self.turn_player_ids[0]
+        ):
             self.phase = "bet2"
             self._start_betting_round(start_index=0)
         else:
