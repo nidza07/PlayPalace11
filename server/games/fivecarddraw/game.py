@@ -426,6 +426,10 @@ class FiveCardDrawGame(Game):
         if not p or p.folded or (p.all_in and self.phase != "draw"):
             self._advance_turn()
             return
+        if self.phase == "draw" and p.is_bot and p.all_in:
+            self.bot_think(p)
+            self._action_draw_cards(p, "draw_cards")
+            return
         self.announce_turn(turn_sound="game_3cardpoker/turn.ogg")
         if p.is_bot:
             BotHelper.jolt_bot(p, ticks=random.randint(5, 10))
