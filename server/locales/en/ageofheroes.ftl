@@ -102,8 +102,8 @@ ageofheroes-eruption-you = An eruption destroys one of your cities.
 ageofheroes-hunger-strikes = Hunger strikes.
 ageofheroes-lose-card-hunger = You lose { $card }.
 ageofheroes-barbarians-pillage = Barbarians attack { $player }'s resources.
-ageofheroes-barbarians-attack = { $attacker } plays Barbarians against { $player }.
-ageofheroes-barbarians-attack-you = Barbarians pillage your resources.
+ageofheroes-barbarians-attack = Barbarians attack { $player }'s resources.
+ageofheroes-barbarians-attack-you = Barbarians attack your resources.
 ageofheroes-lose-card-barbarians = You lose { $card }.
 ageofheroes-block-with-card = { $player } blocks the disaster using { $card }.
 ageofheroes-block-with-card-you = You block the disaster using { $card }.
@@ -235,33 +235,35 @@ ageofheroes-war-roll-other = { $player } rolls { $roll }.
 ageofheroes-war-bonuses-you = { $general ->
     [0] {
         { $fortress ->
-            [1] {"+1 from fortress"}
-            *[other] {"+{ $fortress } from fortresses"}
+            [0] {""}
+            [1] {"+1 from fortress = { $total } total"}
+            *[other] {"+{ $fortress } from fortresses = { $total } total"}
         }
     }
     *[other] {
-        "+{ $general } from general{ $fortress ->
-            [0] {""}
-            [1] {", +1 from fortress"}
-            *[other] {", +{ $fortress } from fortresses"}
-        }"
+        { $fortress ->
+            [0] {"+{ $general } from general = { $total } total"}
+            [1] {"+{ $general } from general, +1 from fortress = { $total } total"}
+            *[other] {"+{ $general } from general, +{ $fortress } from fortresses = { $total } total"}
+        }
     }
-} = { $total } total.
-ageofheroes-war-bonuses-other = { $player }: { $general ->
+}
+ageofheroes-war-bonuses-other = { $general ->
     [0] {
         { $fortress ->
-            [1] {"+1 from fortress"}
-            *[other] {"+{ $fortress } from fortresses"}
+            [0] {""}
+            [1] {"{ $player }: +1 from fortress = { $total } total"}
+            *[other] {"{ $player }: +{ $fortress } from fortresses = { $total } total"}
         }
     }
     *[other] {
-        "+{ $general } from general{ $fortress ->
-            [0] {""}
-            [1] {", +1 from fortress"}
-            *[other] {", +{ $fortress } from fortresses"}
-        }"
+        { $fortress ->
+            [0] {"{ $player }: +{ $general } from general = { $total } total"}
+            [1] {"{ $player }: +{ $general } from general, +1 from fortress = { $total } total"}
+            *[other] {"{ $player }: +{ $general } from general, +{ $fortress } from fortresses = { $total } total"}
+        }
     }
-} = { $total } total.
+}
 
 # Battle
 ageofheroes-battle-start = Battle begins. { $attacker }'s { $att_armies } { $att_armies ->
