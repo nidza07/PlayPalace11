@@ -11,7 +11,8 @@ from collections import Counter
 from itertools import combinations
 from typing import Iterable
 
-from .cards import Card, SUIT_NONE
+from .cards import Card, SUIT_NONE, RANK_KEYS
+from ..messages.localization import Localization
 
 # Hand category ranks (higher is better)
 HIGH_CARD = 0
@@ -99,9 +100,93 @@ def score_5_cards(cards: list[Card]) -> tuple[int, tuple[int, ...]]:
     return (HIGH_CARD, tuple(sorted(ranks, reverse=True)))
 
 
+def describe_hand(score: tuple[int, tuple[int, ...]], locale: str = "en") -> str:
+    """Return a human-friendly description for a scored hand."""
+    category, tiebreakers = score
+
+    if category == HIGH_CARD:
+        high = _cap(_rank_name(tiebreakers[0], locale))
+        kickers = _rank_list(tiebreakers[1:], locale, cap=True)
+        return f"{high} high, with {kickers}"
+
+    if category == ONE_PAIR:
+        pair = _cap(_rank_name_plural(tiebreakers[0], locale))
+        kickers = _rank_list(tiebreakers[1:], locale, cap=True)
+        return f"Pair of {pair}, with {kickers}"
+
+    if category == TWO_PAIR:
+        high_pair = _cap(_rank_name_plural(tiebreakers[0], locale))
+        low_pair = _cap(_rank_name_plural(tiebreakers[1], locale))
+        kicker = _cap(_rank_name(tiebreakers[2], locale))
+        return f"Two Pair, {high_pair} and {low_pair}, with {kicker}"
+
+    if category == THREE_OF_A_KIND:
+        trips = _cap(_rank_name_plural(tiebreakers[0], locale))
+        kickers = _rank_list(tiebreakers[1:], locale, cap=True)
+        return f"Three of a Kind, {trips}, with {kickers}"
+
+    if category == STRAIGHT:
+        high = _cap(_rank_name(tiebreakers[0], locale))
+        return f"{high} high Straight"
+
+    if category == FLUSH:
+        high = _cap(_rank_name(tiebreakers[0], locale))
+        kickers = _rank_list(tiebreakers[1:], locale, cap=True)
+        return f"{high} high Flush, with {kickers}"
+
+    if category == FULL_HOUSE:
+        trips = _cap(_rank_name_plural(tiebreakers[0], locale))
+        pair = _cap(_rank_name_plural(tiebreakers[1], locale))
+        return f"Full House, {trips} over {pair}"
+
+    if category == FOUR_OF_A_KIND:
+        quads = _cap(_rank_name_plural(tiebreakers[0], locale))
+        kicker = _cap(_rank_name(tiebreakers[1], locale))
+        return f"Four of a Kind, {quads}, with {kicker}"
+
+    if category == STRAIGHT_FLUSH:
+        high = _cap(_rank_name(tiebreakers[0], locale))
+        return f"{high} high Straight Flush"
+
+    return "Unknown hand"
+
+
+def describe_best_hand(cards: list[Card], locale: str = "en") -> tuple[str, list[Card]]:
+    """Return the best hand description and the chosen 5 cards."""
+    score, best = best_hand(cards)
+    return describe_hand(score, locale), best
+
+
 def _rank_value(rank: int) -> int:
     """Convert Card.rank to standard poker rank (Ace high)."""
     return 14 if rank == 1 else rank
+
+
+def _rank_name(rank: int, locale: str) -> str:
+    normalized = 1 if rank == 14 else rank
+    key = RANK_KEYS.get(normalized)
+    return Localization.get(locale, key) if key else str(rank)
+
+
+def _rank_name_plural(rank: int, locale: str) -> str:
+    name = _rank_name(rank, locale)
+    if name.endswith(("s", "x")):
+        return f"{name}es"
+    return f"{name}s"
+
+
+def _rank_list(ranks: Iterable[int], locale: str, cap: bool = False) -> str:
+    names = [_rank_name(rank, locale) for rank in ranks]
+    if cap:
+        names = [_cap(name) for name in names]
+    return Localization.format_list_and(locale, names)
+
+
+def _cap(name: str) -> str:
+    if not name:
+        return name
+    first = name[0].upper()
+    return f"{first}{name[1:]}"
 
 
 def _is_flush(suits: Iterable[int]) -> bool:

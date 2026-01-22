@@ -16,6 +16,8 @@ from server.game_utils.poker_evaluator import (
     FOUR_OF_A_KIND,
     STRAIGHT_FLUSH,
     best_hand,
+    describe_best_hand,
+    describe_hand,
     score_5_cards,
 )
 
@@ -161,3 +163,26 @@ def test_tie_scores_equal():
     score_a = score_5_cards(hand_a)
     score_b = score_5_cards(hand_b)
     assert score_a == score_b
+
+
+def test_describe_hand_pair():
+    hand = _cards([(1, SUIT_SPADES), (1, SUIT_DIAMONDS), (9, SUIT_CLUBS), (7, SUIT_HEARTS), (4, SUIT_DIAMONDS)])
+    score = score_5_cards(hand)
+    assert describe_hand(score) == "Pair of Aces, with 9, 7, and 4"
+
+
+def test_describe_best_hand_straight_flush():
+    cards = _cards(
+        [
+            (1, SUIT_SPADES),
+            (13, SUIT_SPADES),
+            (12, SUIT_SPADES),
+            (11, SUIT_SPADES),
+            (10, SUIT_SPADES),
+            (9, SUIT_DIAMONDS),
+            (2, SUIT_CLUBS),
+        ]
+    )
+    description, best = describe_best_hand(cards)
+    assert description == "Ace high Straight Flush"
+    assert len(best) == 5
