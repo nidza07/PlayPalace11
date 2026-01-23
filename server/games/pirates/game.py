@@ -473,7 +473,7 @@ class PiratesGame(Game):
         self._start_round()
 
         # Jolt bots
-        BotHelper.jolt_bots(self, ticks=random.randint(80, 120))
+        BotHelper.jolt_bots(self, ticks=random.randint(10, 30))
 
     def _start_round(self) -> None:
         """Start a new round."""
