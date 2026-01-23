@@ -36,7 +36,3 @@ holdem-option-changed-max-raises = Max raises set to { $count }.
 
 holdem-antes-posted = Antes posted: { $amount }.
 holdem-blinds-posted = Blinds posted: { $sb } / { $bb }.
-holdem-betting-round-preflop = Pre-flop betting.
-holdem-betting-round-flop = Flop betting.
-holdem-betting-round-turn = Turn betting.
-holdem-betting-round-river = River betting.

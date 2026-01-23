@@ -214,6 +214,7 @@ class HoldemGame(Game):
                 id="call",
                 label=Localization.get(locale, "poker-call"),
                 handler="_action_call",
+                get_label="_get_call_label",
                 is_enabled="_is_turn_action_enabled",
                 is_hidden="_is_turn_action_hidden",
             )
@@ -554,15 +555,14 @@ class HoldemGame(Game):
         else:
             start_index = (self.table_state.button_index + 1) % len(players)
         order = players[start_index:] + players[:start_index]
-        delay_ticks = 0
+        sounds: list[tuple[str, int]] = []
         for _ in range(2):
             for p in order:
                 card = self.deck.draw_one() if self.deck else None
                 if card:
                     p.hand.append(card)
-            sound = f"game_cards/draw{random.randint(1,4)}.ogg"
-            self.schedule_sound(sound, delay_ticks, volume=70)
-            delay_ticks += 6
+                sounds.append((f"game_cards/draw{random.randint(1,4)}.ogg", 6))
+        self.schedule_sound_sequence(sounds, start_delay=0)
         for p in players:
             p.hand = sort_cards(p.hand)
             user = self.get_user(p)
@@ -581,14 +581,13 @@ class HoldemGame(Game):
         # Burn card (cosmetic)
         if self.deck and not self.deck.is_empty():
             self.deck.draw_one()
-        delay_ticks = 0
+        sounds: list[tuple[str, int]] = []
         for _ in range(count):
             card = self.deck.draw_one() if self.deck else None
             if card:
                 self.community.append(card)
-            sound = f"game_cards/draw{random.randint(1,4)}.ogg"
-            self.schedule_sound(sound, delay_ticks, volume=70)
-            delay_ticks += 6
+            sounds.append((f"game_cards/draw{random.randint(1,4)}.ogg", 6))
+        self.schedule_sound_sequence(sounds, start_delay=0)
 
     def _start_all_in_showdown(self, delay_between_rounds: int = 0) -> None:
         if self.pending_showdown:
@@ -1055,7 +1054,10 @@ class HoldemGame(Game):
         order = [p.id for p in active]
         if button_id and player.id in order:
             idx = (order.index(player.id) - order.index(button_id)) % len(order)
-            user.speak_l("poker-position", position=idx)
+            if idx == 0:
+                user.speak_l("poker-position-button")
+            else:
+                user.speak_l("poker-position", position=idx)
 
     def _action_check_turn_timer(self, player: Player, action_id: str) -> None:
         user = self.get_user(player)
@@ -1162,6 +1164,15 @@ class HoldemGame(Game):
         if self.phase != "showdown":
             return "poker-reveal-only-showdown"
         return None
+
+    def _get_call_label(self, player: Player, action_id: str) -> str:
+        if not self.betting:
+            return Localization.get("en", "poker-call")
+        to_call = self.betting.amount_to_call(player.id)
+        key = "poker-check" if to_call == 0 else "poker-call"
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        return Localization.get(locale, key)
 
     def _is_reveal_hidden(self, player: Player) -> Visibility:
         if self.phase != "showdown":

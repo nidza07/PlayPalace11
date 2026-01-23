@@ -1,7 +1,8 @@
 # Shared Poker Messages
 
 poker-fold = Fold
-poker-call = Call / Check
+poker-call = Call
+poker-check = Check
 poker-raise = Raise
 poker-all-in = All in
 poker-enter-raise = Enter raise amount
@@ -54,6 +55,7 @@ poker-blinds-raise-next-hand = Blinds will raise next hand.
 poker-button-is = Button is with { $player }.
 poker-dealer-is = Dealer is { $player }.
 poker-position = You are { $position } seats after the button.
+poker-position-button = You are on the button.
 poker-position-dealer = You are { $position } seats after the dealer.
 poker-show-hand = { $player }: { $cards } ({ $hand }).
 poker-reveal-only-showdown = You can only reveal cards at the end of the hand.
