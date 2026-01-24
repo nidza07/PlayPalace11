@@ -36,7 +36,7 @@ def test_active_tables_menu_lists_members_without_host() -> None:
     server._show_active_tables_menu(viewer)
 
     texts = _menu_texts(viewer, "active_tables_menu")
-    expected = "Pig: Bob's table (3 players) with Sue and Jim"
+    expected = "Pig: Bob's table (3 users) with Sue and Jim"
     assert expected in texts
 
 
@@ -49,7 +49,7 @@ def test_active_tables_menu_singular_player_format() -> None:
     server._show_active_tables_menu(viewer)
 
     texts = _menu_texts(viewer, "active_tables_menu")
-    expected = "Farkle: Kate's table (1 player)"
+    expected = "Farkle: Kate's table (1 user)"
     assert expected in texts
 
 
