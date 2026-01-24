@@ -340,11 +340,13 @@ class CrazyEightsGame(Game):
         if not turn_set:
             return
         turn_set.remove_by_prefix("play_card_")
-        for idx in range(len(player.hand)):
+        if self.status != "playing" or player.is_spectator or self.current_player != player:
+            return
+        for card in player.hand:
             turn_set.add(
                 Action(
-                    id=f"play_card_{idx}",
-                    label="card",
+                    id=f"play_card_{card.id}",
+                    label="",
                     handler="_action_play_card",
                     is_enabled="_is_play_card_enabled",
                     is_hidden="_is_play_card_hidden",
@@ -515,16 +517,16 @@ class CrazyEightsGame(Game):
         if self.awaiting_wild_suit:
             return
         try:
-            idx = int(action_id.split("_")[-1])
+            card_id = int(action_id.split("_")[-1])
         except ValueError:
             return
-        if idx < 0 or idx >= len(p.hand):
+        card = next((c for c in p.hand if c.id == card_id), None)
+        if not card:
             return
-        card = p.hand[idx]
         if not self._is_card_playable(card):
             return
 
-        p.hand.pop(idx)
+        p.hand.remove(card)
         self.discard_pile.append(card)
         self.turn_has_drawn = False
         self.turn_drawn_card = None
@@ -683,12 +685,13 @@ class CrazyEightsGame(Game):
         if not action_id:
             return Visibility.HIDDEN
         try:
-            idx = int(action_id.split("_")[-1])
+            card_id = int(action_id.split("_")[-1])
         except ValueError:
             return Visibility.HIDDEN
-        if idx < 0 or idx >= len(player.hand):
+        card = next((c for c in player.hand if c.id == card_id), None)
+        if not card:
             return Visibility.HIDDEN
-        if not self._is_card_playable(player.hand[idx]):
+        if not self._is_card_playable(card):
             return Visibility.HIDDEN
         return Visibility.VISIBLE
 
@@ -923,14 +926,15 @@ class CrazyEightsGame(Game):
         if not isinstance(player, CrazyEightsPlayer):
             return action_id
         try:
-            idx = int(action_id.split("_")[-1])
+            card_id = int(action_id.split("_")[-1])
         except ValueError:
             return action_id
-        if idx < 0 or idx >= len(player.hand):
+        card = next((c for c in player.hand if c.id == card_id), None)
+        if not card:
             return action_id
         user = self.get_user(player)
         locale = user.locale if user else "en"
-        return self.format_card(player.hand[idx], locale)
+        return self.format_card(card, locale)
 
     def format_card(self, card: Card, locale: str) -> str:
         if card.rank == 8:
