@@ -175,6 +175,14 @@ class ActionVisibilityMixin:
         """Whose turn is always hidden (keybind only)."""
         return Visibility.HIDDEN
 
+    def _is_whos_at_table_enabled(self, player: "Player") -> str | None:
+        """Check if whos_at_table action is enabled."""
+        return None
+
+    def _is_whos_at_table_hidden(self, player: "Player") -> Visibility:
+        """Whos at table is always hidden (keybind only)."""
+        return Visibility.HIDDEN
+
     def _is_check_scores_enabled(self, player: "Player") -> str | None:
         """Check if check_scores action is enabled."""
         if self.status != "playing":

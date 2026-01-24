@@ -31,6 +31,7 @@ remove-bot = Remove bot
 actions-menu = Actions menu
 save-table = Save table
 whose-turn = Whose turn
+whos-at-table = Who's at the table
 check-scores = Check scores
 check-scores-detailed = Detailed scores
 
@@ -129,6 +130,9 @@ dice-no-dice = No dice available.
 # Game actions
 game-turn-start = { $player }'s turn.
 game-no-turn = No one's turn right now.
+table-no-players = No players.
+table-players-one = { $count } player: { $players }.
+table-players-many = { $count } players: { $players }.
 game-leave = Leave
 game-over = Game Over
 game-final-scores = Final Scores

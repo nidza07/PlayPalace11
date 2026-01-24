@@ -29,6 +29,7 @@ remove-bot = Usuń bota
 actions-menu = Menu akcji
 save-table = zapisz stół
 whose-turn = czyja tura?
+whos-at-table = kto jest przy stole
 check-scores = sprawdź wyniki
 check-scores-detailed = Szczegułowe wyniki
 
@@ -127,6 +128,9 @@ dice-no-dice = brak kości
 # Game actions
 game-turn-start = { tura $player }.
 game-no-turn = nikt teraz nie ma tury.
+table-no-players = Brak graczy.
+table-players-one = { $count } gracz: { $players }.
+table-players-many = { $count } graczy: { $players }.
 game-leave = Opuść
 game-over = Koniec gry
 game-final-scores = Wyniki końcowe

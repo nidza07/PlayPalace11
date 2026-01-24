@@ -28,6 +28,7 @@ remove-bot = 移除机器人
 actions-menu = 操作菜单
 save-table = 保存桌台
 whose-turn = 轮到谁
+whos-at-table = 桌上都有谁
 check-scores = 查看分数
 check-scores-detailed = 详细分数
 
@@ -44,6 +45,9 @@ table-full = 桌台已满。
 player-replaced-by-bot = { $player } 离开，已由机器人替代。
 player-took-over = { $player } 接管了机器人。
 spectator-joined = 已作为观众加入 { $host } 的桌台。
+table-no-players = 没有玩家。
+table-players-one = { $count } 位玩家：{ $players }。
+table-players-many = { $count } 位玩家：{ $players }。
 
 # 观众模式
 spectate = 观战

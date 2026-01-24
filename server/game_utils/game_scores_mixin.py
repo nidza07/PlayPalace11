@@ -29,6 +29,20 @@ class GameScoresMixin:
             else:
                 user.speak_l("game-no-turn")
 
+    def _action_whos_at_table(self, player: "Player", action_id: str) -> None:
+        """Announce who is at the table."""
+        user = self.get_user(player)
+        if not user:
+            return
+        players = [p.name for p in self.players if not p.is_spectator]
+        count = len(players)
+        if count == 0:
+            user.speak_l("table-no-players")
+            return
+        names = Localization.format_list_and(user.locale, players)
+        key = "table-players-one" if count == 1 else "table-players-many"
+        user.speak_l(key, count=count, players=names)
+
     def _action_check_scores(self, player: "Player", action_id: str) -> None:
         """Announce scores briefly."""
         user = self.get_user(player)

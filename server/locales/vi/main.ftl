@@ -31,6 +31,7 @@ remove-bot = Xóa Bot
 actions-menu = Menu hành động
 save-table = Lưu bàn
 whose-turn = Đến lượt ai?
+whos-at-table = Ai đang ở bàn
 check-scores = Xem điểm
 check-scores-detailed = Chi tiết điểm số
 
@@ -50,6 +51,9 @@ table-full = Bàn đã đầy.
 player-replaced-by-bot = { $player } đã thoát và được thay thế bởi Bot.
 player-took-over = { $player } đã thế chỗ cho Bot.
 spectator-joined = Đã vào xem bàn của { $host }.
+table-no-players = Không có người chơi.
+table-players-one = { $count } người chơi: { $players }.
+table-players-many = { $count } người chơi: { $players }.
 
 # Chế độ khán giả
 spectate = Xem

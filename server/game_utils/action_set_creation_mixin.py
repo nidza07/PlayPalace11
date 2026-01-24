@@ -134,6 +134,15 @@ class ActionSetCreationMixin:
         )
         action_set.add(
             Action(
+                id="whos_at_table",
+                label=Localization.get(locale, "whos-at-table"),
+                handler="_action_whos_at_table",
+                is_enabled="_is_whos_at_table_enabled",
+                is_hidden="_is_whos_at_table_hidden",
+            )
+        )
+        action_set.add(
+            Action(
                 id="check_scores",
                 label=Localization.get(locale, "check-scores"),
                 handler="_action_check_scores",
@@ -204,6 +213,13 @@ class ActionSetCreationMixin:
             "Whose turn",
             ["whose_turn"],
             state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+        self.define_keybind(
+            "ctrl+w",
+            "Who's at the table",
+            ["whos_at_table"],
+            state=KeybindState.ALWAYS,
             include_spectators=True,
         )
         self.define_keybind(

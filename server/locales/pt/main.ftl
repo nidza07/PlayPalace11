@@ -28,6 +28,7 @@ remove-bot = Remover bot
 actions-menu = Menu de ações
 save-table = Salvar mesa
 whose-turn = De quem é a vez
+whos-at-table = Quem está na mesa
 check-scores = Ver pontuação
 check-scores-detailed = Pontuação detalhada
 
@@ -44,6 +45,9 @@ table-full = A mesa está cheia.
 player-replaced-by-bot = { $player } saiu e foi substituído por um bot.
 player-took-over = { $player } assumiu o controle do bot.
 spectator-joined = Entrou na mesa de { $host } como espectador.
+table-no-players = Sem jogadores.
+table-players-one = { $count } jogador: { $players }.
+table-players-many = { $count } jogadores: { $players }.
 
 # Modo espectador
 spectate = Assistir
