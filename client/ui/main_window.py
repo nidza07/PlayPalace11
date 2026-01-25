@@ -179,6 +179,8 @@ class MainWindow(wx.Frame):
         self.ID_TOGGLE_TABLE_CHAT = wx.NewIdRef()
         self.ID_TOGGLE_GLOBAL_CHAT = wx.NewIdRef()
         self.ID_PING = wx.NewIdRef()
+        self.ID_LIST_ONLINE = wx.NewIdRef()
+        self.ID_LIST_ONLINE_WITH_GAMES = wx.NewIdRef()
 
         # Buffer system IDs
         self.ID_PREV_BUFFER = wx.NewIdRef()
@@ -200,6 +202,10 @@ class MainWindow(wx.Frame):
             wx.AcceleratorEntry(wx.ACCEL_NORMAL, wx.WXK_F8, self.ID_AMBIENCE_UP),
             wx.AcceleratorEntry(wx.ACCEL_NORMAL, wx.WXK_F9, self.ID_VOLUME_DOWN),
             wx.AcceleratorEntry(wx.ACCEL_NORMAL, wx.WXK_F10, self.ID_VOLUME_UP),
+            wx.AcceleratorEntry(wx.ACCEL_NORMAL, wx.WXK_F2, self.ID_LIST_ONLINE),
+            wx.AcceleratorEntry(
+                wx.ACCEL_SHIFT, wx.WXK_F2, self.ID_LIST_ONLINE_WITH_GAMES
+            ),
             wx.AcceleratorEntry(wx.ACCEL_ALT, ord("P"), self.ID_PING),
         ]
 
@@ -239,6 +245,12 @@ class MainWindow(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_volume_down, id=self.ID_VOLUME_DOWN)
         self.Bind(wx.EVT_MENU, self.on_volume_up, id=self.ID_VOLUME_UP)
         self.Bind(wx.EVT_MENU, self.on_ping, id=self.ID_PING)
+        self.Bind(wx.EVT_MENU, self.on_list_online, id=self.ID_LIST_ONLINE)
+        self.Bind(
+            wx.EVT_MENU,
+            self.on_list_online_with_games,
+            id=self.ID_LIST_ONLINE_WITH_GAMES,
+        )
 
         # Buffer system event bindings
         self.Bind(wx.EVT_MENU, self.on_prev_buffer, id=self.ID_PREV_BUFFER)
@@ -323,6 +335,18 @@ class MainWindow(wx.Frame):
         self._ping_start_time = time.time()
         self.sound_manager.play("pingstart.ogg")
         self.network.send_packet({"type": "ping"})
+
+    def on_list_online(self, event):
+        """Handle F2 to request list of online users."""
+        if self.connected:
+            self.network.send_packet({"type": "list_online"})
+
+    def on_list_online_with_games(self, event):
+        """Handle Shift+F2 to request online users with game info."""
+        if self.connected:
+            if self.current_menu_id == "online_users":
+                return
+            self.network.send_packet({"type": "list_online_with_games"})
 
     def on_server_pong(self, packet):
         """Handle pong response from server."""
@@ -496,7 +520,10 @@ class MainWindow(wx.Frame):
         elif key_code == wx.WXK_F1:
             key_name = "f1"
         elif key_code == wx.WXK_F2:
-            key_name = "f2"
+            # F2 is handled by accelerator table for online list
+            # Don't send to server, let it bubble up to the accelerator
+            event.Skip()
+            return
         elif key_code == wx.WXK_F3:
             key_name = "f3"
         elif key_code == wx.WXK_F4:
