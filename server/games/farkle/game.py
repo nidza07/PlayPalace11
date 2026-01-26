@@ -310,7 +310,7 @@ class FarkleGame(Game):
 
     @classmethod
     def get_max_players(cls) -> int:
-        return 4
+        return 20
 
     @classmethod
     def get_leaderboard_types(cls) -> list[dict]:
