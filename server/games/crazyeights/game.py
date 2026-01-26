@@ -466,8 +466,8 @@ class CrazyEightsGame(Game):
         for p in active_players:
             p.hand = []
 
-        # Deal 5 cards to each
-        for _ in range(5):
+        # Deal 7 cards to each
+        for _ in range(7):
             for p in active_players:
                 card = self.deck.draw_one()
                 if card:
@@ -676,7 +676,7 @@ class CrazyEightsGame(Game):
         self.current_suit = suit
         self.awaiting_wild_suit = False
         self.play_sound("game_crazyeights/morf.ogg")
-        self.schedule_sound(self._suit_sound(suit), delay_ticks=10)
+        self.schedule_sound(self._suit_sound(suit), delay_ticks=15)
         self._broadcast_suit_chosen(suit)
         if p.is_bot:
             BotHelper.jolt_bot(p, ticks=random.randint(20, 30))
@@ -888,9 +888,7 @@ class CrazyEightsGame(Game):
     # ==========================================================================
 
     def _is_number_card(self, card: Card) -> bool:
-        if card.rank == 8:
-            return False
-        if card.rank in (11, 12, 13):
+        if card.rank in (8,11, 12, 13):
             return False
         return True
 
