@@ -337,6 +337,46 @@ class Database:
         self._conn.commit()
         return cursor.rowcount > 0
 
+    def get_non_admin_users(self) -> list[UserRecord]:
+        """Get all approved users who are not admins (trust_level < 2)."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "SELECT id, username, password_hash, uuid, locale, preferences_json, trust_level, approved FROM users WHERE approved = 1 AND trust_level < 2 ORDER BY username"
+        )
+        users = []
+        for row in cursor.fetchall():
+            users.append(UserRecord(
+                id=row["id"],
+                username=row["username"],
+                password_hash=row["password_hash"],
+                uuid=row["uuid"],
+                locale=row["locale"] or "en",
+                preferences_json=row["preferences_json"] or "{}",
+                trust_level=row["trust_level"] if row["trust_level"] is not None else 1,
+                approved=True,
+            ))
+        return users
+
+    def get_admin_users(self) -> list[UserRecord]:
+        """Get all users who are admins (trust_level >= 2)."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "SELECT id, username, password_hash, uuid, locale, preferences_json, trust_level, approved FROM users WHERE trust_level >= 2 ORDER BY username"
+        )
+        users = []
+        for row in cursor.fetchall():
+            users.append(UserRecord(
+                id=row["id"],
+                username=row["username"],
+                password_hash=row["password_hash"],
+                uuid=row["uuid"],
+                locale=row["locale"] or "en",
+                preferences_json=row["preferences_json"] or "{}",
+                trust_level=row["trust_level"],
+                approved=bool(row["approved"]) if row["approved"] is not None else False,
+            ))
+        return users
+
     # Table operations
 
     def save_table(self, table: Table) -> None:
