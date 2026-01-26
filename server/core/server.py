@@ -188,8 +188,14 @@ class Server:
         """Handle client disconnection."""
         print(f"Client disconnected: {client.address}")
         if client.username:
-            # Broadcast offline announcement to all users (including the disconnecting user)
-            self._broadcast_presence_l("user-offline", client.username, "offline.ogg")
+            # Check if the disconnecting user is an admin before cleanup
+            user = self._users.get(client.username)
+            is_admin = user and user.trust_level >= 2
+
+            # Broadcast offline announcement to all users with appropriate sound
+            offline_sound = "offlineadmin.ogg" if is_admin else "offline.ogg"
+            self._broadcast_presence_l("user-offline", client.username, offline_sound)
+
             # Clean up user state
             self._users.pop(client.username, None)
             self._user_states.pop(client.username, None)
@@ -210,7 +216,18 @@ class Server:
             if not user.approved:
                 continue  # Don't send broadcasts to unapproved users
             user.speak_l("user-is-admin", player=admin_name)
-            user.play_sound("ranked.ogg")
+
+    def _notify_admins(
+        self, message_id: str, sound: str, exclude_username: str | None = None
+    ) -> None:
+        """Notify all online admins with a message and sound, optionally excluding one admin."""
+        for username, user in self._users.items():
+            if user.trust_level < 2:
+                continue  # Not an admin
+            if exclude_username and username == exclude_username:
+                continue  # Skip the excluded admin
+            user.speak_l(message_id)
+            user.play_sound(sound)
 
     async def _on_client_message(self, client: ClientConnection, packet: dict) -> None:
         """Handle incoming message from client."""
@@ -253,6 +270,9 @@ class Server:
 
         # Try to authenticate or register
         if not self._auth.authenticate(username, password):
+            # Check if this will be a new user that needs approval (not the first user)
+            needs_approval = self._db.get_user_count() > 0
+
             # Try to register
             if not self._auth.register(username, password):
                 # Username taken with different password
@@ -264,6 +284,10 @@ class Server:
                     }
                 )
                 return
+
+            # New user registered - notify admins if approval is needed
+            if needs_approval:
+                self._notify_admins("account-request", "accountrequest.ogg")
 
         # Authentication successful
         client.username = username
@@ -288,11 +312,12 @@ class Server:
         )
         self._users[username] = user
 
-        # Broadcast online announcement to all users (including the new user)
-        self._broadcast_presence_l("user-online", username, "online.ogg")
+        # Broadcast online announcement to all users with appropriate sound
+        online_sound = "onlineadmin.ogg" if trust_level >= 2 else "online.ogg"
+        self._broadcast_presence_l("user-online", username, online_sound)
 
         # If user is an admin, announce that as well
-        if trust_level == 2:
+        if trust_level >= 2:
             self._broadcast_admin_announcement(username)
 
         # Send success response
@@ -351,12 +376,18 @@ class Server:
             })
             return
 
+        # Check if this will be a user that needs approval (not the first user)
+        needs_approval = self._db.get_user_count() > 0
+
         # Try to register the user
         if self._auth.register(username, password):
             await client.send({
                 "type": "speak",
                 "text": "Registration successful! You can now log in with your credentials."
             })
+            # Notify admins of new account request (only if user needs approval)
+            if needs_approval:
+                self._notify_admins("account-request", "accountrequest.ogg")
         else:
             await client.send({
                 "type": "speak",
@@ -2184,6 +2215,11 @@ class Server:
         if self._db.approve_user(username):
             admin.speak_l("account-approved", player=username)
 
+            # Notify other admins of the account action
+            self._notify_admins(
+                "account-action", "accountactionnotify.ogg", exclude_username=admin.username
+            )
+
             # Check if the user is online and waiting for approval
             waiting_user = self._users.get(username)
             if waiting_user:
@@ -2194,7 +2230,7 @@ class Server:
                 if waiting_state.get("menu") == "waiting_for_approval":
                     # User is online and waiting - welcome them and show main menu
                     waiting_user.speak_l("account-approved-welcome")
-                    waiting_user.play_sound("welcome.ogg")
+                    waiting_user.play_sound("accountapprove.ogg")
                     self._show_main_menu(waiting_user)
 
         self._show_account_approval_menu(admin)
@@ -2206,6 +2242,11 @@ class Server:
 
         if self._db.delete_user(username):
             admin.speak_l("account-declined", player=username)
+
+            # Notify other admins of the account action
+            self._notify_admins(
+                "account-action", "accountactionnotify.ogg", exclude_username=admin.username
+            )
 
             # If user is online, disconnect them
             if waiting_user:

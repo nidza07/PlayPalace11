@@ -249,5 +249,9 @@ account-declined = { $player }'s account has been declined and deleted.
 
 # Waiting for approval (shown to unapproved users)
 waiting-for-approval = Your account is waiting for approval by an administrator. Please wait...
-account-approved-welcome = Your account has been approved! Welcome to PlayPalace.
+account-approved-welcome = Your account has been approved! Welcome to PlayPalace!
 account-declined-goodbye = Your account request has been declined.
+
+# Admin notifications for account requests
+account-request = account request
+account-action = account action taken
