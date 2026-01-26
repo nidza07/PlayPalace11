@@ -14,24 +14,28 @@ crazyeights-draw = Draw
 crazyeights-pass = Pass
 crazyeights-read-top = Read top card
 crazyeights-read-counts = Read card counts
+crazyeights-deck-count = talię { $count }
 
 crazyeights-new-hand = Round { $round }.
 crazyeights-start-card = { $player } turns up { $card }.
-crazyeights-wild-played = { $player } played a Wild.
+crazyeights-wild-played = { $player } played a Wild 8.
 
 crazyeights-no-players = No players.
 crazyeights-no-top = No top card.
 
-crazyeights-wild = Wild
-crazyeights-wild-suit = Wild, { $suit }
+crazyeights-wild = Wild 8
+crazyeights-wild-suit = Wild 8, { $suit }
 crazyeights-reverse = Reverse of { $suit }
 crazyeights-skip = Skip of { $suit }
 crazyeights-draw-two = Draw Two of { $suit }
 
 crazyeights-suit-chosen = Suit is now { $suit }.
 
+crazyeights-round-summary = { $player } wins. { $details }. { $player } gains { $total }.
+crazyeights-round-details-none = Nie odebrano punktów przeciwników.
 crazyeights-round-winner = { $player } wins { $points } points. { $detail }
 crazyeights-round-points-from = { $points } from { $player }
+crazyeights-dealt-cards = Wszyscy otrzymują { $cards } kart.
 
 crazyeights-game-winner = { $player } wins with { $score } points.
 

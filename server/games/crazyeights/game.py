@@ -18,6 +18,7 @@ from ...users.base import User
 from datetime import datetime
 from .bot import bot_think
 
+SUIT_SORT_ORDER = {1: 0, 2: 1, 3: 2, 4: 3}
 
 TURN_TIMER_CHOICES = ["5", "10", "15", "20", "30", "45", "60", "90", "0"]
 TURN_TIMER_LABELS = {
@@ -351,7 +352,13 @@ class CrazyEightsGame(Game):
         turn_set.remove("pass")
         if self.status != "playing" or player.is_spectator:
             return
-        for card in player.hand:
+        nonwild_cards = sorted(
+            (card for card in player.hand if card.rank != 8),
+            key=lambda c: (SUIT_SORT_ORDER.get(c.suit, 4), -c.rank, c.id),
+        )
+        wild_cards = [card for card in player.hand if card.rank == 8]
+        ordered_cards = nonwild_cards + wild_cards
+        for card in ordered_cards:
             turn_set.add(
                 Action(
                     id=f"play_card_{card.id}",
@@ -466,8 +473,8 @@ class CrazyEightsGame(Game):
         for p in active_players:
             p.hand = []
 
-        # Deal 5 cards to each
-        for _ in range(5):
+        # Deal 7 cards to each
+        for _ in range(7):
             for p in active_players:
                 card = self.deck.draw_one()
                 if card:
@@ -487,6 +494,7 @@ class CrazyEightsGame(Game):
             self.discard_pile.append(start_card)
             self.current_suit = start_card.suit
             self._broadcast_start_card()
+            self.broadcast_l("crazyeights-dealt-cards", cards=7)
         self._start_turn()
 
     def _draw_start_card(self) -> Card | None:
@@ -676,7 +684,7 @@ class CrazyEightsGame(Game):
         self.current_suit = suit
         self.awaiting_wild_suit = False
         self.play_sound("game_crazyeights/morf.ogg")
-        self.schedule_sound(self._suit_sound(suit), delay_ticks=10)
+        self.schedule_sound(self._suit_sound(suit), delay_ticks=15)
         self._broadcast_suit_chosen(suit)
         if p.is_bot:
             BotHelper.jolt_bot(p, ticks=random.randint(20, 30))
@@ -698,13 +706,18 @@ class CrazyEightsGame(Game):
         user = self.get_user(player)
         if not user:
             return
+        locale = user.locale
         parts = []
         for p in self.turn_players:
             if p.is_spectator:
                 continue
             if isinstance(p, CrazyEightsPlayer):
                 parts.append(f"{p.name} {len(p.hand)}")
-        user.speak(", ".join(parts) if parts else Localization.get(user.locale, "crazyeights-no-players"))
+        deck_count = self.deck.size()
+        if deck_count > 0:
+            parts.append(Localization.get(locale, "crazyeights-deck-count", count=deck_count))
+        text = ", ".join(parts) if parts else Localization.get(locale, "crazyeights-no-players")
+        user.speak(text)
 
     def _action_check_turn_timer(self, player: Player, action_id: str) -> None:
         user = self.get_user(player)
@@ -779,8 +792,6 @@ class CrazyEightsGame(Game):
             return "action-not-available"
         if self.turn_has_drawn:
             return "action-not-available"
-        if len(player.hand) >= self.max_hand_size:
-            return "action-not-available"
         if self._has_playable_cards(player):
             return "action-not-available"
         return None
@@ -793,8 +804,6 @@ class CrazyEightsGame(Game):
         if not isinstance(player, CrazyEightsPlayer):
             return Visibility.HIDDEN
         if self.turn_has_drawn:
-            return Visibility.HIDDEN
-        if len(player.hand) >= self.max_hand_size:
             return Visibility.HIDDEN
         if self._has_playable_cards(player):
             return Visibility.HIDDEN
@@ -888,9 +897,7 @@ class CrazyEightsGame(Game):
     # ==========================================================================
 
     def _is_number_card(self, card: Card) -> bool:
-        if card.rank == 8:
-            return False
-        if card.rank in (11, 12, 13):
+        if card.rank in (8,11, 12, 13):
             return False
         return True
 
@@ -1116,7 +1123,7 @@ class CrazyEightsGame(Game):
             user = self.get_user(p)
             if not user:
                 continue
-            parts = [
+            points_parts = [
                 Localization.get(
                     user.locale,
                     "crazyeights-round-points-from",
@@ -1125,12 +1132,16 @@ class CrazyEightsGame(Game):
                 )
                 for opp, score in points_from
             ]
-            detail = ", ".join(parts)
+            details = (
+                Localization.format_list_and(user.locale, points_parts)
+                if points_parts
+                else Localization.get(user.locale, "crazyeights-round-details-none")
+            )
             user.speak_l(
-                "crazyeights-round-winner",
+                "crazyeights-round-summary",
                 player=winner.name,
-                points=total,
-                detail=detail,
+                details=details,
+                total=total,
             )
 
     def _broadcast_start_card(self) -> None:
