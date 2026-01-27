@@ -8,6 +8,7 @@ game-name-ninetynine = Ninety Nine
 game-round-start = Round { $round }.
 game-round-end = Round { $round } complete.
 game-turn-start = { $player }'s turn.
+game-your-turn = Twoja kolej.
 game-no-turn = No one's turn right now.
 
 # Score display

@@ -22,13 +22,17 @@ farkle-take-full-house = 葫芦得 { $points } 分
 
 # 游戏事件（与v10完全匹配）
 farkle-rolls = { $player } 掷 { $count } 个骰子...
+farkle-you-roll = 你掷 { $count } 个骰子...
 farkle-roll-result = { $dice }
 farkle-farkle = 法克尔！{ $player } 失去 { $points } 分
+farkle-you-farkle = 法克尔！你失去 { $points } 分
 farkle-takes-combo = { $player } 拿走 { $combo } 得 { $points } 分
 farkle-you-take-combo = 你拿走 { $combo } 得 { $points } 分
 farkle-hot-dice = 热骰子！
 farkle-banks = { $player } 存入 { $points } 分，总计 { $total }
+farkle-you-bank = 你存入 { $points } 分，总计 { $total }
 farkle-winner = { $player } 以 { $score } 分获胜！
+farkle-you-win = 你以 { $score } 分获胜！
 farkle-winners-tie = 平局！获胜者：{ $players }
 
 # 检查回合得分操作

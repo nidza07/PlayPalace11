@@ -28,13 +28,17 @@ farkle-rolls = { $player } rolls { $count } { $count ->
     [one] die
    *[other] dice
 }...
+farkle-you-roll = Rzucasz { $count } { $count -> [one] kością [other] kośćmi }...
 farkle-roll-result = { $dice }
 farkle-farkle = FARKLE! { $player } loses { $points } points
+farkle-you-farkle = FARKLE! Tracisz { $points } punktów
 farkle-takes-combo = { $player } takes { $combo } for { $points } points
 farkle-you-take-combo = You take { $combo } for { $points } points
 farkle-hot-dice = Hot dice!
 farkle-banks = { $player } banks { $points } points for a total of { $total }
+farkle-you-bank = Bankujesz { $points } punktów (razem { $total })
 farkle-winner = { $player } wins with { $score } points!
+farkle-you-win = Wygrywasz z wynikiem { $score } punktów!
 farkle-winners-tie = We have a tie! Winners: { $players }
 
 # Check turn score action

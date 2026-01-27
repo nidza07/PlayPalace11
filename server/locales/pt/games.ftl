@@ -8,6 +8,7 @@ game-name-ninetynine = Noventa e Nove
 game-round-start = Rodada { $round }.
 game-round-end = Rodada { $round } concluída.
 game-turn-start = Vez de { $player }.
+game-your-turn = Sua vez.
 game-no-turn = Não é a vez de ninguém agora.
 
 # Exibição de pontuação

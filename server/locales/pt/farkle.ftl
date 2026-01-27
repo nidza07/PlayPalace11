@@ -28,13 +28,17 @@ farkle-rolls = { $player } rola { $count } { $count ->
     [one] dado
    *[other] dados
 }...
+farkle-you-roll = Você rola { $count } { $count -> [one] dado [other] dados }...
 farkle-roll-result = { $dice }
 farkle-farkle = FARKLE! { $player } perde { $points } pontos
+farkle-you-farkle = FARKLE! Você perde { $points } pontos
 farkle-takes-combo = { $player } pega { $combo } por { $points } pontos
 farkle-you-take-combo = Você pega { $combo } por { $points } pontos
 farkle-hot-dice = Dados quentes!
 farkle-banks = { $player } banca { $points } pontos para um total de { $total }
+farkle-you-bank = Você banca { $points } pontos para um total de { $total }
 farkle-winner = { $player } vence com { $score } pontos!
+farkle-you-win = Você venceu com { $score } pontos!
 farkle-winners-tie = Temos um empate! Vencedores: { $players }
 
 # Ação de verificar pontuação do turno

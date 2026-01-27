@@ -124,7 +124,11 @@ class TurnManagementMixin:
             user.play_sound(turn_sound)
 
         # Broadcast turn announcement to all players
-        self.broadcast_l("game-turn-start", player=player.name)
+        self.broadcast_personal_l(
+            player,
+            "game-your-turn",
+            "game-turn-start"
+        )
 
     @property
     def turn_players(self) -> list["Player"]:

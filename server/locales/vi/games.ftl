@@ -8,6 +8,7 @@ game-name-ninetynine = Ninety Nine
 game-round-start = Vòng { $round }.
 game-round-end = Vòng { $round } hoàn tất.
 game-turn-start = Lượt của { $player }.
+game-your-turn = Tới lượt bạn.
 game-no-turn = Hiện không phải lượt của ai.
 
 # Hiển thị điểm số

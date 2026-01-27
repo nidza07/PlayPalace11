@@ -28,13 +28,17 @@ farkle-rolls = { $player } gieo { $count } { $count ->
     [one] viên
    *[other] viên
 }...
+farkle-you-roll = Bạn gieo { $count } viên...
 farkle-roll-result = { $dice }
 farkle-farkle = CHÁY ĐIỂM! { $player } mất { $points } điểm
+farkle-you-farkle = CHÁY ĐIỂM! Bạn mất { $points } điểm
 farkle-takes-combo = { $player } lấy { $combo } được { $points } điểm
 farkle-you-take-combo = Bạn lấy { $combo } được { $points } điểm
 farkle-hot-dice = Ăn trọn! (Hot dice)
 farkle-banks = { $player } chốt { $points } điểm, tổng cộng có { $total }
+farkle-you-bank = Bạn chốt { $points } điểm, tổng cộng có { $total }
 farkle-winner = { $player } thắng với { $score } điểm!
+farkle-you-win = Bạn thắng với { $score } điểm!
 farkle-winners-tie = Hòa nhau rồi! Những người thắng: { $players }
 
 # Kiểm tra điểm lượt này

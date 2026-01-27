@@ -8,6 +8,7 @@ game-name-ninetynine = 九十九
 game-round-start = 第 { $round } 回合。
 game-round-end = 第 { $round } 回合结束。
 game-turn-start = 轮到 { $player }。
+game-your-turn = 轮到你了。
 game-no-turn = 现在不是任何人的回合。
 
 # 分数显示
