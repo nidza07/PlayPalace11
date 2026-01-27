@@ -22,6 +22,7 @@ crazyeights-you-turn-up = Bạn lật lên lá { $card }.
 crazyeights-wild-played = { $player } đã đánh một lá Wild 8.
 
 crazyeights-no-players = Không có người chơi.
+crazyeights-no-hands = Không có ván bài nào đang diễn ra.
 crazyeights-no-top = Không có lá bài trên cùng.
 
 crazyeights-wild = Lá Wild 8 (Đổi chất)

@@ -644,7 +644,9 @@ class FarkleGame(Game):
         else:
             num_dice = len(farkle_player.current_roll)
 
-        self.broadcast_l("farkle-rolls", player=player.name, count=num_dice)
+        self.broadcast_personal_l(
+            player, "farkle-you-roll", "farkle-rolls", count=num_dice
+        )
         self.play_sound("game_pig/roll.ogg")
 
         # Jolt bot to pause before next action
@@ -662,8 +664,11 @@ class FarkleGame(Game):
         # Check for farkle
         if not has_scoring_dice(farkle_player.current_roll):
             self.play_sound("game_farkle/farkle.ogg")
-            self.broadcast_l(
-                "farkle-farkle", player=player.name, points=farkle_player.turn_score
+            self.broadcast_personal_l(
+                player,
+                "farkle-you-farkle",
+                "farkle-farkle",
+                points=farkle_player.turn_score
             )
             # Track turn (farkle = 0 points banked)
             farkle_player.turns_taken += 1
@@ -851,9 +856,10 @@ class FarkleGame(Game):
 
         self.play_sound(f"game_farkle/bank{random.randint(1, 3)}.ogg")
 
-        self.broadcast_l(
+        self.broadcast_personal_l(
+            player,
+            "farkle-you-bank",
             "farkle-banks",
-            player=player.name,
             points=farkle_player.turn_score,
             total=farkle_player.score,
         )
@@ -1056,8 +1062,11 @@ class FarkleGame(Game):
             # Single winner
             self.play_sound("game_pig/win.ogg")
             winner_farkle: FarklePlayer = winners[0]  # type: ignore
-            self.broadcast_l(
-                "farkle-winner", player=winners[0].name, score=winner_farkle.score
+            self.broadcast_personal_l(
+                winners[0],
+                "farkle-you-win",
+                "farkle-winner",
+                score=winner_farkle.score
             )
             self.finish_game()
         elif len(winners) > 1:

@@ -315,9 +315,9 @@ class CrazyEightsGame(Game):
         super().setup_keybinds()
         self.define_keybind("space", "Draw", ["draw"], state=KeybindState.ACTIVE)
         self.define_keybind("p", "Pass", ["pass"], state=KeybindState.ACTIVE)
-        self.define_keybind("c", "Read top card", ["read_top"], include_spectators=True)
-        self.define_keybind("e", "Read counts", ["read_counts"], include_spectators=True)
-        self.define_keybind("shift+t", "Turn timer", ["check_turn_timer"], include_spectators=True)
+        self.define_keybind("c", "Read top card", ["read_top"], state=KeybindState.ACTIVE, include_spectators=True)
+        self.define_keybind("e", "Read counts", ["read_counts"], state=KeybindState.ACTIVE, include_spectators=True)
+        self.define_keybind("shift+t", "Turn timer", ["check_turn_timer"], state=KeybindState.ACTIVE, include_spectators=True)
         # Suit selection overrides (keybind only)
         self.define_keybind("c", "Choose clubs", ["suit_clubs"], state=KeybindState.ACTIVE)
         self.define_keybind("d", "Choose diamonds", ["suit_diamonds"], state=KeybindState.ACTIVE)
@@ -603,6 +603,9 @@ class CrazyEightsGame(Game):
         self._play_card_sound(card)
         self._broadcast_play(p, card)
 
+        if len(p.hand) == 1:
+            self.play_sound("game_crazyeights/onecard.ogg")
+
         if card.rank == 8:
             if len(p.hand) == 0:
                 self._end_round(p, last_card=card)
@@ -626,9 +629,6 @@ class CrazyEightsGame(Game):
             return
 
         self._apply_card_effects(card)
-
-        if len(p.hand) == 1:
-            self.play_sound("game_crazyeights/onecard.ogg")
 
         if len(p.hand) == 0:
             self._end_round(p, last_card=card)
@@ -726,7 +726,14 @@ class CrazyEightsGame(Game):
         deck_count = self.deck.size()
         if deck_count > 0:
             parts.append(Localization.get(locale, "crazyeights-deck-count", count=deck_count))
-        text = ", ".join(parts) if parts else Localization.get(locale, "crazyeights-no-players")
+        
+        if parts:
+            text = ", ".join(parts)
+        elif self.players:
+            text = Localization.get(locale, "crazyeights-no-hands")
+        else:
+            text = Localization.get(locale, "crazyeights-no-players")
+        
         user.speak(text)
 
     def _action_check_turn_timer(self, player: Player, action_id: str) -> None:
@@ -773,7 +780,7 @@ class CrazyEightsGame(Game):
         return Visibility.VISIBLE
 
     def _is_play_card_enabled(self, player: Player, *, action_id: str | None = None) -> str | None:
-        if self.awaiting_wild_suit:
+        if self.awaiting_wild_suit and player == self.current_player:
             return "action-not-available"
         return None
 
@@ -859,7 +866,7 @@ class CrazyEightsGame(Game):
         return None
 
     def _is_check_enabled(self, player: Player) -> str | None:
-        if self.status != "playing":
+        if self.status == "waiting":
             return "action-not-playing"
         return None
 
@@ -867,19 +874,23 @@ class CrazyEightsGame(Game):
         return Visibility.HIDDEN
 
     def _is_read_top_enabled(self, player: Player) -> str | None:
-        if self.awaiting_wild_suit:
+        if self.awaiting_wild_suit and player == self.current_player:
             return "action-not-available"
         return self._is_check_enabled(player)
 
     def _is_check_scores_enabled(self, player: Player) -> str | None:
-        if self.awaiting_wild_suit:
+        if self.awaiting_wild_suit and player == self.current_player:
             return "action-not-available"
-        return super()._is_check_scores_enabled(player)
+        if len(self._team_manager.teams) == 0:
+            return "action-no-scores"
+        return None
 
     def _is_check_scores_detailed_enabled(self, player: Player) -> str | None:
-        if self.awaiting_wild_suit:
+        if self.awaiting_wild_suit and player == self.current_player:
             return "action-not-available"
-        return super()._is_check_scores_detailed_enabled(player)
+        if len(self._team_manager.teams) == 0:
+            return "action-no-scores"
+        return None
 
     def _is_suit_choice_hidden(self, player: Player) -> Visibility:
         if not self.awaiting_wild_suit:
@@ -1103,6 +1114,8 @@ class CrazyEightsGame(Game):
 
     def _end_round(self, winner: CrazyEightsPlayer, last_card: Card | None) -> None:
         self._stop_turn_loop()
+        
+        # Calculate scores before clearing hands
         points_from: list[tuple[CrazyEightsPlayer, int]] = []
         total = 0
         for p in self.players:
@@ -1120,15 +1133,21 @@ class CrazyEightsGame(Game):
         self._announce_round_points(winner, points_from, total)
         self._play_round_end_sounds(winner, points_from, total)
 
+        # Clear game state for the wait period
+        self.discard_pile = []
+        self.deck = Deck()
+        self.turn_player_ids = []
+        for p in self.players:
+            if isinstance(p, CrazyEightsPlayer):
+                p.hand = []
+        
+        self.rebuild_all_menus()
+
         if winner.score >= self.options.winning_score:
             self._end_game(winner)
             return
 
         self.hand_wait_ticks = 5 * 20
-        for p in self.players:
-            user = self.get_user(p)
-            if user:
-                user.remove_menu("turn_menu")
 
     def _hand_points(self, hand: list[Card]) -> int:
         total = 0

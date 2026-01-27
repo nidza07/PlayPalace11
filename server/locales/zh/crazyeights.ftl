@@ -22,6 +22,7 @@ crazyeights-you-turn-up = 你翻开了 { $card }。
 crazyeights-wild-played = { $player } played a Wild 8.
 
 crazyeights-no-players = No players.
+crazyeights-no-hands = 没有正在进行的手牌。
 crazyeights-no-top = No top card.
 
 crazyeights-wild = Wild 8

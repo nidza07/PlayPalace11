@@ -22,6 +22,7 @@ crazyeights-you-turn-up = Você vira { $card }.
 crazyeights-wild-played = { $player } played a Wild 8.
 
 crazyeights-no-players = No players.
+crazyeights-no-hands = Nenhuma mão em andamento.
 crazyeights-no-top = No top card.
 
 crazyeights-wild = Wild 8
