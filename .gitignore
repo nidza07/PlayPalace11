@@ -10,3 +10,7 @@ server/playpalace.db
 client/build/
 client/dist/
 client/*.spec
+
+# Test report coverage files
+server/.coverage
+server/coverage-report.txt
