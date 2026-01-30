@@ -1042,9 +1042,9 @@ class MainWindow(wx.Frame):
         # Play connection loop sound
         self.sound_manager.music("connectloop.ogg")
 
-        self.add_history(f"Connecting to {server_url}...")
+        self.add_history(f"Connecting to {server_url}...", "activity")
         if self.network.connect(server_url, username, password):
-            self.add_history(f"Connecting as {username}...")
+            self.add_history(f"Connecting as {username}...", "activity")
 
             # Set a timeout to detect if connection never succeeds
             self.connection_timeout_timer = wx.CallLater(10000, self._check_connection_timeout)
@@ -1216,7 +1216,7 @@ class MainWindow(wx.Frame):
             username = new_credentials.get("username")
             password = new_credentials.get("password", "")
 
-            self.add_history(f"Connecting to {server_url} as {username}...")
+            self.add_history(f"Connecting to {server_url} as {username}...", "activity")
             self.sound_manager.music("connectloop.ogg")
             if self.network.connect(server_url, username, password):
                 # Set connection timeout
@@ -1235,6 +1235,8 @@ class MainWindow(wx.Frame):
         """Handle authorization success from server."""
         self.connected = True
         version = packet.get("version", "unknown")
+        username = packet.get("username") or self.credentials.get("username", "Guest")
+        server_url = self.credentials.get("server_url", "")
 
         # Cancel any pending timeout timer
         if self.connection_timeout_timer:
@@ -1245,7 +1247,16 @@ class MainWindow(wx.Frame):
         self.sound_manager.stop_music(fade=False)
         self.sound_manager.play("welcome.ogg", volume=1.0)
 
-        self.add_history(f"Connected to server version {version}")
+        if server_url:
+            self.add_history(
+                f"Connected to {server_url} as {username} (server {version})",
+                "activity",
+            )
+        else:
+            self.add_history(
+                f"Connected as {username} (server {version})",
+                "activity",
+            )
 
     def on_open_server_options(self, packet):
         """Handle open server options packet from server.
@@ -1262,9 +1273,23 @@ class MainWindow(wx.Frame):
         without requiring the user to open the options dialog.
         """
         self.games_list = packet.get("games", [])
-        self.lang_codes = packet.get("languages", [])
+        languages = packet.get("languages", {})
+        # Server may send list (codes) or dict (code->name). Normalize to dict.
+        if isinstance(languages, list):
+            languages = {code: code for code in languages}
+        self.lang_codes = languages
         if not self.config_manager or not self.server_id:
             return
+
+        # Ensure profile structure exists
+        profiles = self.config_manager.profiles
+        profiles.setdefault("server_options", {})
+        profiles.setdefault("client_options_defaults", {}).setdefault("local_table", {}).setdefault(
+            "creation_notifications", {}
+        )
+        profiles.setdefault("client_options_defaults", {}).setdefault("social", {}).setdefault(
+            "language_subscriptions", {}
+        )
 
         updated = False
 
@@ -1272,9 +1297,9 @@ class MainWindow(wx.Frame):
         # Update games in both default profile and server profile
         if self.games_list:
             # Update default profile
-            default_local_table = self.config_manager.profiles[
-                "client_options_defaults"
-            ].setdefault("local_table", {})
+            default_local_table = profiles["client_options_defaults"].setdefault(
+                "local_table", {}
+            )
             default_creation_notifications = default_local_table.setdefault("creation_notifications", {})
             for game_info in self.games_list:
                 game_name = game_info["name"]
@@ -1283,10 +1308,9 @@ class MainWindow(wx.Frame):
                     updated = True
 
             # Update server profile
-            if self.server_id in self.config_manager.profiles["servers"]:
-                server_overrides = self.config_manager.profiles["servers"][
-                    self.server_id
-                ].setdefault("options_overrides", {})
+            server_profiles = profiles.get("server_options", {})
+            if self.server_id in server_profiles:
+                server_overrides = server_profiles[self.server_id].setdefault("options_overrides", {})
                 server_local_table = server_overrides.setdefault("local_table", {})
                 server_creation_notifications = server_local_table.setdefault(
                     "creation_notifications", {}
@@ -1301,9 +1325,7 @@ class MainWindow(wx.Frame):
         # Rebuild dicts to match server order (alphabetical ascending)
         if languages:
             # Update default profile - rebuild to match server order
-            default_social = self.config_manager.profiles[
-                "client_options_defaults"
-            ].setdefault("social", {})
+            default_social = profiles["client_options_defaults"].setdefault("social", {})
             default_lang_subscriptions = default_social.get(
                 "language_subscriptions", {}
             )
@@ -1317,10 +1339,9 @@ class MainWindow(wx.Frame):
                 updated = True
 
             # Update server profile - rebuild to match server order
-            if self.server_id in self.config_manager.profiles["servers"]:
-                server_overrides = self.config_manager.profiles["servers"][
-                    self.server_id
-                ].setdefault("options_overrides", {})
+            server_profiles = profiles.get("server_options", {})
+            if self.server_id in server_profiles:
+                server_overrides = server_profiles[self.server_id].setdefault("options_overrides", {})
                 social_overrides = server_overrides.setdefault("social", {})
                 lang_subscriptions = social_overrides.get(
                     "language_subscriptions", {}
@@ -1427,13 +1448,10 @@ class MainWindow(wx.Frame):
                 if not self.client_options["social"]["language_subscriptions"][lang]:
                     return
         end this comment"""
-        message = (
-            packet.get("sender")
-            + " says "
-            + ("globally" if convo == "global" else "")
-            + ": "
-            + packet.get("message")
-        )
+        if convo == "global":
+            message = f"{packet.get('sender')} globally: {packet.get('message')}"
+        else:
+            message = f"{packet.get('sender')}: {packet.get('message')}"
         # Convo doesn't support muting, or the mute flag is disabled
         if True:
             """(

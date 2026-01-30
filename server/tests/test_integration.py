@@ -191,6 +191,22 @@ class TestTableManagerIntegration:
         waiting_all = manager.get_waiting_tables()
         assert len(waiting_all) == 3
 
+    def test_table_destroyed_when_empty(self):
+        """Removing the last member should destroy the table."""
+        manager = TableManager()
+        host = MockUser("host")
+        table = manager.create_table("pig", "host", host)
+        table.remove_member("host")
+        assert manager.get_table(table.table_id) is None
+
+    def test_manager_tick_removes_empty_table(self):
+        """Manager tick should remove tables with no members."""
+        manager = TableManager()
+        table = Table(table_id="empty", game_type="pig", host="host")
+        manager.add_table(table)
+        manager.on_tick()
+        assert manager.get_table("empty") is None
+
 
 class TestGameRegistryIntegration:
     """Test game registry."""

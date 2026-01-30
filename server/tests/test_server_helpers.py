@@ -93,7 +93,6 @@ def test_broadcast_helpers_respect_approval(server):
     assert unapproved.sounds == []
 
 
-@pytest.mark.slow
 def test_on_client_disconnect_broadcasts_only_for_approved(server):
     approved = DummyNetworkUser(approved=True)
     banned = DummyNetworkUser(approved=True)
@@ -110,6 +109,78 @@ def test_on_client_disconnect_broadcasts_only_for_approved(server):
     assert server._users == {"bob": banned}
     assert server._user_states == {"bob": {}}
     assert approved.sounds[-1] == "offlineadmin.ogg"
+
+
+def test_on_client_disconnect_keeps_members_when_not_last(server):
+    user = DummyNetworkUser(approved=True)
+    user.uuid = "user-1"
+    user.trust_level = type("T", (), {"value": 1})()
+    server._users = {"alice": user}
+    server._user_states = {"alice": {}}
+
+    class DummyGame:
+        def __init__(self, player_id):
+            self.player_id = player_id
+            self.called = False
+
+        def get_player_by_id(self, player_id):
+            return SimpleNamespace(id=player_id) if player_id == self.player_id else None
+
+        def _perform_leave_game(self, player):
+            self.called = True
+
+    members = [SimpleNamespace(username="alice"), SimpleNamespace(username="bob")]
+    table = SimpleNamespace(
+        members=members,
+        game=DummyGame(user.uuid),
+        remove_member=lambda username: members.__setitem__(
+            slice(None), [m for m in members if m.username != username]
+        ),
+    )
+    server._tables = SimpleNamespace(find_user_table=lambda username: table)
+
+    client = SimpleNamespace(username="alice", address="addr")
+    server._on_client_disconnect = Server._on_client_disconnect.__get__(server, Server)
+    asyncio.run(server._on_client_disconnect(client))
+
+    assert table.game.called
+    assert [m.username for m in members] == ["alice", "bob"]
+
+
+def test_on_client_disconnect_removes_last_member(server):
+    user = DummyNetworkUser(approved=True)
+    user.uuid = "user-1"
+    user.trust_level = type("T", (), {"value": 1})()
+    server._users = {"alice": user}
+    server._user_states = {"alice": {}}
+
+    class DummyGame:
+        def __init__(self, player_id):
+            self.player_id = player_id
+            self.called = False
+
+        def get_player_by_id(self, player_id):
+            return SimpleNamespace(id=player_id) if player_id == self.player_id else None
+
+        def _perform_leave_game(self, player):
+            self.called = True
+
+    members = [SimpleNamespace(username="alice")]
+    table = SimpleNamespace(
+        members=members,
+        game=DummyGame(user.uuid),
+        remove_member=lambda username: members.__setitem__(
+            slice(None), [m for m in members if m.username != username]
+        ),
+    )
+    server._tables = SimpleNamespace(find_user_table=lambda username: table)
+
+    client = SimpleNamespace(username="alice", address="addr")
+    server._on_client_disconnect = Server._on_client_disconnect.__get__(server, Server)
+    asyncio.run(server._on_client_disconnect(client))
+
+    assert table.game.called
+    assert members == []
 
 
 @pytest.mark.slow
