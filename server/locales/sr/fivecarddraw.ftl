@@ -6,9 +6,9 @@ draw-set-starting-chips = Početni žetoni: { $count }
 draw-enter-starting-chips = Upišite početne žetone
 draw-option-changed-starting-chips = Početni žetoni podešeni na { $count }.
 
-draw-set-ante = Ante: { $count }
-draw-enter-ante = Upišite ante količinu
-draw-option-changed-ante = Ante podešen na { $count }.
+draw-set-ante = Minimalni ulog: { $count }
+draw-enter-ante = Upišite količinu minimalnog uloga
+draw-option-changed-ante = Minimalni ulog podešen na { $count }.
 
 draw-set-turn-timer = Tajmer za potez: { $mode }
 draw-select-turn-timer = Izaberite tajmer za potez
@@ -22,7 +22,7 @@ draw-set-max-raises = Maksimum povećavanja uloga: { $count }
 draw-enter-max-raises = Upišite maksimum povećavanja uloga (0 za neograničeno)
 draw-option-changed-max-raises = Maksimum povećavanja uloga podešen na { $count }.
 
-draw-antes-posted = Anteovi podešeni: { $amount }.
+draw-antes-posted = Minimalan ulog: { $amount }.
 draw-betting-round-1 = Runda ulaganja.
 draw-betting-round-2 = Runda ulaganja.
 draw-begin-draw = Faza izvlačenja.
@@ -30,8 +30,8 @@ draw-not-draw-phase = Nije vreme za izvlačenje.
 draw-not-betting = Ne možete da ulažete tokom faze izvlačenja.
 
 draw-toggle-discard = Odbaci ili zadrži kartu { $index }
-draw-card-keep = Zadrži { $card }
-draw-card-discard = Odbaci { $card }
+draw-card-keep = { $card }, zadržava se
+draw-card-discard = { $card }, odbacuje se
 draw-card-kept = Zadrži { $card }.
 draw-card-discarded = Odbaci { $card }.
 draw-draw-cards = Izvuci karte
