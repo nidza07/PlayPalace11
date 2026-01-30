@@ -1042,11 +1042,7 @@ class Server(AdministrationMixin):
             game_type = selection_id[5:]  # Remove "game_" prefix
             self._show_tables_menu(user, game_type)
         elif selection_id == "back":
-            category = state.get("category")
-            if category:
-                self._show_games_menu(user, category)
-            else:
-                self._show_categories_menu(user)
+            self._show_categories_menu(user)
 
     async def _handle_tables_selection(
         self, user: NetworkUser, selection_id: str, state: dict
@@ -2403,13 +2399,10 @@ class Server(AdministrationMixin):
         message = packet.get("message", "")
         language = packet.get("language", "Other")
 
-        chat_text = (
-            username
-            + " says "
-            + ("globally" if convo == "global" else "")
-            + ": "
-            + message
-        )
+        if convo == "global":
+            chat_text = f"{username} globally: {message}"
+        else:
+            chat_text = f"{username}: {message}"
         chat_sound = "chatlocal.ogg" if convo == "local" else "chat.ogg"
 
         if convo == "local":

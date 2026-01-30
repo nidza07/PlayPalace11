@@ -228,6 +228,7 @@ class NetworkManager:
         elif packet_type == "table_create":
             self.main_window.on_table_create(packet)
         elif packet_type == "chat":
-            self.main_window.on_receive_chat(packet)
+            # Chat is delivered via speak packets; ignore legacy chat packets.
+            return
         elif packet_type == "pong":
             self.main_window.on_server_pong(packet)
