@@ -35,6 +35,12 @@ markers = [
     "slow: marks tests that require --runslow to execute",
 ]
 
+filterwarnings = [
+    "ignore:.*arguments.__init__ got an unexpected keyword argument 'lineno'.*:DeprecationWarning:fluent_compiler",
+    "ignore:.*arguments.__init__ got an unexpected keyword argument 'col_offset'.*:DeprecationWarning:fluent_compiler",
+    "ignore:.*If.__init__ missing 1 required positional argument.*:DeprecationWarning:fluent_compiler",
+    "ignore:.*Module.__init__ got an unexpected keyword argument.*:DeprecationWarning:fluent_compiler",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
