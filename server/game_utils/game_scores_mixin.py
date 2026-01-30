@@ -36,12 +36,8 @@ class GameScoresMixin:
         user = self.get_user(player)
         if not user:
             return
-        if getattr(self, "_table", None) and self._table.members:
-            players = [m.username for m in self._table.members if not m.is_spectator]
-            spectators = [m.username for m in self._table.members if m.is_spectator]
-        else:
-            players = [p.name for p in self.players if not p.is_spectator]
-            spectators = [p.name for p in self.players if p.is_spectator]
+        players = [p.name for p in self.players if not p.is_spectator]
+        spectators = [p.name for p in self.players if p.is_spectator]
         count = len(players)
         if count == 0:
             user.speak_l("table-no-players")
