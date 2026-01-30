@@ -313,12 +313,22 @@ class Database:
         )
         self._conn.commit()
 
-    def get_pending_users(self) -> list[UserRecord]:
-        """Get all users who are not yet approved."""
+    def get_pending_users(self, exclude_banned: bool = True) -> list[UserRecord]:
+        """Get all users who are not yet approved.
+
+        Args:
+            exclude_banned: If True (default), excludes banned users from the results.
+        """
         cursor = self._conn.cursor()
-        cursor.execute(
-            "SELECT id, username, password_hash, uuid, locale, preferences_json, trust_level, approved FROM users WHERE approved = 0"
-        )
+        if exclude_banned:
+            cursor.execute(
+                "SELECT id, username, password_hash, uuid, locale, preferences_json, trust_level, approved FROM users WHERE approved = 0 AND trust_level > ?",
+                (TrustLevel.BANNED.value,),
+            )
+        else:
+            cursor.execute(
+                "SELECT id, username, password_hash, uuid, locale, preferences_json, trust_level, approved FROM users WHERE approved = 0"
+            )
         users = []
         for row in cursor.fetchall():
             trust_level_int = row["trust_level"] if row["trust_level"] is not None else 1
