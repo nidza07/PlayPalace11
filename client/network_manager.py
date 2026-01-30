@@ -3,10 +3,21 @@
 import asyncio
 import json
 import threading
+import hashlib
+from urllib.parse import urlparse
+
 import wx
 import websockets
 import ssl
 from websockets.asyncio.client import connect
+
+from certificate_prompt import CertificatePromptDialog, CertificateInfo
+
+
+class TLSUserDeclinedError(Exception):
+    """Raised when the user declines to trust a presented TLS certificate."""
+
+    pass
 
 
 class NetworkManager:
@@ -26,6 +37,8 @@ class NetworkManager:
         self.thread = None
         self.loop = None
         self.should_stop = False
+        self.server_url = None
+        self.server_id = None
 
     def connect(self, server_url, username, password):
         """
@@ -45,6 +58,8 @@ class NetworkManager:
 
             self.username = username
             self.should_stop = False
+            self.server_url = server_url
+            self.server_id = getattr(self.main_window, "server_id", None)
 
             # Start async thread
             self.thread = threading.Thread(
@@ -81,46 +96,29 @@ class NetworkManager:
 
     async def _connect_and_listen(self, server_url, username, password):
         """Connect to server and listen for messages."""
+        websocket = None
         try:
-            # Create SSL context that allows self-signed certificates
-            ssl_context = None
-            if server_url.startswith("wss://"):
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
+            websocket = await self._open_connection(server_url)
+            self.ws = websocket
+            self.connected = True
 
-            async with connect(server_url, ssl=ssl_context) as websocket:
-                self.ws = websocket
-                self.connected = True
+            await self._send_authorize(websocket, username, password)
 
-                # Send authorization packet
-                await websocket.send(
-                    json.dumps(
-                        {
-                            "type": "authorize",
-                            "username": username,
-                            "password": password,
-                            "major": 11,
-                            "minor": 0,
-                            "patch": 0,
-                        }
-                    )
-                )
-
-                # Listen for messages
-                while not self.should_stop:
-                    try:
-                        message = await asyncio.wait_for(websocket.recv(), timeout=1.0)
-                        packet = json.loads(message)
-
-                        # Forward to main thread
-                        wx.CallAfter(self._handle_packet, packet)
-                    except asyncio.TimeoutError:
-                        # Timeout is normal, just continue
-                        continue
-                    except websockets.exceptions.ConnectionClosed:
-                        break
-
+            while not self.should_stop:
+                try:
+                    message = await asyncio.wait_for(websocket.recv(), timeout=1.0)
+                    packet = json.loads(message)
+                    wx.CallAfter(self._handle_packet, packet)
+                except asyncio.TimeoutError:
+                    continue
+                except websockets.exceptions.ConnectionClosed:
+                    break
+        except TLSUserDeclinedError:
+            wx.CallAfter(
+                self.main_window.add_history,
+                "TLS certificate was not trusted; connection aborted.",
+                "activity",
+            )
         except Exception:
             import traceback
 
@@ -128,10 +126,223 @@ class NetworkManager:
         finally:
             self.connected = False
             self.ws = None
-            # Only call on_connection_lost if we're not in the middle of stopping
-            # (to avoid race conditions during reconnection)
+            if websocket:
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
             if not self.should_stop:
                 wx.CallAfter(self.main_window.on_connection_lost)
+
+    async def _send_authorize(self, websocket, username, password):
+        """Send the authorize packet after connecting."""
+        await websocket.send(
+            json.dumps(
+                {
+                    "type": "authorize",
+                    "username": username,
+                    "password": password,
+                    "major": 11,
+                    "minor": 0,
+                    "patch": 0,
+                }
+            )
+        )
+
+    async def _open_connection(self, server_url: str):
+        """Open a websocket connection, handling TLS verification."""
+        if not server_url.startswith("wss://"):
+            return await connect(server_url)
+
+        try:
+            websocket = await connect(server_url, ssl=self._build_default_ssl_context())
+            await self._verify_pinned_certificate(websocket, server_url)
+            return websocket
+        except ssl.SSLCertVerificationError:
+            websocket = await self._handle_tls_failure(server_url)
+            if websocket:
+                return websocket
+            raise
+
+    def _build_default_ssl_context(self) -> ssl.SSLContext:
+        context = ssl.create_default_context()
+        context.check_hostname = True
+        context.verify_mode = ssl.CERT_REQUIRED
+        return context
+
+    async def _handle_tls_failure(self, server_url: str):
+        """Recover from TLS verification failure (self-signed certs)."""
+        trust_entry = self._get_trusted_certificate_entry()
+        if trust_entry:
+            return await self._connect_with_trusted_certificate(server_url, trust_entry)
+
+        cert_info = await self._fetch_certificate_info(server_url)
+        if not cert_info:
+            return None
+
+        if not self._prompt_trust_decision(cert_info):
+            raise TLSUserDeclinedError("User declined to trust the certificate.")
+
+        self._store_trusted_certificate(cert_info)
+        trust_entry = self._get_trusted_certificate_entry()
+        if not trust_entry:
+            raise TLSUserDeclinedError("Unable to store trusted certificate.")
+        return await self._connect_with_trusted_certificate(server_url, trust_entry)
+
+    async def _connect_with_trusted_certificate(
+        self, server_url: str, trust_entry: dict
+    ):
+        """Connect using a stored certificate fingerprint (TOFU)."""
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+        websocket = await connect(server_url, ssl=context)
+        await self._verify_pinned_certificate(websocket, server_url, trust_entry)
+        return websocket
+
+    async def _verify_pinned_certificate(
+        self,
+        websocket: websockets.WebSocketClientProtocol,
+        server_url: str,
+        trust_entry: dict | None = None,
+    ):
+        """Compare presented certificate fingerprint with stored metadata."""
+        entry = trust_entry or self._get_trusted_certificate_entry()
+        if not entry:
+            return
+
+        fingerprint_hex, _, _ = self._extract_peer_certificate(websocket)
+        if not fingerprint_hex:
+            raise ssl.SSLError("Unable to read peer certificate.")
+
+        expected = entry.get("fingerprint", "").upper()
+        if expected != fingerprint_hex.upper():
+            await websocket.close()
+            raise ssl.SSLError("Trusted certificate fingerprint mismatch.")
+
+    async def _fetch_certificate_info(self, server_url: str) -> CertificateInfo | None:
+        """Retrieve certificate information without enforcing trust."""
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+        websocket = None
+        try:
+            websocket = await connect(server_url, ssl=context)
+            fingerprint_hex, cert_dict, pem = self._extract_peer_certificate(websocket)
+            if not fingerprint_hex or not cert_dict or not pem:
+                return None
+            host = self._get_server_host(server_url)
+            return self._build_certificate_info(cert_dict, fingerprint_hex, pem, host)
+        except Exception:
+            return None
+        finally:
+            if websocket:
+                try:
+                    await websocket.close()
+                except Exception:
+                    pass
+
+    def _prompt_trust_decision(self, cert_info: CertificateInfo) -> bool:
+        """Show the trust dialog on the main thread."""
+        decision = {"trust": False}
+        done = threading.Event()
+
+        def _show_dialog():
+            dlg = CertificatePromptDialog(self.main_window, cert_info)
+            result = dlg.ShowModal()
+            dlg.Destroy()
+            decision["trust"] = result == wx.ID_OK
+            done.set()
+
+        wx.CallAfter(_show_dialog)
+        done.wait()
+        return decision["trust"]
+
+    def _store_trusted_certificate(self, cert_info: CertificateInfo) -> None:
+        """Persist the trusted certificate metadata via ConfigManager."""
+        manager = getattr(self.main_window, "config_manager", None)
+        server_id = getattr(self.main_window, "server_id", None)
+        if not manager or not server_id:
+            return
+        manager.set_trusted_certificate(
+            server_id,
+            {
+                "fingerprint": cert_info.fingerprint_hex,
+                "pem": cert_info.pem,
+                "host": cert_info.host,
+                "common_name": cert_info.common_name,
+            },
+        )
+
+    def _get_trusted_certificate_entry(self) -> dict | None:
+        manager = getattr(self.main_window, "config_manager", None)
+        server_id = getattr(self.main_window, "server_id", None)
+        if not manager or not server_id:
+            return None
+        return manager.get_trusted_certificate(server_id)
+
+    def _extract_peer_certificate(self, websocket):
+        """Return (hex fingerprint, decoded cert dict, PEM)."""
+        if not websocket or not websocket.transport:
+            return None, None, None
+        ssl_obj = websocket.transport.get_extra_info("ssl_object")
+        if not ssl_obj:
+            return None, None, None
+        der_bytes = ssl_obj.getpeercert(binary_form=True)
+        cert_dict = ssl_obj.getpeercert()
+        if not der_bytes or cert_dict is None:
+            return None, cert_dict, None
+        fingerprint_hex = hashlib.sha256(der_bytes).hexdigest().upper()
+        pem = ssl.DER_cert_to_PEM_cert(der_bytes)
+        return fingerprint_hex, cert_dict, pem
+
+    def _build_certificate_info(
+        self, cert_dict, fingerprint_hex: str, pem: str, host: str
+    ) -> CertificateInfo:
+        """Convert Python's SSL cert dict into CertificateInfo."""
+        subject = cert_dict.get("subject", [])
+        common_name = ""
+        for entry in subject:
+            for key, value in entry:
+                if key == "commonName":
+                    common_name = value
+        issuer = []
+        for entry in cert_dict.get("issuer", []):
+            issuer.append("=".join(entry_part[1] for entry_part in entry))
+        issuer_text = ", ".join(issuer) if issuer else "(unknown)"
+        sans = [
+            value for kind, value in cert_dict.get("subjectAltName", []) if kind == "DNS"
+        ]
+        matches = False
+        host_lower = (host or "").lower()
+        if host_lower:
+            if common_name.lower() == host_lower:
+                matches = True
+            elif any(san.lower() == host_lower for san in sans):
+                matches = True
+        display_fp = ":".join(
+            fingerprint_hex[i : i + 2] for i in range(0, len(fingerprint_hex), 2)
+        )
+        return CertificateInfo(
+            host=host,
+            common_name=common_name,
+            sans=sans,
+            issuer=issuer_text,
+            valid_from=cert_dict.get("notBefore", ""),
+            valid_to=cert_dict.get("notAfter", ""),
+            fingerprint=display_fp,
+            fingerprint_hex=fingerprint_hex,
+            pem=pem,
+            matches_host=matches,
+        )
+
+    def _get_server_host(self, server_url: str) -> str:
+        try:
+            return urlparse(server_url).hostname or ""
+        except Exception:
+            return ""
 
     def disconnect(self, wait=False, timeout=3.0):
         """

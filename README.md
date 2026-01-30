@@ -71,6 +71,10 @@ The client requires wxPython and a few other dependencies from v10.
 The client supports both `ws://` and `wss://` connections. When connecting to a server with SSL enabled, enter the server address with the `wss://` prefix (e.g., `wss://example.com`). The client will handle SSL certificate validation automatically.
 Use the **Server Manager** button on the login screen to add/edit servers (name, host, port, notes) and manage saved accounts for each server. You can add `localhost` for local testing.
 
+#### TLS Verification
+
+PlayPalace now enforces TLS hostname and certificate verification for all `wss://` connections. When the server presents an unknown or self-signed certificate, the client shows the certificate details (CN, SANs, issuer, validity window, and SHA-256 fingerprint) and lets you explicitly trust it. Trusted certificates are pinned per server entry—subsequent connections will only succeed if the fingerprint matches, and you can remove a stored certificate from the Server Manager dialog at any time.
+
 ## Project Structure
 
 The server and client are separate codebases with different philosophies.
