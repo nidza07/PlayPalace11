@@ -75,8 +75,16 @@ class AdministrationMixin:
                 text=Localization.get(user.locale, "account-approval"),
                 id="account_approval",
             ),
+            MenuItem(
+                text=Localization.get(user.locale, "ban-user"),
+                id="ban_user",
+            ),
+            MenuItem(
+                text=Localization.get(user.locale, "unban-user"),
+                id="unban_user",
+            ),
         ]
-        # Only server owners can promote/demote admins, transfer ownership, ban/unban, and manage virtual bots
+        # Only server owners can promote/demote admins, manage virtual bots, and transfer ownership
         if user.trust_level.value >= TrustLevel.SERVER_OWNER.value:
             items.append(
                 MenuItem(
@@ -92,26 +100,14 @@ class AdministrationMixin:
             )
             items.append(
                 MenuItem(
-                    text=Localization.get(user.locale, "transfer-ownership"),
-                    id="transfer_ownership",
-                )
-            )
-            items.append(
-                MenuItem(
-                    text=Localization.get(user.locale, "ban-user"),
-                    id="ban_user",
-                )
-            )
-            items.append(
-                MenuItem(
-                    text=Localization.get(user.locale, "unban-user"),
-                    id="unban_user",
-                )
-            )
-            items.append(
-                MenuItem(
                     text=Localization.get(user.locale, "virtual-bots"),
                     id="virtual_bots",
+                )
+            )
+            items.append(
+                MenuItem(
+                    text=Localization.get(user.locale, "transfer-ownership"),
+                    id="transfer_ownership",
                 )
             )
         items.append(MenuItem(text=Localization.get(user.locale, "back"), id="back"))
@@ -733,30 +729,30 @@ class AdministrationMixin:
             self._show_unban_user_menu(user)
 
     async def _handle_ban_reason_editbox(
-        self, owner: NetworkUser, text: str, state: dict
+        self, admin: NetworkUser, text: str, state: dict
     ) -> None:
         """Handle ban reason editbox submission."""
         target_username = state.get("target_username")
         broadcast_scope = state.get("broadcast_scope", "nobody")
         if not target_username:
-            self._show_ban_user_menu(owner)
+            self._show_ban_user_menu(admin)
             return
 
         # Proceed with ban, passing the reason and broadcast scope
-        await self._ban_user(owner, target_username, reason=text, broadcast_scope=broadcast_scope)
+        await self._ban_user(admin, target_username, reason=text, broadcast_scope=broadcast_scope)
 
     async def _handle_unban_reason_editbox(
-        self, owner: NetworkUser, text: str, state: dict
+        self, admin: NetworkUser, text: str, state: dict
     ) -> None:
         """Handle unban reason editbox submission."""
         target_username = state.get("target_username")
         broadcast_scope = state.get("broadcast_scope", "nobody")
         if not target_username:
-            self._show_unban_user_menu(owner)
+            self._show_unban_user_menu(admin)
             return
 
         # Proceed with unban, passing the reason and broadcast scope
-        await self._unban_user(owner, target_username, reason=text, broadcast_scope=broadcast_scope)
+        await self._unban_user(admin, target_username, reason=text, broadcast_scope=broadcast_scope)
 
     async def _handle_virtual_bots_selection(
         self, user: NetworkUser, selection_id: str
@@ -978,11 +974,11 @@ class AdministrationMixin:
 
         self._show_admin_menu(owner)
 
-    @require_server_owner
+    @require_admin
     async def _ban_user(
-        self, owner: NetworkUser, username: str, reason: str = "", broadcast_scope: str = "nobody"
+        self, admin: NetworkUser, username: str, reason: str = "", broadcast_scope: str = "nobody"
     ) -> None:
-        """Ban a user. Only server owner can do this."""
+        """Ban a user. Admins and server owner can do this."""
         # Check if the user is online first
         target_user = self._users.get(username)
 
@@ -991,9 +987,9 @@ class AdministrationMixin:
 
         # Broadcast the ban announcement based on scope
         if broadcast_scope == "nobody":
-            # Silent mode - only notify the server owner who performed the action
-            owner.speak_l("user-banned", player=username)
-            owner.play_sound("accountban.ogg")
+            # Silent mode - only notify the admin who performed the action
+            admin.speak_l("user-banned", player=username)
+            admin.play_sound("accountban.ogg")
         else:
             # Broadcast to all or admins
             self._broadcast_admin_change(
@@ -1026,13 +1022,13 @@ class AdministrationMixin:
                 "show_message": True,
             })
 
-        self._show_ban_user_menu(owner)
+        self._show_ban_user_menu(admin)
 
-    @require_server_owner
+    @require_admin
     async def _unban_user(
-        self, owner: NetworkUser, username: str, reason: str = "", broadcast_scope: str = "nobody"
+        self, admin: NetworkUser, username: str, reason: str = "", broadcast_scope: str = "nobody"
     ) -> None:
-        """Unban a user. Only server owner can do this."""
+        """Unban a user. Admins and server owner can do this."""
         # Update trust level in database to USER
         self._db.update_user_trust_level(username, TrustLevel.USER)
 
@@ -1041,9 +1037,9 @@ class AdministrationMixin:
 
         # Broadcast the unban announcement based on scope
         if broadcast_scope == "nobody":
-            # Silent mode - only notify the server owner who performed the action
-            owner.speak_l("user-unbanned", player=username)
-            owner.play_sound("accountapprove.ogg")
+            # Silent mode - only notify the admin who performed the action
+            admin.speak_l("user-unbanned", player=username)
+            admin.play_sound("accountapprove.ogg")
         else:
             # Broadcast to all or admins
             self._broadcast_admin_change(
@@ -1053,7 +1049,7 @@ class AdministrationMixin:
                 broadcast_scope,
             )
 
-        self._show_unban_user_menu(owner)
+        self._show_unban_user_menu(admin)
 
     # ==================== Virtual Bot Actions ====================
 

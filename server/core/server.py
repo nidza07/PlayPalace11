@@ -374,6 +374,13 @@ class Server(AdministrationMixin):
         elif trust_level.value >= TrustLevel.ADMIN.value:
             self._broadcast_admin_announcement(username)
 
+        # Notify admin of pending account approvals (excluding banned users)
+        if trust_level.value >= TrustLevel.ADMIN.value:
+            pending_users = self._db.get_pending_users(exclude_banned=True)
+            if pending_users:
+                user.speak_l("account-request")
+                user.play_sound("accountrequest.ogg")
+
         # Check if user is in a table
         table = self._tables.find_user_table(username)
 
