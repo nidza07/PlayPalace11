@@ -2981,7 +2981,9 @@ async def run_server(
         try:
             database = Database(str(db_path))
             database.connect()
-            needs_owner = database.get_user_count() == 0
+            user_count = database.get_user_count()
+            owner = database.get_server_owner()
+            needs_owner = user_count == 0 or owner is None
             database.close()
         except Exception as exc:
             print(f"ERROR: Failed to open database '{db_path}': {exc}", file=sys.stderr)
