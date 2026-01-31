@@ -2963,9 +2963,11 @@ async def run_server(
             raise SystemExit(1) from exc
         print(f"Created '{config_path}' from '{example_path}'.")
 
+        db_created = False
         if not db_path.exists():
             from server.cli import bootstrap_owner
 
+            db_created = True
             while True:
                 username = input("Server owner username: ").strip()
                 if username:
@@ -2993,6 +2995,8 @@ async def run_server(
             except RuntimeError as exc:
                 print(f"ERROR: {exc}", file=sys.stderr)
                 raise SystemExit(1) from exc
+            if db_created:
+                print(f"Created database at '{db_path}'.")
 
         print(
             "Review server/config.toml before running in production. "
