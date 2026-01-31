@@ -121,8 +121,15 @@ class Server(AdministrationMixin):
 
         # Initialize localization
         if locales_dir is None:
-            locales_dir = _DEFAULT_LOCALES_DIR
-        Localization.init(Path(locales_dir))
+            resolved_locales = _DEFAULT_LOCALES_DIR
+        else:
+            provided_locales = Path(locales_dir)
+            if not provided_locales.is_absolute():
+                candidate = _MODULE_DIR / provided_locales
+                if candidate.exists():
+                    provided_locales = candidate
+            resolved_locales = provided_locales
+        Localization.init(resolved_locales)
         Localization.preload_bundles()
 
     async def start(self) -> None:
