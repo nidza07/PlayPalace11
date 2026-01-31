@@ -1,5 +1,6 @@
 """Server manager dialogs for managing servers and user accounts."""
 
+import re
 import wx
 import sys
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 # Add parent directory to path to import config_manager
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config_manager import ConfigManager
+from constants import DEFAULT_CREDENTIAL_HINT
 
 
 class AccountEditorDialog(wx.Dialog):
@@ -28,7 +30,7 @@ class AccountEditorDialog(wx.Dialog):
             account_id: Account ID to edit, or None to create new account
         """
         title = "Edit Account" if account_id else "Add Account"
-        super().__init__(parent, title=title, size=(400, 280))
+        super().__init__(parent, title=title, size=(400, 330))
 
         self.config_manager = config_manager
         self.server_id = server_id
@@ -64,14 +66,38 @@ class AccountEditorDialog(wx.Dialog):
         password_label = wx.StaticText(panel, label="&Password:")
         sizer.Add(password_label, 0, wx.LEFT | wx.TOP, 10)
 
+        password_sizer = wx.BoxSizer(wx.HORIZONTAL)
         password_value = ""
         if self.account_data:
             password_value = self.account_data.get("password", "")
+
+        # Create both masked and plain text controls for password
         self.password_input = wx.TextCtrl(panel, value=password_value, style=wx.TE_PASSWORD)
-        sizer.Add(self.password_input, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        self.password_input.SetName("Password")
+        self.password_plain = wx.TextCtrl(panel, value=password_value)
+        self.password_plain.SetName("Password")
+        self.password_plain.Hide()
+
+        password_sizer.Add(self.password_input, 1, wx.RIGHT, 5)
+        password_sizer.Add(self.password_plain, 1, wx.RIGHT, 5)
+
+        self.show_password_btn = wx.Button(panel, label="&Show Password")
+        password_sizer.Add(self.show_password_btn, 0)
+
+        sizer.Add(password_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+
+        # Email
+        email_label = wx.StaticText(panel, label="&Email:")
+        sizer.Add(email_label, 0, wx.LEFT | wx.TOP, 10)
+
+        email_value = ""
+        if self.account_data:
+            email_value = self.account_data.get("email", "")
+        self.email_input = wx.TextCtrl(panel, value=email_value)
+        sizer.Add(self.email_input, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
 
         # Notes
-        notes_label = wx.StaticText(panel, label="&Notes:")
+        notes_label = wx.StaticText(panel, label="N&otes:")
         sizer.Add(notes_label, 0, wx.LEFT | wx.TOP, 10)
 
         notes_value = ""
@@ -85,6 +111,9 @@ class AccountEditorDialog(wx.Dialog):
         # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
+        credential_policy_btn = wx.Button(panel, label="Default Credential &Policy")
+        button_sizer.Add(credential_policy_btn, 0, wx.RIGHT, 5)
+
         close_btn = wx.Button(panel, wx.ID_CANCEL, "&Close")
         button_sizer.Add(close_btn, 0)
 
@@ -93,11 +122,15 @@ class AccountEditorDialog(wx.Dialog):
         panel.SetSizer(sizer)
 
         # Bind events
+        self.show_password_btn.Bind(wx.EVT_BUTTON, self.on_show_password)
+        credential_policy_btn.Bind(wx.EVT_BUTTON, self.on_credential_policy)
         close_btn.Bind(wx.EVT_BUTTON, self.on_close)
 
         # Auto-save on field changes
         self.username_input.Bind(wx.EVT_KILL_FOCUS, self.on_field_change)
         self.password_input.Bind(wx.EVT_KILL_FOCUS, self.on_field_change)
+        self.password_plain.Bind(wx.EVT_KILL_FOCUS, self.on_field_change)
+        self.email_input.Bind(wx.EVT_KILL_FOCUS, self.on_field_change)
         self.notes_input.Bind(wx.EVT_KILL_FOCUS, self.on_field_change)
 
         # Set focus
@@ -106,24 +139,126 @@ class AccountEditorDialog(wx.Dialog):
     def on_key(self, event):
         """Handle key events."""
         if event.GetKeyCode() == wx.WXK_ESCAPE:
+            if not self._validate_for_close():
+                return
             self._save_if_needed()
             self.EndModal(wx.ID_OK)
         else:
             event.Skip()
+
+    def on_show_password(self, event):
+        """Toggle password visibility."""
+        if self.password_input.IsShown():
+            # Switch to plain text (show password)
+            current_value = self.password_input.GetValue()
+            self.password_plain.SetValue(current_value)
+            self.password_input.Hide()
+            self.password_plain.Show()
+            self.show_password_btn.SetLabel("&Hide Password")
+            self.password_plain.SetFocus()
+        else:
+            # Switch to masked (hide password)
+            current_value = self.password_plain.GetValue()
+            self.password_input.SetValue(current_value)
+            self.password_plain.Hide()
+            self.password_input.Show()
+            self.show_password_btn.SetLabel("&Show")
+            self.password_input.SetFocus()
+
+        self.password_input.GetParent().Layout()
 
     def on_field_change(self, event):
         """Handle field change - auto-save."""
         self._save_if_needed()
         event.Skip()
 
-    def _save_if_needed(self):
-        """Save account data if there are changes."""
+    def _get_password_value(self) -> str:
+        """Get the current password value from whichever control is visible."""
+        if self.password_input.IsShown():
+            return self.password_input.GetValue()
+        else:
+            return self.password_plain.GetValue()
+
+    def _validate_email(self, email: str) -> bool:
+        """Validate email address format.
+
+        Args:
+            email: Email address to validate
+
+        Returns:
+            True if valid (empty or valid format), False otherwise
+        """
+        if not email:
+            return True  # Empty is allowed
+        # Lowercase and validate against pattern
+        email_lower = email.lower()
+        pattern = r'^[a-z0-9_.-]+@[a-z0-9_.-]+$'
+        return bool(re.match(pattern, email_lower))
+
+    def _validate_for_close(self) -> bool:
+        """Validate all fields before closing.
+
+        Validates in display order: username, password, email.
+
+        Returns:
+            True if all fields are valid, False otherwise
+        """
         username = self.username_input.GetValue().strip()
-        password = self.password_input.GetValue()
+        password = self._get_password_value()
+        email = self.email_input.GetValue().strip()
+
+        # Validate username
+        if not username:
+            wx.MessageBox(
+                "Username cannot be empty.",
+                "Validation Error",
+                wx.OK | wx.ICON_ERROR,
+            )
+            self.username_input.SetFocus()
+            return False
+
+        # Validate password
+        if not password:
+            wx.MessageBox(
+                "Password cannot be empty.",
+                "Validation Error",
+                wx.OK | wx.ICON_ERROR,
+            )
+            # Focus the visible password field
+            if self.password_input.IsShown():
+                self.password_input.SetFocus()
+            else:
+                self.password_plain.SetFocus()
+            return False
+
+        # Validate email
+        if not self._validate_email(email):
+            wx.MessageBox(
+                "Invalid email address format.",
+                "Validation Error",
+                wx.OK | wx.ICON_ERROR,
+            )
+            self.email_input.SetFocus()
+            return False
+
+        return True
+
+    def _save_if_needed(self) -> bool:
+        """Save account data if there are changes.
+
+        Returns:
+            True if saved successfully or no save needed, False if validation failed
+        """
+        username = self.username_input.GetValue().strip()
+        password = self._get_password_value()
+        email = self.email_input.GetValue().strip().lower()
         notes = self.notes_input.GetValue().strip()
 
         if not username:
-            return  # Don't save without a username
+            return True  # Don't save without a username, but not an error
+
+        if not self._validate_email(email):
+            return False  # Validation failed
 
         if self.account_id:
             # Update existing account
@@ -132,6 +267,7 @@ class AccountEditorDialog(wx.Dialog):
                 self.account_id,
                 username=username,
                 password=password,
+                email=email,
                 notes=notes,
             )
         else:
@@ -140,17 +276,154 @@ class AccountEditorDialog(wx.Dialog):
                 self.server_id,
                 username=username,
                 password=password,
+                email=email,
                 notes=notes,
             )
+        return True
+
+    def on_credential_policy(self, event):
+        """Handle credential policy button click."""
+        wx.MessageBox(
+            DEFAULT_CREDENTIAL_HINT,
+            "Credential Policy",
+            wx.OK | wx.ICON_INFORMATION,
+        )
 
     def on_close(self, event):
         """Handle close button click."""
+        if not self._validate_for_close():
+            return
         self._save_if_needed()
         self.EndModal(wx.ID_OK)
 
     def get_account_id(self) -> str:
         """Get the account ID (for newly created accounts)."""
         return self.account_id
+
+
+class TrustedCertificateDialog(wx.Dialog):
+    """Dialog for viewing and managing trusted certificates."""
+
+    def __init__(
+        self,
+        parent,
+        config_manager: ConfigManager,
+        server_id: str,
+    ):
+        """Initialize the trusted certificate dialog.
+
+        Args:
+            parent: Parent window
+            config_manager: ConfigManager instance
+            server_id: Server ID to view certificate for
+        """
+        super().__init__(parent, title="Trusted Certificate", size=(450, 300))
+
+        self.config_manager = config_manager
+        self.server_id = server_id
+
+        self._create_ui()
+        self.CenterOnParent()
+
+        # Bind escape key to close
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_key)
+
+    def _create_ui(self):
+        """Create the UI components."""
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Certificate details label
+        details_label = wx.StaticText(panel, label="Certificate &Details:")
+        sizer.Add(details_label, 0, wx.LEFT | wx.TOP, 10)
+
+        # Certificate details text field
+        self.details_text = wx.TextCtrl(
+            panel,
+            style=wx.TE_MULTILINE | wx.TE_READONLY,
+            size=(-1, 150),
+        )
+        sizer.Add(self.details_text, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+
+        # Populate certificate details
+        self._refresh_certificate_details()
+
+        # Buttons
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.forget_btn = wx.Button(panel, label="&Forget Certificate")
+        self.forget_btn.Bind(wx.EVT_BUTTON, self.on_forget_certificate)
+        button_sizer.Add(self.forget_btn, 0, wx.RIGHT, 5)
+
+        close_btn = wx.Button(panel, wx.ID_CANCEL, "&Close")
+        close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+        button_sizer.Add(close_btn, 0)
+
+        sizer.Add(button_sizer, 0, wx.ALL | wx.CENTER, 10)
+
+        panel.SetSizer(sizer)
+
+        # Update forget button state
+        self._update_forget_button_state()
+
+    def _refresh_certificate_details(self):
+        """Refresh the certificate details text."""
+        if not self.server_id:
+            self.details_text.SetValue("No server saved yet.")
+            return
+
+        cert = self.config_manager.get_trusted_certificate(self.server_id)
+        if not cert:
+            self.details_text.SetValue("No trusted certificate stored.")
+            return
+
+        # Build certificate details text
+        details = []
+        if cert.get("host"):
+            details.append(f"Host: {cert['host']}")
+        if cert.get("common_name"):
+            details.append(f"Common Name: {cert['common_name']}")
+        if cert.get("fingerprint"):
+            details.append(f"Fingerprint: {cert['fingerprint']}")
+        if cert.get("pem"):
+            details.append("")
+            details.append("PEM Certificate:")
+            details.append(cert["pem"])
+
+        self.details_text.SetValue("\n".join(details) if details else "Certificate data unavailable.")
+
+    def _update_forget_button_state(self):
+        """Enable/disable forget button based on certificate existence."""
+        if not self.server_id:
+            self.forget_btn.Enable(False)
+            return
+        cert = self.config_manager.get_trusted_certificate(self.server_id)
+        self.forget_btn.Enable(cert is not None)
+
+    def on_forget_certificate(self, event):
+        """Remove stored trusted certificate for this server."""
+        if not self.server_id:
+            return
+        confirm = wx.MessageBox(
+            "Remove the trusted certificate for this server?",
+            "Forget Certificate",
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
+        )
+        if confirm == wx.YES:
+            self.config_manager.clear_trusted_certificate(self.server_id)
+            self._refresh_certificate_details()
+            self._update_forget_button_state()
+
+    def on_key(self, event):
+        """Handle key events."""
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.EndModal(wx.ID_OK)
+        else:
+            event.Skip()
+
+    def on_close(self, event):
+        """Handle close button click."""
+        self.EndModal(wx.ID_OK)
 
 
 class ServerEditorDialog(wx.Dialog):
@@ -191,6 +464,36 @@ class ServerEditorDialog(wx.Dialog):
         panel = wx.Panel(self)
         sizer = wx.BoxSizer(wx.VERTICAL)
 
+        # User Accounts section
+        accounts_label = wx.StaticText(panel, label="&User Accounts:")
+        sizer.Add(accounts_label, 0, wx.LEFT | wx.TOP, 10)
+
+        self.accounts_list = wx.ListBox(panel, style=wx.LB_SINGLE, size=(-1, 100))
+        sizer.Add(self.accounts_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+
+        # Account buttons
+        account_btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.edit_account_btn = wx.Button(panel, label="&Edit Account")
+        account_btn_sizer.Add(self.edit_account_btn, 0, wx.RIGHT, 5)
+
+        self.delete_account_btn = wx.Button(panel, label="&Delete Account")
+        account_btn_sizer.Add(self.delete_account_btn, 0, wx.RIGHT, 5)
+
+        self.add_account_btn = wx.Button(panel, label="&Add Account")
+        account_btn_sizer.Add(self.add_account_btn, 0)
+
+        sizer.Add(account_btn_sizer, 0, wx.ALL | wx.CENTER, 5)
+
+        # Bind account button events
+        self.edit_account_btn.Bind(wx.EVT_BUTTON, self.on_edit_account)
+        self.delete_account_btn.Bind(wx.EVT_BUTTON, self.on_delete_account)
+        self.add_account_btn.Bind(wx.EVT_BUTTON, self.on_add_account)
+
+        # Populate accounts list
+        self._account_ids = []
+        self._refresh_accounts_list()
+
         # Server Name
         name_label = wx.StaticText(panel, label="Server &Name:")
         sizer.Add(name_label, 0, wx.LEFT | wx.TOP, 10)
@@ -221,6 +524,11 @@ class ServerEditorDialog(wx.Dialog):
         self.port_input = wx.TextCtrl(panel, value=port_value)
         sizer.Add(self.port_input, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
 
+        # Trusted certificate button
+        self.cert_btn = wx.Button(panel, label="&Trusted Certificate")
+        self.cert_btn.Bind(wx.EVT_BUTTON, self.on_trusted_certificate)
+        sizer.Add(self.cert_btn, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
+
         # Notes
         notes_label = wx.StaticText(panel, label="N&otes:")
         sizer.Add(notes_label, 0, wx.LEFT | wx.TOP, 10)
@@ -233,49 +541,7 @@ class ServerEditorDialog(wx.Dialog):
         )
         sizer.Add(self.notes_input, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
 
-        # Trusted certificate status
-        cert_box = wx.BoxSizer(wx.HORIZONTAL)
-        cert_label = wx.StaticText(panel, label="Trusted certificate:")
-        cert_box.Add(cert_label, 0, wx.ALIGN_CENTER_VERTICAL)
-        self.cert_status = wx.StaticText(panel, label="")
-        cert_box.Add(self.cert_status, 1, wx.LEFT | wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, 8)
-        self.forget_cert_btn = wx.Button(panel, label="Forget Certificate")
-        self.forget_cert_btn.Bind(wx.EVT_BUTTON, self.on_forget_certificate)
-        cert_box.Add(self.forget_cert_btn, 0)
-        sizer.Add(cert_box, 0, wx.LEFT | wx.RIGHT | wx.TOP | wx.EXPAND, 10)
-
-        # User Accounts section
-        accounts_label = wx.StaticText(panel, label="&User Accounts:")
-        sizer.Add(accounts_label, 0, wx.LEFT | wx.TOP, 10)
-
-        self.accounts_list = wx.ListBox(panel, style=wx.LB_SINGLE, size=(-1, 100))
-        sizer.Add(self.accounts_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
-
-        # Account buttons
-        account_btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
-
-        self.edit_account_btn = wx.Button(panel, label="&Edit Account")
-        account_btn_sizer.Add(self.edit_account_btn, 0, wx.RIGHT, 5)
-
-        self.delete_account_btn = wx.Button(panel, label="&Delete Account")
-        account_btn_sizer.Add(self.delete_account_btn, 0, wx.RIGHT, 5)
-
-        self.add_account_btn = wx.Button(panel, label="&Add Account")
-        account_btn_sizer.Add(self.add_account_btn, 0)
-
-        sizer.Add(account_btn_sizer, 0, wx.ALL | wx.CENTER, 5)
-
-        # Bind account button events
-        self.edit_account_btn.Bind(wx.EVT_BUTTON, self.on_edit_account)
-        self.delete_account_btn.Bind(wx.EVT_BUTTON, self.on_delete_account)
-        self.add_account_btn.Bind(wx.EVT_BUTTON, self.on_add_account)
-
-        # Populate accounts list
-        self._account_ids = []
-        self._refresh_accounts_list()
-        self._refresh_certificate_status()
-
-        # Main buttons
+        # Close button
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         close_btn = wx.Button(panel, wx.ID_CANCEL, "&Close")
@@ -318,22 +584,9 @@ class ServerEditorDialog(wx.Dialog):
             self.accounts_list.Append(account.get("username", "Unknown"))
             self._account_ids.append(account_id)
 
-    def _refresh_certificate_status(self):
-        """Update trusted certificate status text and button."""
-        if not hasattr(self, "cert_status"):
-            return
-        if not self.server_id:
-            self.cert_status.SetLabel("No server saved yet.")
-            self.forget_cert_btn.Enable(False)
-            return
-        cert = self.config_manager.get_trusted_certificate(self.server_id)
-        if cert:
-            host = cert.get("host") or "unknown host"
-            self.cert_status.SetLabel(f"Pinned certificate for {host}")
-            self.forget_cert_btn.Enable(True)
-        else:
-            self.cert_status.SetLabel("No trusted certificate stored.")
-            self.forget_cert_btn.Enable(False)
+        # Select first item if nothing is selected
+        if self.accounts_list.GetSelection() == wx.NOT_FOUND and self.accounts_list.GetCount() > 0:
+            self.accounts_list.SetSelection(0)
 
     def _get_selected_account_id(self) -> str:
         """Get the currently selected account ID."""
@@ -342,22 +595,29 @@ class ServerEditorDialog(wx.Dialog):
             return None
         return self._account_ids[selection]
 
-    def on_forget_certificate(self, event):
-        """Remove stored trusted certificate for this server."""
+    def on_trusted_certificate(self, event):
+        """Open the trusted certificate dialog."""
         if not self.server_id:
-            return
-        confirm = wx.MessageBox(
-            "Remove the trusted certificate for this server?",
-            "Forget Certificate",
-            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
-        )
-        if confirm == wx.YES:
-            self.config_manager.clear_trusted_certificate(self.server_id)
-            self._refresh_certificate_status()
+            # Save server first if needed
+            self._save_if_needed()
+            if not self.server_id:
+                wx.MessageBox(
+                    "Please enter a server name first.",
+                    "Server Name Required",
+                    wx.OK | wx.ICON_WARNING,
+                )
+                self.name_input.SetFocus()
+                return
+
+        dlg = TrustedCertificateDialog(self, self.config_manager, self.server_id)
+        dlg.ShowModal()
+        dlg.Destroy()
 
     def on_key(self, event):
         """Handle key events."""
         if event.GetKeyCode() == wx.WXK_ESCAPE:
+            if not self._validate_for_close():
+                return
             self._save_if_needed()
             self.EndModal(wx.ID_OK)
         else:
@@ -367,6 +627,70 @@ class ServerEditorDialog(wx.Dialog):
         """Handle field change - auto-save."""
         self._save_if_needed()
         event.Skip()
+
+    def _validate_for_close(self) -> bool:
+        """Validate all fields before closing.
+
+        Validates in display order: name, host, port.
+        Notes is optional.
+
+        Returns:
+            True if all fields are valid, False otherwise
+        """
+        name = self.name_input.GetValue().strip()
+        host = self.host_input.GetValue().strip()
+        port = self.port_input.GetValue().strip()
+
+        # Validate server name
+        if not name:
+            wx.MessageBox(
+                "Server name cannot be empty.",
+                "Validation Error",
+                wx.OK | wx.ICON_ERROR,
+            )
+            self.name_input.SetFocus()
+            return False
+
+        # Validate host address
+        if not host:
+            wx.MessageBox(
+                "Host address cannot be empty.",
+                "Validation Error",
+                wx.OK | wx.ICON_ERROR,
+            )
+            self.host_input.SetFocus()
+            return False
+
+        # Validate port
+        if not port:
+            wx.MessageBox(
+                "Port cannot be empty.",
+                "Validation Error",
+                wx.OK | wx.ICON_ERROR,
+            )
+            self.port_input.SetFocus()
+            return False
+
+        try:
+            port_num = int(port)
+            if port_num < 1000 or port_num > 65535:
+                wx.MessageBox(
+                    "Port must be between 1000 and 65535.",
+                    "Validation Error",
+                    wx.OK | wx.ICON_ERROR,
+                )
+                self.port_input.SetFocus()
+                return False
+        except ValueError:
+            wx.MessageBox(
+                "Port must be a valid number.",
+                "Validation Error",
+                wx.OK | wx.ICON_ERROR,
+            )
+            self.port_input.SetFocus()
+            return False
+
+        return True
 
     def _save_if_needed(self):
         """Save server data if there are changes."""
@@ -397,7 +721,6 @@ class ServerEditorDialog(wx.Dialog):
             )
             # Reload server data
             self.server_data = self.config_manager.get_server_by_id(self.server_id)
-            self._refresh_certificate_status()
 
     def on_edit_account(self, event):
         """Handle edit account button click."""
@@ -468,6 +791,8 @@ class ServerEditorDialog(wx.Dialog):
 
     def on_close(self, event):
         """Handle close button click."""
+        if not self._validate_for_close():
+            return
         self._save_if_needed()
         self.EndModal(wx.ID_OK)
 
@@ -559,6 +884,9 @@ class ServerManagerDialog(wx.Dialog):
         if self._initial_server_id and self._initial_server_id in self._server_ids:
             idx = self._server_ids.index(self._initial_server_id)
             self.servers_list.SetSelection(idx)
+        # Otherwise select first item if nothing is selected
+        elif self.servers_list.GetSelection() == wx.NOT_FOUND and self.servers_list.GetCount() > 0:
+            self.servers_list.SetSelection(0)
 
     def _get_selected_server_id(self) -> str:
         """Get the currently selected server ID."""

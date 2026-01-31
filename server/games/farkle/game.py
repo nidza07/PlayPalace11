@@ -683,7 +683,15 @@ class FarkleGame(Game):
 
         # Update scoring actions based on new roll
         self.update_scoring_actions(farkle_player)
-        self.rebuild_player_menu(farkle_player)
+
+        # Focus on the first (highest-scoring) combination
+        combos = get_available_combinations(farkle_player.current_roll)
+        if combos:
+            combo_type, number, _ = combos[0]
+            selection_id = f"score_{combo_type}_{number}"
+            self.update_player_menu(farkle_player, selection_id=selection_id)
+        else:
+            self.rebuild_player_menu(farkle_player)
 
     def _action_take_combo(self, player: Player, action_id: str) -> None:
         """Handle taking a scoring combination."""
@@ -938,7 +946,6 @@ class FarkleGame(Game):
         player = self.current_player
         if not player:
             return
-        self.ensure_turn_started()
 
         farkle_player: FarklePlayer = player  # type: ignore
 
@@ -1077,7 +1084,7 @@ class FarkleGame(Game):
                 user = self.get_user(p)
                 if user:
                     names_str = Localization.format_list_and(user.locale, names)
-                    user.speak_l("farkle-winners-tie", players=names_str)
+                    user.speak_l("farkle-winners-tie", players=names_str, buffer="table")
 
             # Mark non-winners as spectators for tiebreaker
             winner_names = [w.name for w in winners]
@@ -1148,6 +1155,5 @@ class FarkleGame(Game):
 
     def end_turn(self, jolt_min: int = 20, jolt_max: int = 30) -> None:
         """End the current player's turn."""
-        self.on_turn_end()
         BotHelper.jolt_bots(self, ticks=random.randint(jolt_min, jolt_max))
         self._on_turn_end()

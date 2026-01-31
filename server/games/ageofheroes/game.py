@@ -1630,7 +1630,7 @@ class AgeOfHeroesGame(Game):
         # Announce result
         user = self.get_user(player)
         if user:
-            user.speak_l("ageofheroes-dice-result", total=total, die1=die1, die2=die2)
+            user.speak_l("ageofheroes-dice-result", total=total, die1=die1, die2=die2, buffer="table")
 
         # Announce to others
         for p in self.players:
@@ -1638,7 +1638,7 @@ class AgeOfHeroesGame(Game):
                 other_user = self.get_user(p)
                 if other_user:
                     other_user.speak_l(
-                        "ageofheroes-dice-result-other", player=player.name, total=total
+                        "ageofheroes-dice-result-other", player=player.name, total=total, buffer="table"
                     )
 
         # Check if all players have rolled
@@ -1690,12 +1690,13 @@ class AgeOfHeroesGame(Game):
                 user = self.get_user(p)
                 if user:
                     if p == first_player:
-                        user.speak_l("ageofheroes-first-player-you", total=max_roll)
+                        user.speak_l("ageofheroes-first-player-you", total=max_roll, buffer="table")
                     else:
                         user.speak_l(
                             "ageofheroes-first-player",
                             player=first_player.name,
                             total=max_roll,
+                            buffer="table",
                         )
 
             # Set turn order starting with winner
@@ -3029,7 +3030,6 @@ class AgeOfHeroesGame(Game):
             self.advance_turn(announce=False)
             self._start_turn()
             return
-        self.ensure_turn_started()
 
         # Process end-of-turn effects from previous turn
         if player.tribe_state:
@@ -3224,7 +3224,6 @@ class AgeOfHeroesGame(Game):
     def _end_turn(self) -> None:
         """End the current turn and advance to next player."""
         player = self.current_player
-        self.on_turn_end()
         if isinstance(player, AgeOfHeroesPlayer):
             # Collect special resources for monument (after action, before next turn)
             self._collect_special_resources(player)

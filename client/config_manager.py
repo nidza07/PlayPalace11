@@ -106,7 +106,7 @@ class ConfigManager:
             try:
                 with open(self.identities_path, "r") as f:
                     identities = json.load(f)
-                    return identities
+                    return self._migrate_identities(identities)
             except Exception as e:
                 print(f"Error loading identities: {e}")
                 return self._get_default_identities()
@@ -119,6 +119,32 @@ class ConfigManager:
             "last_server_id": None,
             "servers": {},  # server_id -> server info with accounts
         }
+
+    def _migrate_identities(self, identities: Dict[str, Any]) -> Dict[str, Any]:
+        """Migrate identities to add new fields.
+
+        Args:
+            identities: The loaded identities dictionary
+
+        Returns:
+            Migrated identities dictionary
+        """
+        needs_save = False
+
+        # Migration: Add email field to all existing accounts
+        for server_id, server in identities.get("servers", {}).items():
+            for account_id, account in server.get("accounts", {}).items():
+                if "email" not in account:
+                    account["email"] = ""
+                    needs_save = True
+
+        # Save immediately if migration occurred
+        if needs_save:
+            self.identities = identities
+            self.save_identities()
+            print("Identities migration completed: added email field to accounts.")
+
+        return identities
 
     def _load_profiles(self) -> Dict[str, Any]:
         """Load option profiles from file (shareable, no credentials)."""
@@ -565,6 +591,7 @@ class ConfigManager:
         server_id: str,
         username: str,
         password: str,
+        email: str = "",
         notes: str = "",
     ) -> Optional[str]:
         """Add a new account to a server.
@@ -573,6 +600,7 @@ class ConfigManager:
             server_id: Server ID
             username: Account username
             password: Account password
+            email: Optional email address
             notes: Optional notes about the account
 
         Returns:
@@ -589,6 +617,7 @@ class ConfigManager:
             "account_id": account_id,
             "username": username,
             "password": password,
+            "email": email,
             "notes": notes,
         }
         self.save_identities()
@@ -600,6 +629,7 @@ class ConfigManager:
         account_id: str,
         username: Optional[str] = None,
         password: Optional[str] = None,
+        email: Optional[str] = None,
         notes: Optional[str] = None,
     ):
         """Update account information.
@@ -609,6 +639,7 @@ class ConfigManager:
             account_id: Account ID
             username: New username (if provided)
             password: New password (if provided)
+            email: New email address (if provided)
             notes: New notes (if provided)
         """
         account = self.get_account_by_id(server_id, account_id)
@@ -619,6 +650,8 @@ class ConfigManager:
             account["username"] = username
         if password is not None:
             account["password"] = password
+        if email is not None:
+            account["email"] = email
         if notes is not None:
             account["notes"] = notes
         self.save_identities()
