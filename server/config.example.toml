@@ -115,7 +115,7 @@ profile = "mixer"
 # table = "the table"
 # game = "crazyeights"
 # bot_groups = ["hosts", "patrons", "mixers"]
-# min_bots = 4
+# min_bots = 0  # Raise this to require a minimum number of bots.
 # max_bots = 4
 # priority = 10
 # profile = "mixer"  # Uncomment to force every assigned bot to behave like a mixer here
@@ -124,7 +124,7 @@ profile = "mixer"
 # table = "scopa_lounge"
 # game = "scopa"
 # bot_groups = ["mixers"]
-# min_bots = 2
+# min_bots = 0  # Raise this to require a minimum number of bots.
 # max_bots = 4
 # priority = 25
 # Optional tick-based scheduling: run this lounge for half of each 60-second (1200-tick) cycle
