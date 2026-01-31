@@ -516,6 +516,7 @@ class CrazyEightsGame(Game):
         player = self.current_player
         if not isinstance(player, CrazyEightsPlayer):
             return
+        self.ensure_turn_started()
         self.turn_has_drawn = False
         self.turn_drawn_card = None
         self.timer_warning_played = False
@@ -538,6 +539,7 @@ class CrazyEightsGame(Game):
 
     def _advance_turn(self) -> None:
         self._stop_turn_loop()
+        self.on_turn_end()
         self.advance_turn(announce=False)
         self._start_turn()
 
@@ -1121,7 +1123,7 @@ class CrazyEightsGame(Game):
         points_from: list[tuple[CrazyEightsPlayer, int]] = []
         total = 0
         for p in self.players:
-            if not isinstance(p, CrazyEightsPlayer):
+            if not isinstance(p, CrazyEightsPlayer) or p.is_spectator:
                 continue
             if p.id == winner.id:
                 continue
@@ -1283,7 +1285,11 @@ class CrazyEightsGame(Game):
 
         for p in self.players:
             user = self.get_user(p)
-            if not user or not isinstance(p, CrazyEightsPlayer):
+            if (
+                not user
+                or not isinstance(p, CrazyEightsPlayer)
+                or p.is_spectator
+            ):
                 continue
             if p.id == winner.id:
                 user.play_sound(win_sound)

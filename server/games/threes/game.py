@@ -339,6 +339,7 @@ class ThreesGame(Game, DiceGameMixin):
 
     def _end_turn(self) -> None:
         """End current player's turn."""
+        self.on_turn_end()
         # Check if round is over
         if self.turn_index >= len(self.turn_players) - 1:
             self._end_round()
@@ -384,6 +385,7 @@ class ThreesGame(Game, DiceGameMixin):
         player = self.current_player
         if not player or not isinstance(player, ThreesPlayer):
             return
+        self.ensure_turn_started()
 
         # Reset turn state
         player.dice.reset()
@@ -401,10 +403,17 @@ class ThreesGame(Game, DiceGameMixin):
 
     def _end_game(self) -> None:
         """End the game and announce winner."""
-        # Find winner(s) (lowest score)
-        players_with_scores = [
-            (p, p.total_score) for p in self.players if isinstance(p, ThreesPlayer)
+        # Only consider active (non-spectator) players when picking winners
+        active_players = [
+            p
+            for p in self.players
+            if isinstance(p, ThreesPlayer) and not p.is_spectator
         ]
+        if not active_players:
+            return
+
+        # Find winner(s) (lowest score)
+        players_with_scores = [(p, p.total_score) for p in active_players]
         players_with_scores.sort(key=lambda x: x[1])
 
         lowest_score = players_with_scores[0][1]
@@ -425,7 +434,11 @@ class ThreesGame(Game, DiceGameMixin):
         """Build the game result with Threes-specific data."""
         # Sorted by score ascending (lowest wins)
         sorted_players = sorted(
-            [p for p in self.players if isinstance(p, ThreesPlayer)],
+            [
+                p
+                for p in self.players
+                if isinstance(p, ThreesPlayer) and not p.is_spectator
+            ],
             key=lambda p: p.total_score,
         )
 

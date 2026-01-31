@@ -201,6 +201,7 @@ class LeftRightCenterGame(Game):
 
         if self._check_for_winner():
             return
+        self.ensure_turn_started()
 
         self.announce_turn()
         if isinstance(player, LeftRightCenterPlayer) and player.chips == 0:
@@ -213,6 +214,7 @@ class LeftRightCenterGame(Game):
         self.rebuild_all_menus()
 
     def _end_turn(self) -> None:
+        self.on_turn_end()
         if self._check_for_winner():
             return
         self.advance_turn(announce=False)
@@ -421,7 +423,7 @@ class LeftRightCenterGame(Game):
             custom_data={
                 "winner_name": winner.name if winner else None,
                 "center_pot": self.center_pot,
-                "final_chips": {p.name: p.chips for p in self.players},
+                "final_chips": {p.name: p.chips for p in active_players},
             },
         )
 
