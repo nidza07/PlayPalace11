@@ -111,15 +111,15 @@ max_bots_per_table = 4
 
 [virtual_bots.bot_groups.hosts]
 # Tag specific bots and optionally pin them to a profile
-bots = ["Alex", "Jordan", "Taylor"]
+bots = ["Smith", "Bastardo", "Scorpion"]
 profile = "host"
 
 [virtual_bots.bot_groups.patrons]
-bots = ["Morgan", "Casey", "Riley", "Quinn"]
+bots = ["Speakertest", "Kitana", "Assembly_programmer", "Liu_kang"]
 profile = "patron"
 
 [virtual_bots.bot_groups.mixers]
-bots = ["Avery", "Skyler", "Jamie", "Phoenix", "River", "Sage", "Rowan", "Finley"]
+bots = ["Omega-alpha", "Alpha-omega", "Gama8", "Electric-bastard", "Yamaha", "Jupiter", "Mars", "Artemis"]
 profile = "mixer"
 
 # Optional guided table rules pin bots to specific tables/channels.
