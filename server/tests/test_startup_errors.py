@@ -4,6 +4,7 @@ import pytest
 
 from server.core.server import Server
 from server.network import websocket_server as websocket_module
+from server.messages.localization import Localization
 
 
 def _write_config(tmp_path: Path, allow_insecure: bool, tick_interval: int | None = None) -> Path:
@@ -21,6 +22,8 @@ def test_localization_missing_directory(tmp_path, capsys):
         Server(locales_dir=missing_locales)
     captured = capsys.readouterr()
     assert "Localization directory" in captured.err
+    # Restore localization path for subsequent tests
+    Localization.init(Path(__file__).resolve().parents[1] / "locales")
 
 
 @pytest.mark.asyncio
