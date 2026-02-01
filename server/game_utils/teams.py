@@ -5,6 +5,8 @@ Provides Team dataclass and TeamManager for handling team assignments,
 scoring, and elimination (for inverse game modes).
 """
 
+from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -18,7 +20,15 @@ if TYPE_CHECKING:
 
 @dataclass
 class Team(DataClassJSONMixin):
-    """A team of players."""
+    """Team container for team-based games.
+
+    Attributes:
+        index: Team index (0-based).
+        members: Player names on the team.
+        round_score: Points earned this round.
+        total_score: Total points across rounds.
+        eliminated: True if eliminated (inverse modes).
+    """
 
     index: int  # Team number (0-based)
     members: list[str] = field(default_factory=list)  # Player names
@@ -29,10 +39,9 @@ class Team(DataClassJSONMixin):
 
 @dataclass
 class TeamManager(DataClassJSONMixin):
-    """
-    Manages team assignments and scoring for games.
+    """Manage team assignments and scoring for games.
 
-    Supports individual mode (teams of 1) and various team configurations
+    Supports individual mode (teams of 1) and common team configurations
     like 2v2, 3v3, 2v2v2, etc.
     """
 
@@ -355,6 +364,7 @@ class TeamManager(DataClassJSONMixin):
 
         # Sort: individual first, then by total players, then alphabetically
         def sort_key(mode: str) -> tuple:
+            """Sort key for team modes (individual first, then size)."""
             if mode == "individual":
                 return (0, 0, "")
             parts = mode.split("v")
@@ -432,3 +442,30 @@ class TeamManager(DataClassJSONMixin):
             name = self.get_team_name(team, locale)
             lines.append(f"{name}: {team.total_score} points")
         return lines
+
+
+class TeamResultBuilder:
+    """Helpers for summarizing and formatting team-based results."""
+
+    @staticmethod
+    def summarize(team_manager: TeamManager):
+        """Return (sorted_teams, winner, ordered final_scores dict)."""
+        sorted_teams = team_manager.get_sorted_teams(by_score=True, descending=True)
+        winner = sorted_teams[0] if sorted_teams else None
+        final_scores: OrderedDict[str, int] = OrderedDict()
+        for team in sorted_teams:
+            name = team_manager.get_team_name(team)
+            final_scores[name] = team.total_score
+        return sorted_teams, winner, final_scores
+
+    @staticmethod
+    def format_final_scores(locale: str, final_scores: Mapping[str, int]) -> list[str]:
+        """Format localized final score lines."""
+        lines = [Localization.get(locale, "game-final-scores")]
+        for index, (name, score) in enumerate(final_scores.items(), 1):
+            points = Localization.get(locale, "game-points", count=score)
+            lines.append(f"{index}. {name}: {points}")
+        return lines
+
+
+__all__ = ["Team", "TeamManager", "TeamResultBuilder"]

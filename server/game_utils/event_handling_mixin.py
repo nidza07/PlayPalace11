@@ -7,21 +7,21 @@ if TYPE_CHECKING:
 
 
 class EventHandlingMixin:
-    """Mixin providing event handling (menu, editbox, keybind events).
+    """Handle menu/editbox/keybind events for a game.
 
-    Expects on the Game class:
-        - self._actions_menu_open: set[str]
-        - self._pending_actions: dict[str, str]
-        - self._status_box_open: set[str]
-        - self._keybinds: dict[str, list[Keybind]]
-        - self.get_user(player) -> User | None
-        - self.find_action(player, action_id) -> Action | None
-        - self.resolve_action(player, action) -> ResolvedAction
-        - self.execute_action(player, action_id, input_value?, context?)
-        - self.get_all_visible_actions(player) -> list[ResolvedAction]
-        - self.rebuild_player_menu(player)
-        - self.rebuild_all_menus()
-        - self._is_player_spectator(player) -> bool
+    Expected Game attributes:
+        _actions_menu_open: set[str].
+        _pending_actions: dict[str, str].
+        _status_box_open: set[str].
+        _keybinds: dict[str, list[Keybind]].
+        get_user(player) -> User | None.
+        find_action(player, action_id) -> Action | None.
+        resolve_action(player, action) -> ResolvedAction.
+        execute_action(player, action_id, input_value?, context?).
+        get_all_visible_actions(player) -> list[ResolvedAction].
+        rebuild_player_menu(player).
+        rebuild_all_menus().
+        _is_player_spectator(player) -> bool.
     """
 
     def handle_event(self, player: "Player", event: dict) -> None:
@@ -197,7 +197,7 @@ class EventHandlingMixin:
         """Handle selection from the actions menu."""
         # Actions menu is no longer open
         self._actions_menu_open.discard(player.id)
-        # Handle "go back" - just return to turn menu
+        # Handle "back" - just return to turn menu
         if action_id == "go_back":
             self.rebuild_player_menu(player)
             return
@@ -206,6 +206,9 @@ class EventHandlingMixin:
             resolved = self.resolve_action(player, action)
             if resolved.enabled:
                 self.execute_action(player, action_id)
-        # Don't rebuild if action is waiting for input
-        if player.id not in self._pending_actions:
+        # Don't rebuild if action is waiting for input or status box is open
+        if (
+            player.id not in self._pending_actions
+            and player.id not in self._status_box_open
+        ):
             self.rebuild_player_menu(player)

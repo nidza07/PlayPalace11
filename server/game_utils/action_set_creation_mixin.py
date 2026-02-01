@@ -11,14 +11,17 @@ from ..ui.keybinds import Keybind, KeybindState
 
 
 class ActionSetCreationMixin:
-    """Mixin providing action set creation (lobby, estimate, standard) and keybind management.
+    """Create standard/lobby action sets and define keybinds.
 
-    Expects on the Game class:
-        - self.players: list[Player]
-        - self.player_action_sets: dict[str, list[ActionSet]]
-        - self._keybinds: dict[str, list[Keybind]]
-        - self.get_user(player) -> User | None
-        - self.add_action_set(player, action_set)
+    Games override `create_turn_action_set` to define turn-specific actions.
+    This mixin also defines the global keybinds used across games.
+
+    Expected Game attributes:
+        players: list[Player].
+        player_action_sets: dict[str, list[ActionSet]].
+        _keybinds: dict[str, list[Keybind]].
+        get_user(player) -> User | None.
+        add_action_set(player, action_set).
     """
 
     def create_lobby_action_set(self, player: "Player") -> ActionSet:
@@ -69,15 +72,6 @@ class ActionSetCreationMixin:
                 get_label="_get_toggle_spectator_label",
             )
         )
-        action_set.add(
-            Action(
-                id="leave_game",
-                label=Localization.get(locale, "leave-table"),
-                handler="_action_leave_game",
-                is_enabled="_is_leave_game_enabled",
-                is_hidden="_is_leave_game_hidden",
-            )
-        )
         return action_set
 
     def create_estimate_action_set(self, player: "Player") -> ActionSet:
@@ -109,7 +103,8 @@ class ActionSetCreationMixin:
                 label=Localization.get(locale, "actions-menu"),
                 handler="_action_show_actions_menu",
                 is_enabled="_is_show_actions_enabled",
-                is_hidden="_is_show_actions_hidden",
+                is_hidden="_is_always_hidden",
+                show_in_actions_menu=False,
             )
         )
         action_set.add(
@@ -168,6 +163,15 @@ class ActionSetCreationMixin:
                 is_hidden="_is_predict_outcomes_hidden",
             )
         )
+        action_set.add(
+            Action(
+                id="leave_game",
+                label=Localization.get(locale, "leave-table"),
+                handler="_action_leave_game",
+                is_enabled="_is_leave_game_enabled",
+                is_hidden="_is_leave_game_hidden",
+            )
+        )
 
         return action_set
 
@@ -215,6 +219,14 @@ class ActionSetCreationMixin:
             "Actions menu",
             ["show_actions"],
             state=KeybindState.ALWAYS,
+            include_spectators=True,
+        )
+        self.define_keybind(
+            "ctrl+e",
+            "Estimate duration",
+            ["estimate_duration"],
+            state=KeybindState.IDLE,
+            players=[self.host],
             include_spectators=True,
         )
         self.define_keybind(

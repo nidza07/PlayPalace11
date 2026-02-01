@@ -10,23 +10,27 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ..games.base import Player
     from ..users.base import User
+from ..users.base import TrustLevel
 
 
 class DurationEstimateMixin:
-    """Mixin providing game duration estimation by running CLI simulations.
+    """Estimate game duration via CLI simulations.
 
-    Expects on the Game class:
-        - self._estimate_threads: list
-        - self._estimate_results: list
-        - self._estimate_errors: list
-        - self._estimate_running: bool
-        - self._estimate_lock: threading.Lock
-        - self.players: list[Player]
-        - self.get_user(player) -> User | None
-        - self.broadcast_l() / self.broadcast()
-        - self.get_type() -> str
-        - self.get_min_players() -> int
-        - self.TICKS_PER_SECOND: int (inherited from GameSoundMixin or defined locally)
+    This mixin spawns background simulations and reports estimated duration
+    based on tick counts.
+
+    Expected Game attributes:
+        _estimate_threads: list.
+        _estimate_results: list.
+        _estimate_errors: list.
+        _estimate_running: bool.
+        _estimate_lock: threading.Lock.
+        players: list[Player].
+        get_user(player) -> User | None.
+        broadcast_l() / broadcast().
+        get_type() -> str.
+        get_min_players() -> int.
+        TICKS_PER_SECOND: int (inherited or defined).
     """
 
     # Constants
@@ -36,8 +40,10 @@ class DurationEstimateMixin:
 
     def _action_estimate_duration(self, player: "Player", action_id: str) -> None:
         """Start duration estimation by spawning CLI simulation threads."""
+        user = self.get_user(player)
+        if not user or user.trust_level.value < TrustLevel.ADMIN.value:
+            return
         if self._estimate_running:
-            user = self.get_user(player)
             if user:
                 user.speak_l("estimate-already-running")
             return
@@ -68,6 +74,7 @@ class DurationEstimateMixin:
 
         # Spawn simulation threads
         def run_simulation():
+            """Run a single headless simulation and collect tick counts."""
             try:
                 result = subprocess.run(
                     base_cmd,
