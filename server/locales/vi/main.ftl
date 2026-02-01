@@ -3,6 +3,7 @@
 # Danh mục trò chơi
 category-card-games = Game Bài
 category-dice-games = Game Xúc Xắc
+category-board-games = Game Bàn Cờ
 category-rb-play-center = Trung tâm Giải trí RB
 category-poker = Poker
 category-uncategorized = Chưa phân loại

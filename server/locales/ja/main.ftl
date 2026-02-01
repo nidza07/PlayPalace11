@@ -3,6 +3,7 @@
 # ゲームカテゴリー
 category-card-games = カードゲーム
 category-dice-games = サイコロゲーム
+category-board-games = ボードゲーム
 category-rb-play-center = RBプレイセンター
 category-poker = ポーカー
 category-uncategorized = 未分類

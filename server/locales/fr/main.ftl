@@ -3,6 +3,7 @@
 # Catégories de jeux
 category-card-games = Jeux de cartes
 category-dice-games = Jeux de dés
+category-board-games = Jeux de société
 category-rb-play-center = Centre RB Play
 category-poker = Poker
 category-uncategorized = Non catégorisé

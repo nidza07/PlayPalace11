@@ -3,6 +3,7 @@
 # Game categories
 category-card-games = Карточные игры
 category-dice-games = Игры в кости
+category-board-games = Настольные игры
 category-rb-play-center = RB Play Center
 category-poker = Покер
 category-uncategorized = Без категории
