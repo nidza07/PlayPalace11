@@ -335,14 +335,17 @@ class BoolOption(OptionMeta):
 def option_field(meta: OptionMeta) -> Any:
     """Create a dataclass field with option metadata attached.
 
-    Usage:
-        target_score: int = option_field(IntOption(default=50, ...))
+    Args:
+        meta: Option metadata instance.
+
+    Returns:
+        Dataclass field configured for declarative options.
     """
     return field(default=meta.default, metadata={"option_meta": meta})
 
 
 def get_option_meta(options_class: type, field_name: str) -> OptionMeta | None:
-    """Get the OptionMeta for a field, if it has one."""
+    """Get OptionMeta for a field, if present."""
     for f in fields(options_class):
         if f.name == field_name:
             return f.metadata.get("option_meta")
@@ -431,11 +434,7 @@ class OptionsHandlerMixin:
         return ActionSet(name="options")
 
     def _handle_option_change(self, option_name: str, value: str) -> None:
-        """Handle a declarative option change (for int/menu options).
-
-        This is called by auto-generated option actions.
-        No broadcast needed - screen readers speak the updated list item.
-        """
+        """Handle a declarative option change (int/menu options)."""
         meta = get_option_meta(type(self.options), option_name)
         if not meta:
             return
@@ -453,11 +452,7 @@ class OptionsHandlerMixin:
         self.rebuild_all_menus()
 
     def _handle_option_toggle(self, option_name: str) -> None:
-        """Handle a declarative boolean option toggle.
-
-        This is called by auto-generated toggle actions.
-        No broadcast needed - screen readers speak the updated list item.
-        """
+        """Handle a declarative boolean option toggle."""
         meta = get_option_meta(type(self.options), option_name)
         if not meta:
             return

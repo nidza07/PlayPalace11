@@ -41,14 +41,13 @@ def require_server_owner(func):
 
 
 class AdministrationMixin:
-    """
-    Mixin class providing administration functionality.
+    """Provide administration menu actions and account moderation flows.
 
-    This mixin expects the following attributes on the class it's mixed into:
-    - _db: Database instance
-    - _users: dict[str, NetworkUser] of online users
-    - _user_states: dict[str, dict] of user menu states
-    - _show_main_menu(user): method to show main menu
+    Expected attributes:
+        _db: Database instance.
+        _users: dict[str, NetworkUser] of online users.
+        _user_states: dict[str, dict] of user menu states.
+        _show_main_menu(user): Method to show the main menu.
     """
 
     _db: "Database"

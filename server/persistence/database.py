@@ -12,7 +12,18 @@ from ..users.base import TrustLevel
 
 @dataclass
 class UserRecord:
-    """A user record from the database."""
+    """User record loaded from the database.
+
+    Attributes:
+        id: Internal numeric id.
+        username: Username (display name).
+        password_hash: Stored password hash.
+        uuid: Persistent UUID for stats tracking.
+        locale: Preferred locale.
+        preferences_json: JSON preferences blob.
+        trust_level: Trust level for permissions.
+        approved: Whether the account is approved.
+    """
 
     id: int
     username: str
@@ -26,7 +37,17 @@ class UserRecord:
 
 @dataclass
 class SavedTableRecord:
-    """A saved table record from the database."""
+    """Saved table record from the database.
+
+    Attributes:
+        id: Internal numeric id.
+        username: Owner username.
+        save_name: User-visible save name.
+        game_type: Game type identifier.
+        game_json: Serialized game state.
+        members_json: Serialized member list.
+        saved_at: Timestamp string.
+    """
 
     id: int
     username: str
@@ -38,10 +59,9 @@ class SavedTableRecord:
 
 
 class Database:
-    """
-    SQLite database for PlayPalace persistence.
+    """SQLite database for PlayPalace persistence.
 
-    Stores users and tables as specified in persistence.md.
+    Stores users, tables, saved tables, and game results.
     """
 
     def __init__(self, db_path: str | Path = "playpalace.db"):

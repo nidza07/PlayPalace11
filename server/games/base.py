@@ -179,15 +179,11 @@ class Game(
         self._estimate_lock: threading.Lock = threading.Lock()  # Protect results list
 
     def rebuild_runtime_state(self) -> None:
-        """
-        Rebuild non-serialized runtime state after deserialization.
+        """Rebuild runtime-only state after deserialization.
 
-        Called after loading a game from JSON. Subclasses should override
-        this to rebuild any runtime-only objects not stored in serialized fields.
-        Turn management and sound scheduling are now built into the base class
-        using serialized fields, so they don't need rebuilding.
-
-        Note: Estimation state is initialized clean by __post_init__.
+        Subclasses can override to rebuild non-serialized objects. Base turn
+        management and sound scheduling are stored in serialized fields, so
+        they do not require rebuilding.
         """
         pass
 
@@ -287,11 +283,11 @@ class Game(
 
     @abstractmethod
     def on_start(self) -> None:
-        """Called when the game starts."""
+        """Start game logic after lobby transitions to playing."""
         ...
 
     def on_tick(self) -> None:
-        """Called every tick (50ms). Handle bot AI here.
+        """Run per-tick logic (50ms). Override for bots/timers.
 
         Subclasses should call super().on_tick() to ensure base functionality runs.
         """
@@ -299,7 +295,7 @@ class Game(
         self.check_estimate_completion()
 
     def on_round_timer_ready(self) -> None:
-        """Called when round timer expires. Override in subclasses that use RoundTransitionTimer."""
+        """Handle round-timer expiry for games using RoundTransitionTimer."""
         pass
 
     # Player management

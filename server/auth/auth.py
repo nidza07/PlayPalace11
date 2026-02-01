@@ -23,11 +23,10 @@ if TYPE_CHECKING:
 
 
 class AuthManager:
-    """
-    Handles user authentication and session management.
+    """Handle user authentication and session management.
 
-    Uses Argon2 for password hashing (industry standard for secure password storage).
-    Supports migration from legacy SHA-256 hashes.
+    Uses Argon2 for password hashing and supports migration from legacy
+    SHA-256 hashes on successful login.
     """
 
     def __init__(self, database: "Database"):
