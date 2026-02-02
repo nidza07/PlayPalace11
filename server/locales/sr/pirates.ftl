@@ -29,6 +29,7 @@ pirates-map-edge = Ne možete više da plovite. Vi ste na poziciji { $position }
 
 # Position and status
 pirates-check-status = Proveri status
+pirates-check-status-detailed = Detaljni status
 pirates-check-position = Proveri poziciju
 pirates-check-moon = Proveri osvetljenje meseca
 pirates-your-position = Vaša pozicija: { $position } u okejanu { $ocean }
@@ -80,7 +81,7 @@ pirates-push = { $attacker } gura igrača { $defender } { $direction } sa { $old
 pirates-steal-attempt = { $attacker } pokušava da ukrade dragulj!
 pirates-steal-rolls = Bacanje kradljivca: { $steal } Protiv odbrane: { $defend }
 pirates-steal-success-you = Ukrali ste  { $gem } igraču { $target }!
-pirates-steal-success-them = { $attacker } vam je ukrao { $gem }!
+pirates-steal-success-them = { $attacker } vam krade { $gem }!
 pirates-steal-success = { $attacker } krade { $gem } od igrača { $defender }!
 pirates-steal-failed = Pokušaj krađe je propao!
 

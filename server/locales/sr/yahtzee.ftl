@@ -54,7 +54,7 @@ yahtzee-your-dice-kept = Vaše kockice: { $dice }. Zadržava se: { $kept }
 yahtzee-not-rolled = Još uvek niste bacili.
 
 # Scoresheet display
-yahtzee-scoresheet-header = === Tabela rezultata igrača { $player } ===
+yahtzee-scoresheet-header = Tabela rezultata igrača { $player }
 yahtzee-scoresheet-upper = Grupe:
 yahtzee-scoresheet-lower = Ostalo:
 yahtzee-scoresheet-category-filled = { $category }: { $points }
