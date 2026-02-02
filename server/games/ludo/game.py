@@ -174,7 +174,6 @@ class LudoGame(Game):
             handler="_action_check_board",
             is_enabled="_is_check_board_enabled",
             is_hidden="_is_check_board_hidden",
-            show_in_actions_menu=True,
         )
         action_set.add(action)
         if action.id in action_set._order:
@@ -423,8 +422,6 @@ class LudoGame(Game):
         return self._is_move_token_enabled(player, 3)
 
     def _is_check_board_enabled(self, player: Player) -> str | None:
-        if self.status != "playing":
-            return "action-not-playing"
         return None
 
     def _is_check_board_hidden(self, player: Player) -> Visibility:
