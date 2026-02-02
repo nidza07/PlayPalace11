@@ -3,6 +3,7 @@
 # Kategorije igara
 category-card-games = Igre kartama
 category-dice-games = Igre sa kockicama
+category-board-games = Igre na tabli
 category-rb-play-center = RB Play centar
 category-poker = Poker
 category-uncategorized = Nekategorisano
