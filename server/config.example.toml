@@ -24,6 +24,10 @@ allow_insecure_ws = false
 # Higher values = slower updates but less CPU usage
 tick_interval_ms = 50
 
+[localization]
+# Default locale for new users (and for auth flows without a client locale)
+default_locale = "en"
+
 [virtual_bots]
 # Bot names - these will be used for virtual bot usernames
 names = [

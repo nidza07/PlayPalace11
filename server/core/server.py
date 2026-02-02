@@ -106,6 +106,7 @@ class Server(AdministrationMixin):
         self.port = port
         self._ssl_cert = ssl_cert
         self._ssl_key = ssl_key
+        self._default_locale = "en"
 
         if db_path == "playpalace.db":
             db_path = str(_MODULE_DIR / "playpalace.db")
@@ -270,6 +271,12 @@ class Server(AdministrationMixin):
         auth_cfg = config.get("auth")
         if not isinstance(auth_cfg, dict):
             auth_cfg = {}
+
+        locale_cfg = config.get("localization")
+        if isinstance(locale_cfg, dict):
+            default_locale = locale_cfg.get("default_locale")
+            if isinstance(default_locale, str) and default_locale.strip():
+                self._default_locale = default_locale.strip()
 
         def _read_limit(source: dict[str, Any], key: str, current: int, minimum: int = 1) -> int:
             """Read an integer limit from config with a minimum clamp."""
@@ -651,7 +658,7 @@ class Server(AdministrationMixin):
         """
         username_raw = packet.get("username", "")
         password_raw = packet.get("password", "")
-        locale = packet.get("locale", "en")
+        locale = packet.get("locale") or self._default_locale
 
         username, password, error = self._validate_credentials(username_raw, password_raw)
         if error:
@@ -685,7 +692,7 @@ class Server(AdministrationMixin):
             needs_approval = self._db.get_user_count() > 0
 
             # Try to register
-            if not self._auth.register(username, password):
+            if not self._auth.register(username, password, locale=locale):
                 self._record_login_failure(username)
                 # Registration failed (shouldn't happen if user not found, but handle anyway)
                 error_message = Localization.get(locale, "incorrect-username")
@@ -824,6 +831,7 @@ class Server(AdministrationMixin):
         username_raw = packet.get("username", "")
         password_raw = packet.get("password", "")
         # email and bio are sent but not stored yet
+        locale = packet.get("locale") or self._default_locale
 
         username, password, error = self._validate_credentials(username_raw, password_raw)
         if error:
@@ -840,7 +848,7 @@ class Server(AdministrationMixin):
         needs_approval = True
 
         # Try to register the user
-        if self._auth.register(username, password):
+        if self._auth.register(username, password, locale=locale):
             await client.send({
                 "type": "speak",
                 "text": "Registration successful! Your account is waiting for approval.",

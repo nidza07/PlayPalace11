@@ -3,6 +3,7 @@
 # Spielkategorien
 category-card-games = Kartenspiele
 category-dice-games = Würfelspiele
+category-board-games = Brettspiele
 category-rb-play-center = RB Play Center
 category-poker = Poker
 category-uncategorized = Unkategorisiert

@@ -3,6 +3,7 @@
 # Game categories
 category-card-games = Juegos de Cartas
 category-dice-games = Juegos de Dados
+category-board-games = Juegos de Mesa
 category-rb-play-center = Centro de Juegos RB
 category-poker = Póker
 category-uncategorized = Sin categoría
