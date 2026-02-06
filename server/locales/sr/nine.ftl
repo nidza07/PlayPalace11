@@ -1,38 +1,35 @@
 # Nine game messages
 
 # Game name
-game-name-nine = Devetka
-
-# Game options (if any are needed later, though rules don't specify any yet)
+game-name-nine = Devetka (nezvanična)
 
 # Player count validation
 nine-error-invalid-player-count = Devetka se može igrati samo sa 2, 3, 4 ili 6 igrača.
 
 # Dealing messages
-nine-deal-2-players = Deljenje 18 karata za dva igrača.
-nine-deal-3-players = Deljenje 12 karata za tri igrača.
-nine-deal-4-players = Deljenje 9 karata za 4 igrača.
-nine-deal-6-players = Deljenje 6 karata za 6 igrača.
-nine-you-dealt-card = Delite { $card }.
-nine-player-dealt-card = { $player } deli { $card }.
+nine-player-deal-2-players = Deljenje 18 karata za dva igrača.
+nine-player-deal-3-players = Deljenje 12 karata za tri igrača.
+nine-player-deal-4-players = Deljenje 9 karata za 4 igrača.
+nine-player-deal-6-players = Deljenje 6 karata za 6 igrača.
 
 # Game start
-nine-game-starts = Devetka počinje!
-nine-start-player-announcement = { $player } ima devetku tref i počinje igru.
+nine-player-game-starts = Devetka počinje!
+nine-player-start-player-announcement = { $player } ima devetku tref i počinje igru.
+nine-you-start-player-announcement = Imate devetku tref i počinjete igru.
 
 # Turn actions
 nine-you-play-card = Igrate { $card }.
 nine-player-plays-card = { $player } igra { $card }.
-nine-you-play-nine-clubs = Igrate devetku tref.
+nine-you-plays-nine-clubs = Igrate devetku tref.
 nine-player-plays-nine-clubs = { $player } igra devetku tref.
 
-nine-you-play-nine-suit = Igrate { $card } da započnete niz { $suit }.
+nine-you-plays-nine-suit = Igrate { $card } da započnete niz { $suit }.
 nine-player-plays-nine-suit = { $player } igra { $card } da započne niz { $suit }.
 
 nine-you-extend-sequence = Proširili ste niz  { $suit } kartom { $card }.
 nine-player-extend-sequence = { $player } proširuje niz { $suit } kartom { $card }.
 
-nine-you-skip-turn = Nemate ispravnih poteza i morate da preskočite potez.
+nine-you-skips-turn = Nemate ispravnih poteza i morate da preskočite potez.
 nine-player-skips-turn = { $player } nema ispravnih poteza i preskače potez.
 
 # Reasons for not being able to play a card
@@ -44,9 +41,10 @@ nine-reason-must-skip = Imate ispravnu kartu i ne možete da preskočite vaš po
 nine-reason-generic = Ova karta se ne može igrati sada.
 
 # Winning
-nine-wins-game = { $player } nema više karata i pobeđuje!
-nine-game-ended = Devetka je gotova.
-nine-final-score = Konačni rezultat: { $score } karata.
+nine-you-wins-game = Nemate više karata i pobeđujete!
+nine-player-wins-game = { $player } nema više karata i pobeđuje!
+nine-player-game-ended = Devetka je gotova.
+nine-you-game-ended = Devetka je gotova.
 nine-you-win = Pobedili ste!
 nine-you-lose = Izgubili ste!
 
@@ -55,4 +53,5 @@ nine-status = { $name }: { $cards_left } karata.
 nine-status-sequence = Niz { $suit }: { $sequence }.
 nine-status-no-sequence = { $suit } niz još uvek nije započeo.
 nine-none = Nema
+nine-action-check-sequences = Proveri nizove
 
