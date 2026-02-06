@@ -176,6 +176,12 @@ class NineGame(Game):
         suit_name = self._get_localized_suit_name(card.suit, locale)
         return Localization.get(locale, "card-name", rank=rank_name, suit=suit_name)
 
+    def _get_localized_check_sequences_label(self, player: Player, action_id: str) -> str:
+        """Get localized label for the 'Check Sequences' action."""
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        return Localization.get(locale, "nine-action-check-sequences")
+
     def _sort_player_hand(self, hand: list[Card]) -> list[Card]:
         """Sorts a player's hand according to Nine's rules (rank ascending, then suit)."""
         # Sort by rank using NINE_RANK_ORDER for custom Ace value, then by suit
@@ -188,6 +194,40 @@ class NineGame(Game):
             # so no reshuffling of discard pile is needed.
             return None
         return self.deck.draw_one()
+
+    def _broadcast_nine_message(
+        self, message_key: str, sending_player: NinePlayer | None = None, **kwargs
+    ) -> None:
+        """Broadcasts a localized message to all players, personalizing 'you' vs 'player',
+        with fallback for 'you' messages to 'player' messages if 'you' version is not defined."""
+        for p in self.players:
+            user = self.get_user(p)
+            if not user:
+                continue
+            
+            target_locale = user.locale
+            
+            final_message_key = f"nine-player-{message_key}" # Default to player version
+
+            if sending_player and p == sending_player:
+                # Check if a specific "you" version exists for this message key
+                you_version_key = f"nine-you-{message_key}"
+                if Localization.get(target_locale, you_version_key, silent=True):
+                    final_message_key = you_version_key
+            
+            
+            # Make a mutable copy of kwargs for localization per recipient
+            msg_kwargs = dict(kwargs) 
+
+            # Localize card object if present in kwargs before speaking
+            if "card" in msg_kwargs and isinstance(msg_kwargs["card"], Card):
+                msg_kwargs["card"] = self._get_localized_card_name(msg_kwargs["card"], target_locale)
+            
+            # Localize suit if present in kwargs before speaking (expecting int suit ID)
+            if "suit" in msg_kwargs and isinstance(msg_kwargs["suit"], int):
+                msg_kwargs["suit"] = self._get_localized_suit_name(msg_kwargs["suit"], target_locale)
+
+            user.speak_l(final_message_key, **msg_kwargs)
 
     # ==========================================================================
     # Game Flow
@@ -233,8 +273,8 @@ class NineGame(Game):
             
             if first_player_obj:
                 self.current_player = first_player_obj
-                self.broadcast_l(
-                    "nine-start-player-announcement", player=first_player_obj.name
+                self._broadcast_nine_message(
+                    "start-player-announcement", player=first_player_obj.name, sending_player=first_player_obj
                 )
         else:
             # This should ideally not happen if deck is built correctly
@@ -242,7 +282,7 @@ class NineGame(Game):
             self.finish_game()
             return
         
-        self.broadcast_l("nine-game-starts")
+        self._broadcast_nine_message("game-starts")
         self.play_sound(random.choice(["game_cards/shuffle1.ogg", "game_cards/shuffle2.ogg", "game_cards/shuffle3.ogg"]))
 
         self._start_turn()
@@ -255,16 +295,16 @@ class NineGame(Game):
 
         if num_players == 2:
             cards_to_deal_per_player = 18
-            self.broadcast_l("nine-deal-2-players")
+            self._broadcast_nine_message("deal-2-players")
         elif num_players == 3:
             cards_to_deal_per_player = 12
-            self.broadcast_l("nine-deal-3-players")
+            self._broadcast_nine_message("deal-3-players")
         elif num_players == 4:
             cards_to_deal_per_player = 9
-            self.broadcast_l("nine-deal-4-players")
+            self._broadcast_nine_message("deal-4-players")
         elif num_players == 6:
             cards_to_deal_per_player = 6
-            self.broadcast_l("nine-deal-6-players")
+            self._broadcast_nine_message("deal-6-players")
         else:
             # Should be caught by prestart_validate
             return
@@ -333,8 +373,8 @@ class NineGame(Game):
 
         if winner_obj:
             self.play_sound("game_pig/win.ogg") # Reusing for now
-            self.broadcast_l("nine-wins-game", player=winner_obj.name)
-            self.broadcast_l("nine-game-ended")
+            self._broadcast_nine_message("wins-game", sending_player=winner_obj, player=winner_obj.name)
+            self._broadcast_nine_message("game-ended")
 
         self.finish_game()
 
@@ -419,11 +459,13 @@ class NineGame(Game):
         # Add a custom status action
         action_set.add(
             Action(
-                id="check_sequences_status", # Renamed ID
-                label="Check Sequences", # Renamed Label
-                handler="_action_check_sequences_status", # Renamed handler
-                is_enabled="_is_check_sequences_status_enabled", # Renamed
-                is_hidden="_is_check_sequences_status_hidden", # Renamed
+                id="check_sequences_status",
+                label="", # Revert to empty string or remove if get_label is used
+                handler="_action_check_sequences_status",
+                is_enabled="_is_check_sequences_status_enabled",
+                is_hidden="_is_check_sequences_status_hidden",
+                get_label="_get_localized_check_sequences_label", # Use get_label for dynamic localization
+                show_in_actions_menu=True, # Set to True to make visible in general menu
             )
         )
 
@@ -448,11 +490,11 @@ class NineGame(Game):
         if "s" in self._keybinds:
             self._keybinds["s"] = []
 
-        # New keybind for checking sequences
+        # Custom keybind for status
         self.define_keybind(
-            "c", # Changed from 's' to 'c'
-            "Check Sequences", # Changed label
-            ["check_sequences_status"], # Changed ID
+            "s", # Changed from 'c' back to 's'
+            Localization.get("en", "nine-action-check-sequences"),
+            ["check_sequences_status"],
             state=KeybindState.ACTIVE,
             include_spectators=True,
         )
@@ -530,8 +572,8 @@ class NineGame(Game):
         return None
 
     def _is_check_sequences_status_hidden(self, player: Player) -> Visibility:
-        """Check sequences status is always visible."""
-        return Visibility.VISIBLE
+        """Check sequences status is always hidden (keybind only)."""
+        return Visibility.HIDDEN
 
     def _is_skip_turn_enabled(self, player: Player) -> str | None:
         """Check if skip turn action is enabled."""
@@ -603,7 +645,7 @@ class NineGame(Game):
             if user: user.speak_l("nine-reason-must-skip")
             return
         
-        self.broadcast_l("nine-player-skips-turn", player=player.name)
+        self._broadcast_nine_message("skips-turn", sending_player=player, player=player.name)
         self.play_sound("game_cah/buzz.ogg") # Reusing buzz sound for skip
         self._end_turn()
 
@@ -719,11 +761,17 @@ class NineGame(Game):
             # Must be Nine of Clubs
             self.nine_state.nine_of_clubs_played = True
             self.nine_state.sequences[card.suit] = SequenceState(low_card=card, high_card=card)
-            self.broadcast_l("nine-player-plays-nine-clubs", player=player.name)
+            self._broadcast_nine_message("plays-nine-clubs", sending_player=player, player=player.name)
         elif card.rank == RANK_NINE:
             # Playing a nine to start a new sequence
             self.nine_state.sequences[card.suit] = SequenceState(low_card=card, high_card=card)
-            self.broadcast_l("nine-player-plays-nine-suit", player=player.name, card=self._get_localized_card_name(card, locale), suit=self._get_localized_suit_name(card.suit, locale))
+            self._broadcast_nine_message(
+                "plays-nine-suit",
+                sending_player=player,
+                player=player.name,
+                card=card, # Pass raw Card object
+                suit=card.suit, # Pass raw suit integer
+            )
         else:
             # Extending an existing sequence
             sequence = self.nine_state.sequences[card.suit]
@@ -734,7 +782,13 @@ class NineGame(Game):
             elif sequence.high_card and self._get_card_nine_value(sequence.high_card) == card_nine_value - 1:
                 sequence.high_card = card
             
-            self.broadcast_l("nine-player-extend-sequence", player=player.name, card=self._get_localized_card_name(card, locale), suit=self._get_localized_suit_name(card.suit, locale))
+            self._broadcast_nine_message(
+                "extend-sequence",
+                sending_player=player,
+                player=player.name,
+                card=card, # Pass raw Card object
+                suit=card.suit, # Pass raw suit integer
+            )
 
         self.discard_pile.append(card)
         self.play_sound(random.choice(["game_cards/play1.ogg", "game_cards/play2.ogg", "game_cards/play3.ogg", "game_cards/play4.ogg"]))
