@@ -336,12 +336,23 @@ class NineGame(Game):
 
         self.announce_turn()
 
+        # Check for automatic skip
+        if not self._has_valid_move(player):
+            self._auto_skip_current_player_turn(player)
+            return
+
         # Jolt bot to think about next play
         if player.is_bot:
             BotHelper.jolt_bot(player, ticks=random.randint(30, 50))
 
         self._update_all_turn_actions()
         self.rebuild_all_menus()
+
+    def _auto_skip_current_player_turn(self, player: NinePlayer) -> None:
+        """Execute the logic for automatically skipping a player's turn."""
+        self._broadcast_nine_message("skips-turn", sending_player=player, player=player.name)
+        self.play_sound("game_cah/buzz.ogg") # Reusing buzz sound for skip
+        self._end_turn()
 
     def _end_turn(self) -> None:
         """End current player's turn."""
@@ -439,17 +450,6 @@ class NineGame(Game):
 
         # Actions for playing cards dynamically added based on hand
         # This will be updated by _update_card_actions
-
-        # Action to skip turn (only if no valid moves)
-        action_set.add(
-            Action(
-                id="skip_turn",
-                label="Skip Turn",
-                handler="_action_skip_turn",
-                is_enabled="_is_skip_turn_enabled",
-                is_hidden="_is_skip_turn_hidden",
-            )
-        )
         return action_set
 
     def create_standard_action_set(self, player: NinePlayer) -> ActionSet:
@@ -576,20 +576,12 @@ class NineGame(Game):
         return Visibility.HIDDEN
 
     def _is_skip_turn_enabled(self, player: Player) -> str | None:
-        """Check if skip turn action is enabled."""
-        if self.status != "playing":
-            return "action-not-playing"
-        if self.current_player != player:
-            return "action-not-your-turn"
-        
-        # Player can only skip if no valid moves
-        if self._has_valid_move(player):
-            return Localization.get("en", "nine-reason-must-skip")
-        return None
+        """Skip turn action is never enabled for direct player interaction."""
+        return "action-disabled"
 
     def _is_skip_turn_hidden(self, player: Player) -> Visibility:
-        """Skip turn is always visible."""
-        return Visibility.VISIBLE
+        """Skip turn action is always hidden from the UI."""
+        return Visibility.HIDDEN
 
     def _has_valid_move(self, player: NinePlayer) -> bool:
         """Check if the player has any valid moves."""
@@ -634,20 +626,10 @@ class NineGame(Game):
         """Handle skipping a turn."""
         if not isinstance(player, NinePlayer):
             return
-
-        if self.current_player != player:
-            user = self.get_user(player)
-            if user: user.speak_l("nine-reason-not-your-turn")
-            return
-
-        if self._has_valid_move(player):
-            user = self.get_user(player)
-            if user: user.speak_l("nine-reason-must-skip")
-            return
         
-        self._broadcast_nine_message("skips-turn", sending_player=player, player=player.name)
-        self.play_sound("game_cah/buzz.ogg") # Reusing buzz sound for skip
-        self._end_turn()
+        # All checks should have happened before this point, if this action is still callable,
+        # it means a player wants to skip when they legitimately have no moves.
+        self._auto_skip_current_player_turn(player)
 
     def _action_play_card(self, player: Player, action_id: str) -> None:
         """Handle playing a card from hand."""

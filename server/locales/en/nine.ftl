@@ -49,6 +49,7 @@ nine-you-game-ended = The game of Nine has ended.
 
 nine-you-win = You win!
 nine-you-lose = You lose!
+nine-final-score = Cards left: { $score }
 
 # Status
 nine-status = { $name }: { $cards_left } cards left.
