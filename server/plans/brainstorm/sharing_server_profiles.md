@@ -14,12 +14,16 @@ Both modes will have almost identical controls, however there will be slight dif
 To import or export data, the main server manager screen will have a button for each operation.
 All checkboxes in the dialog start unchecked by default in both modes.
 
+## Important Temporary Note
+Option profiles at the current moment are empty. This is expected at the time of adding these features. It should still behave as normal, since exporting / importing things like option profiles and user accounts just coppies the object.
+
 ## Updated server manager main layout
 After the add server button, add the "import server profiles" and "export server profiles" buttons.
 
 ## Config Sharing Dialog layout
 These controls are present regardless of the mode.
 
+*Filters (grouping)
 *included types (checklistbox): controls which types of data are visible in the server panel. The label adapts to the mode ("export types" or "import types"). Items are: user accounts, option profiles. In import mode, "server info updates" is also included when applicable. The list is dynamic: if no servers have data for a given type, that type is removed from the list. All items are checked by default. Checking an item shows the corresponding control in the server panel; unchecking hides it. This does not change the value of any server's settings, it only affects visibility. Hiding and unhiding a type preserves whatever state the user set per server.
 
 In import mode only:
@@ -37,7 +41,7 @@ Each server has these controls:
 *add options profile (checkbox): determines if the options profile for the focused server should be included in the operation. If no options profile data is available for this server, this checkbox is grayed out with "(will use defaults)" appended to the accessible label.
 
 In import mode only, for existing servers where the imported name or port differs from the current data:
-*server info (read-only): displays the imported server info for comparison.
+*server info (read-only multiline): displays the imported server info for comparison.
 *update server info (checkbox): determines if the server name and port should be updated to match the imported data.
 If the imported server info is identical to the existing server (comparing name and port only, not notes), the server info display and update checkbox are hidden entirely.
 

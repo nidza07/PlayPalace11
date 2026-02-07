@@ -9,6 +9,7 @@ from config_manager import (
     get_item_from_dict,
     set_item_in_dict,
 )
+from config_schemas import OptionsProfile
 
 
 def write_json(path: Path, data):
@@ -129,13 +130,13 @@ def test_deep_merge_override_behavior(tmp_path):
 
 def test_add_update_delete_server(tmp_path):
     cm = make_manager(tmp_path)
-    server_id = cm.add_server("Local", "localhost", "9000", "notes")
+    server_id = cm.add_server("Local", "localhost", 9000, "notes")
     assert server_id in cm.get_all_servers()
 
-    cm.update_server(server_id, name="Prod", port="8000")
+    cm.update_server(server_id, name="Prod", port=8000)
     server = cm.get_server_by_id(server_id)
     assert server["name"] == "Prod"
-    assert server["port"] == "8000"
+    assert server["port"] == 8000
 
     assert cm.get_server_display_name(server_id) == "Prod"
     assert cm.get_server_url(server_id) == "ws://localhost:8000"
@@ -146,13 +147,13 @@ def test_add_update_delete_server(tmp_path):
 
 def test_get_server_url_respects_existing_scheme(tmp_path):
     cm = make_manager(tmp_path)
-    server_id = cm.add_server("Secure", "wss://example.com", "9001")
+    server_id = cm.add_server("Secure", "wss://example.com", 9001)
     assert cm.get_server_url(server_id) == "wss://example.com:9001"
 
 
 def test_last_server_and_accounts(tmp_path):
     cm = make_manager(tmp_path)
-    server_id = cm.add_server("Local", "localhost", "8000")
+    server_id = cm.add_server("Local", "localhost", 8000)
     account_id = cm.add_account(server_id, "alice", "pwd", email="a@example.com")
     assert cm.get_server_accounts(server_id)
     cm.update_account(server_id, account_id, password="secret", notes="admin")
@@ -171,7 +172,7 @@ def test_last_server_and_accounts(tmp_path):
 
 def test_trusted_certificate_round_trip(tmp_path):
     cm = make_manager(tmp_path)
-    server_id = cm.add_server("Secure", "example", "8000")
+    server_id = cm.add_server("Secure", "example", 8000)
     assert cm.get_trusted_certificate(server_id) is None
 
     cert_info = {"fingerprint": "aa:bb", "issued_to": "example"}
@@ -187,7 +188,7 @@ def test_trusted_certificate_round_trip(tmp_path):
 
 def test_client_options_with_overrides(tmp_path):
     cm = make_manager(tmp_path)
-    server_id = cm.add_server("Local", "localhost", "8000")
+    server_id = cm.add_server("Local", "localhost", 8000)
 
     cm.set_client_option("audio/music_volume", 25)
     cm.set_client_option("audio/music_volume", 60, server_id, create_mode=True)
@@ -210,7 +211,7 @@ def test_set_client_option_creates_layers(tmp_path):
 
 def test_clear_server_override_prunes_empty_dict(tmp_path):
     cm = make_manager(tmp_path)
-    server_id = cm.add_server("Local", "localhost", "8000")
+    server_id = cm.add_server("Local", "localhost", 8000)
     cm.set_client_option("interface/play_typing_sounds", False, server_id, create_mode=True)
     cm.clear_server_override(server_id, "interface/play_typing_sounds", delete_empty_layers=True)
     assert cm.profiles["server_options"][server_id] == {}
@@ -257,3 +258,133 @@ def test_invalid_profiles_file_returns_defaults(tmp_path):
 
     cm = ConfigManager(base_path=base)
     assert cm.profiles == defaults
+
+
+# ========== Schema Validation Tests ==========
+
+
+def test_schema_fills_missing_fields(tmp_path):
+    """Loading identities with missing fields should fill them with defaults."""
+    identities = {
+        "last_server_id": None,
+        "servers": {
+            "srv-1": {
+                "server_id": "srv-1",
+                "name": "Test",
+                "host": "localhost",
+                "port": 9000,
+                "accounts": {
+                    "acct-1": {
+                        "account_id": "acct-1",
+                        "username": "demo",
+                        "password": "pass",
+                    }
+                },
+            }
+        },
+    }
+    base = tmp_path / "pp"
+    write_json(base / "identities.json", identities)
+    cm = ConfigManager(base_path=base)
+
+    server = cm.identities["servers"]["srv-1"]
+    # Missing fields should be filled with defaults
+    assert server["notes"] == ""
+    assert server["last_account_id"] is None
+    assert server["options_profile"] == OptionsProfile().model_dump()
+    assert server["trusted_certificate"] is None
+    assert "default_options_profile" in cm.identities
+
+    account = server["accounts"]["acct-1"]
+    assert account["email"] == ""
+    assert account["notes"] == ""
+
+
+def test_schema_strips_unknown_fields(tmp_path):
+    """Loading identities with unknown fields should strip them."""
+    identities = {
+        "last_server_id": None,
+        "default_options_profile": {},
+        "unknown_root_field": "should be stripped",
+        "servers": {
+            "srv-1": {
+                "server_id": "srv-1",
+                "name": "Test",
+                "host": "localhost",
+                "port": 8000,
+                "unknown_server_field": True,
+                "accounts": {
+                    "acct-1": {
+                        "account_id": "acct-1",
+                        "username": "demo",
+                        "password": "pass",
+                        "unknown_account_field": 42,
+                    }
+                },
+            }
+        },
+    }
+    base = tmp_path / "pp"
+    write_json(base / "identities.json", identities)
+    cm = ConfigManager(base_path=base)
+
+    assert "unknown_root_field" not in cm.identities
+    server = cm.identities["servers"]["srv-1"]
+    assert "unknown_server_field" not in server
+    account = server["accounts"]["acct-1"]
+    assert "unknown_account_field" not in account
+
+
+def test_schema_coerces_string_port(tmp_path):
+    """Loading identities with port as string should coerce to int."""
+    identities = {
+        "last_server_id": None,
+        "servers": {
+            "srv-1": {
+                "server_id": "srv-1",
+                "name": "Test",
+                "host": "localhost",
+                "port": "9000",
+                "accounts": {},
+            }
+        },
+    }
+    base = tmp_path / "pp"
+    write_json(base / "identities.json", identities)
+    cm = ConfigManager(base_path=base)
+
+    server = cm.identities["servers"]["srv-1"]
+    assert server["port"] == 9000
+    assert isinstance(server["port"], int)
+
+
+def test_new_server_has_all_fields(tmp_path):
+    """Creating a new server should include all fields from the schema."""
+    cm = make_manager(tmp_path)
+    server_id = cm.add_server("Test", "localhost", 8000)
+    server = cm.get_server_by_id(server_id)
+
+    assert server["server_id"] == server_id
+    assert server["name"] == "Test"
+    assert server["host"] == "localhost"
+    assert server["port"] == 8000
+    assert server["notes"] == ""
+    assert server["accounts"] == {}
+    assert server["last_account_id"] is None
+    assert server["options_profile"] == OptionsProfile().model_dump()
+    assert server["trusted_certificate"] is None
+
+
+def test_new_account_has_auto_generated_id(tmp_path):
+    """Creating a new account should auto-generate an account_id."""
+    cm = make_manager(tmp_path)
+    server_id = cm.add_server("Test", "localhost", 8000)
+    account_id = cm.add_account(server_id, "alice", "pwd")
+    account = cm.get_account_by_id(server_id, account_id)
+
+    assert account["account_id"] == account_id
+    assert len(account_id) == 36  # UUID format
+    assert account["username"] == "alice"
+    assert account["password"] == "pwd"
+    assert account["email"] == ""
+    assert account["notes"] == ""

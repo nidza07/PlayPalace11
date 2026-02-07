@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
+from config_schemas import Identities, Server, UserAccount, validate_identities
+
 def get_item_from_dict(dictionary: dict, key_path: (str, tuple), *, create_mode: bool= False):
   """Return the item in a dictionary, typically a nested layer dict.
   Optionally create keys that don't exist, or require the full path to exist already.
@@ -105,8 +107,13 @@ class ConfigManager:
         if self.identities_path.exists():
             try:
                 with open(self.identities_path, "r") as f:
-                    identities = json.load(f)
-                    return self._migrate_identities(identities)
+                    raw = json.load(f)
+                    validated = validate_identities(raw)
+                    if validated != raw:
+                        self.identities = validated
+                        self.save_identities()
+                        print("Identities validated and saved.")
+                    return validated
             except Exception as e:
                 print(f"Error loading identities: {e}")
                 return self._get_default_identities()
@@ -115,36 +122,7 @@ class ConfigManager:
 
     def _get_default_identities(self) -> Dict[str, Any]:
         """Get default identities structure."""
-        return {
-            "last_server_id": None,
-            "servers": {},  # server_id -> server info with accounts
-        }
-
-    def _migrate_identities(self, identities: Dict[str, Any]) -> Dict[str, Any]:
-        """Migrate identities to add new fields.
-
-        Args:
-            identities: The loaded identities dictionary
-
-        Returns:
-            Migrated identities dictionary
-        """
-        needs_save = False
-
-        # Migration: Add email field to all existing accounts
-        for server_id, server in identities.get("servers", {}).items():
-            for account_id, account in server.get("accounts", {}).items():
-                if "email" not in account:
-                    account["email"] = ""
-                    needs_save = True
-
-        # Save immediately if migration occurred
-        if needs_save:
-            self.identities = identities
-            self.save_identities()
-            print("Identities migration completed: added email field to accounts.")
-
-        return identities
+        return Identities().model_dump()
 
     def _load_profiles(self) -> Dict[str, Any]:
         """Load option profiles from file (shareable, no credentials)."""
@@ -409,7 +387,7 @@ class ConfigManager:
         self,
         name: str,
         host: str,
-        port: str,
+        port: int,
         notes: str = "",
     ) -> str:
         """Add a new server.
@@ -423,16 +401,9 @@ class ConfigManager:
         Returns:
             New server ID
         """
-        server_id = str(uuid.uuid4())
-        self.identities["servers"][server_id] = {
-            "server_id": server_id,
-            "name": name,
-            "host": host,
-            "port": port,
-            "notes": notes,
-            "accounts": {},  # account_id -> account info
-            "trusted_certificate": None,
-        }
+        server = Server(name=name, host=host, port=port, notes=notes)
+        server_id = server.server_id
+        self.identities["servers"][server_id] = server.model_dump()
         self.save_identities()
         return server_id
 
@@ -441,7 +412,7 @@ class ConfigManager:
         server_id: str,
         name: Optional[str] = None,
         host: Optional[str] = None,
-        port: Optional[str] = None,
+        port: Optional[int] = None,
         notes: Optional[str] = None,
     ):
         """Update server information.
@@ -508,7 +479,7 @@ class ConfigManager:
             return None
 
         host = server.get("host", "")
-        port = server.get("port", "8000")
+        port = server.get("port", 8000)
 
         # Check if host already has a scheme
         if "://" in host:
@@ -609,17 +580,14 @@ class ConfigManager:
         if server_id not in self.identities["servers"]:
             return None
 
-        account_id = str(uuid.uuid4())
+        account = UserAccount(
+            username=username, password=password, email=email, notes=notes
+        )
+        account_id = account.account_id
         if "accounts" not in self.identities["servers"][server_id]:
             self.identities["servers"][server_id]["accounts"] = {}
 
-        self.identities["servers"][server_id]["accounts"][account_id] = {
-            "account_id": account_id,
-            "username": username,
-            "password": password,
-            "email": email,
-            "notes": notes,
-        }
+        self.identities["servers"][server_id]["accounts"][account_id] = account.model_dump()
         self.save_identities()
         return account_id
 

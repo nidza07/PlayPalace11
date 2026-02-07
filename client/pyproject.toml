@@ -12,6 +12,7 @@ dependencies = [
     "accessible-output2>=0.16",
     "websockets>=14.0",
     "sound-lib>=0.2.2",
+    "pydantic>=2.0",
 ]
 
 [project.scripts]

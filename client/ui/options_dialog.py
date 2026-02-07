@@ -122,7 +122,7 @@ class ClientOptionsDialog(wx.Dialog, uisound.SoundBindingsMixin):
 
         # Show server address as hint
         server_host = server_info.get("host", "")
-        server_port = server_info.get("port", "8000")
+        server_port = server_info.get("port", 8000)
         self.url_hint = wx.StaticText(panel, label=f"Address: {server_host}:{server_port}")
         font = self.url_hint.GetFont()
         font.PointSize -= 1

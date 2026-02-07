@@ -1,8 +1,8 @@
 *.claude
 *.pyc
 *.venv
+*.pytest_cache
 server/.ruff_cache
-server/.pytest_cache
 server/errors.log
 server/.cache/
 server/playpalace.db
