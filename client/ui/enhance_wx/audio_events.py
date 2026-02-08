@@ -1,4 +1,6 @@
-# Custom utility from Zarvox, allowing for playing sounds for ui events with seemless integration.
+"""
+This helper module allows for playing sounds for ui events with little setup.
+"""
 
 import wx
 import wx.adv
@@ -150,9 +152,7 @@ class SoundBindingsMixin:
 
     def on_checklistbox_sfx(self, evt: wx.CommandEvent):
         ctrl = evt.GetEventObject()
-        index = (
-            evt.GetSelection() if hasattr(evt, "GetSelection") else ctrl.GetSelection()
-        )
+        index = ctrl.GetSelection()
         if index is None or ctrl.GetCount() == 0 or index == wx.NOT_FOUND:
             self.play_sfx("list_move")
         else:

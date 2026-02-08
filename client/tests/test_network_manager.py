@@ -59,6 +59,7 @@ PACKET_TO_HANDLER = {
     "table_create": "on_table_create",
     "pong": "on_server_pong",
     "chat": "on_receive_chat",
+    "server_status": "on_server_status",
 }
 
 
@@ -86,6 +87,12 @@ class RecordingMainWindow(DummyMainWindow):
 @pytest.fixture(autouse=True)
 def callafter_immediate(monkeypatch):
     monkeypatch.setattr(nm_mod.wx, "CallAfter", lambda func, *a, **k: func(*a, **k))
+
+
+@pytest.fixture(autouse=True)
+def skip_packet_validation(monkeypatch):
+    monkeypatch.setattr(nm_mod, "validate_incoming", lambda packet: None)
+    monkeypatch.setattr(nm_mod, "validate_outgoing", lambda packet: None)
 
 
 def make_certificate_info(**overrides):
