@@ -13,6 +13,7 @@ const AMBIENCE_VOLUME_KEY = "playpalace.web.ambience_volume";
 const DEFAULT_MUSIC_VOLUME = 20;
 const DEFAULT_AMBIENCE_VOLUME = 100;
 const DEFAULT_WEB_CLIENT_CONFIG = {
+  appVersion: "2026.02.08.1",
   serverUrl: "",
   serverPort: null,
   soundBaseUrl: "./sounds",
@@ -21,6 +22,9 @@ const WEB_CLIENT_CONFIG = {
   ...DEFAULT_WEB_CLIENT_CONFIG,
   ...(window.WEB_CLIENT_CONFIG || {}),
 };
+const APP_VERSION = String(
+  window.PLAYPALACE_WEB_VERSION || WEB_CLIENT_CONFIG.appVersion || DEFAULT_WEB_CLIENT_CONFIG.appVersion
+).trim();
 
 function getDefaultServerUrl() {
   if (WEB_CLIENT_CONFIG.serverUrl) {
@@ -113,6 +117,7 @@ const elements = {
   inputValue: document.getElementById("input-value"),
   inputCancel: document.getElementById("input-cancel"),
   inputSubmit: document.getElementById("input-submit"),
+  appVersion: document.getElementById("app-version"),
 };
 
 const store = createStore();
@@ -163,6 +168,13 @@ let network = null;
 function setStatus(text, isError = false) {
   elements.status.textContent = text;
   elements.status.classList.toggle("error", isError);
+}
+
+function renderVersion() {
+  if (!elements.appVersion) {
+    return;
+  }
+  elements.appVersion.textContent = `Web client version ${APP_VERSION}`;
 }
 
 function setConnectedUi(connected) {
@@ -541,6 +553,7 @@ function installAudioUnlock() {
 }
 
 async function bootstrap() {
+  renderVersion();
   const validator = await loadPacketValidator();
 
   network = createNetworkClient({

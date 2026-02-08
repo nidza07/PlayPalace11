@@ -109,6 +109,9 @@
         clip: rect(0, 0, 0, 0);
         border: 0;
       }
+      .footer {
+        text-align: right;
+      }
       @media (max-width: 900px) {
         .grid { grid-template-columns: 1fr; }
       }
@@ -191,10 +194,24 @@
 
       <div id="live-polite" class="sr-only" aria-live="polite" aria-atomic="true"></div>
       <div id="live-assertive" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+      <footer class="panel footer">
+        <small id="app-version">Version</small>
+      </footer>
     </main>
 
     <script src="./config.sample.js"></script>
     <script src="./config.js"></script>
-    <script type="module" src="./app.js"></script>
+    <script>
+      (() => {
+        const cfg = window.WEB_CLIENT_CONFIG || {};
+        const version = String(cfg.appVersion || "2026.02.08.1").trim();
+        window.PLAYPALACE_WEB_VERSION = version;
+        const script = document.createElement("script");
+        script.type = "module";
+        script.src = `./app.js?v=${encodeURIComponent(version)}`;
+        document.body.appendChild(script);
+      })();
+    </script>
   </body>
 </html>
