@@ -346,7 +346,6 @@ function openLoginDialog() {
   }
   applyRememberedUsernameToLoginForm();
   elements.password.value = "";
-  a11y.announce(`Web client version ${APP_VERSION}`, { assertive: false });
   elements.username.focus();
 }
 
