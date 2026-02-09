@@ -10,6 +10,8 @@ import pytest
 from server.core.server import Server, DEFAULT_WS_MAX_MESSAGE_BYTES
 from server.auth.auth import AuthResult
 from server.users.base import TrustLevel
+from server.tables.table import Table
+from server.games.base import Player
 
 
 class DummyClient:
@@ -18,9 +20,14 @@ class DummyClient:
         self.authenticated = False
         self.sent = []
         self.address = address
+        self.closed = False
+        self.replaced = False
 
     async def send(self, payload):
         self.sent.append(payload)
+
+    async def close(self):
+        self.closed = True
 
 
 class DummyAuth:
@@ -221,6 +228,125 @@ async def test_authorize_rejects_invalid_password_length(server):
     assert server._auth.calls["authenticate"] == []
     assert len(client.sent) == 3
     assert client.sent[1]["text"].startswith("Password must be between")
+
+
+@pytest.mark.asyncio
+async def test_authorize_handoffs_existing_session(monkeypatch, server):
+    record = SimpleNamespace(
+        username="alice",
+        locale="en",
+        uuid="uuid-alice",
+        trust_level=TrustLevel.USER,
+        approved=True,
+        preferences_json="{}",
+    )
+    auth = DummyAuth(user_record=record)
+    server._auth = auth
+    server._tables = SimpleNamespace(find_user_table=lambda username: None)
+
+    async def fake_send_game_list(client):
+        fake_send_game_list.calls.append(client.username)
+
+    fake_send_game_list.calls = []
+    server._send_game_list = fake_send_game_list
+    server._show_main_menu = lambda user: None
+
+    client1 = DummyClient()
+    await server._handle_authorize(client1, {"username": "alice", "password": "validpass"})
+    assert client1.authenticated
+
+    client2 = DummyClient(address="127.0.0.1:2222")
+    await server._handle_authorize(client2, {"username": "alice", "password": "validpass"})
+
+    # Existing connection receives disconnect and is closed
+    assert any(packet["type"] == "disconnect" for packet in client1.sent)
+    assert client1.closed
+
+    # New connection inherits the session
+    user = server._users["alice"]
+    assert user.connection is client2
+    assert client2.authenticated
+    assert client2.sent[0]["type"] == "authorize_success"
+
+
+@pytest.mark.asyncio
+async def test_authorize_rejoin_replays_transcript(monkeypatch, server):
+    from server.users.test_user import MockUser
+
+    record = SimpleNamespace(
+        username="player",
+        locale="en",
+        uuid="uuid-player",
+        trust_level=TrustLevel.USER,
+        approved=True,
+        preferences_json="{}",
+    )
+    auth = DummyAuth(user_record=record)
+    server._auth = auth
+
+    async def fake_send_game_list(client):
+        return None
+
+    server._send_game_list = fake_send_game_list
+
+    table = Table(table_id="tbl1", game_type="dummy", host="player")
+    table._manager = server._tables
+    table._server = server
+    server._tables._tables[table.table_id] = table
+    table.add_member("player", MockUser("player", uuid="uuid-player"), as_spectator=False)
+
+    class DummyGame:
+        def __init__(self):
+            self.player = Player(id="uuid-player", name="player", is_bot=True)
+            self.players = [self.player]
+            self.broadcasts = []
+            self.sounds = []
+            self.menus_rebuilt = 0
+            self.player_menu_rebuilt = 0
+            self.transcript = [{"text": "Bot played card", "buffer": "table"}]
+
+        def to_json(self):
+            return "{}"
+
+        def get_player_by_id(self, player_id):
+            return self.player if self.player.id == player_id else None
+
+        def attach_user(self, player_id, user):
+            self.attached = user
+
+        def broadcast_l(self, message_id, **kwargs):
+            self.broadcasts.append((message_id, kwargs))
+
+        def broadcast_sound(self, sound_name):
+            self.sounds.append(sound_name)
+
+        def rebuild_all_menus(self):
+            self.menus_rebuilt += 1
+
+        def rebuild_player_menu(self, player):
+            self.player_menu_rebuilt += 1
+
+        def get_transcript(self, player_id):
+            return list(self.transcript)
+
+    dummy_game = DummyGame()
+    table.game = dummy_game
+
+    client = DummyClient()
+    packet = {"username": "player", "password": "validpass"}
+    await server._handle_authorize(client, packet)
+
+    assert dummy_game.player.is_bot is False
+    assert ("player-took-over", {"player": "player"}) in dummy_game.broadcasts
+    assert "join.ogg" in dummy_game.sounds
+    assert dummy_game.menus_rebuilt == 1
+    assert dummy_game.player_menu_rebuilt == 1
+    assert server._user_states["player"]["menu"] == "in_game"
+
+    user = server._users["player"]
+    queued = user.get_queued_messages()
+    assert any(packet.get("muted") for packet in queued)
+    assert any(packet.get("text") == "Bot played card" for packet in queued)
 
 
 @pytest.mark.asyncio

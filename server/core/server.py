@@ -677,6 +677,8 @@ class Server(AdministrationMixin):
 
                 # Setup keybinds (runtime only, not serialized)
                 game.setup_keybinds()
+                if hasattr(game, "_reset_transcripts"):
+                    game._reset_transcripts()
                 # Attach bots (humans will be attached when they reconnect)
                 # Action sets are already restored from serialization
                 for player in game.players:
@@ -717,6 +719,45 @@ class Server(AdministrationMixin):
                     for msg in messages:
                         asyncio.create_task(client.send(msg))
 
+    async def _handoff_existing_session(self, user: NetworkUser, new_client: ClientConnection) -> None:
+        """Disconnect the existing client session for a user and bind the new connection."""
+        old_client = user.connection
+        if old_client:
+            old_client.replaced = True
+            try:
+                await old_client.send({
+                    "type": "disconnect",
+                    "reconnect": False,
+                    "show_message": True,
+                    "return_to_login": True,
+                    "message": Localization.get(user.locale, "already-logged-in"),
+                })
+            except Exception:
+                pass
+            with contextlib.suppress(Exception):
+                await old_client.close()
+        new_client.username = user.username
+        new_client.authenticated = True
+        user.set_connection(new_client)
+
+    def _queue_transcript_replay(self, user: NetworkUser, game, player_id: str) -> None:
+        """Queue buffered transcript packets for a user."""
+        if not hasattr(game, "get_transcript"):
+            return
+        history = game.get_transcript(player_id)
+        if not history:
+            return
+        for entry in history:
+            packet = {
+                "type": "speak",
+                "text": entry.get("text", ""),
+                "muted": True,
+            }
+            buffer_name = entry.get("buffer")
+            if buffer_name:
+                packet["buffer"] = buffer_name
+            user.queue_packet(packet)
+
     async def _on_client_connect(self, client: ClientConnection) -> None:
         """Handle new client connection."""
         snapshot = self._lifecycle.snapshot()
@@ -730,6 +771,8 @@ class Server(AdministrationMixin):
         """Handle client disconnection."""
         username = client.username or "unknown"
         print(f"Client disconnected: {username}@{client.address}")
+        if getattr(client, "replaced", False):
+            return
         if client.username:
             username = client.username
             table = self._tables.find_user_table(username)
@@ -893,25 +936,7 @@ class Server(AdministrationMixin):
             if needs_approval:
                 self._notify_admins("account-request", "accountrequest.ogg")
 
-        # Check if user is already logged in
-        if username in self._users:
-            error_message = Localization.get(locale, "already-logged-in")
-            await client.send({"type": "play_sound", "name": "accounterror.ogg"})
-            await client.send({"type": "speak", "text": error_message, "buffer": "activity"})
-            await client.send({
-                "type": "disconnect",
-                "reconnect": False,
-                "show_message": True,
-                "return_to_login": True,
-                "message": error_message,
-            })
-            return
-
-        # Authentication successful
-        client.username = username
-        client.authenticated = True
-
-        # Create network user with preferences and persistent UUID
+        # Create or update network user with preferences and persistent UUID
         user_record = self._auth.get_user(username)
         locale = user_record.locale if user_record else "en"
         user_uuid = user_record.uuid if user_record else None
@@ -924,11 +949,23 @@ class Server(AdministrationMixin):
                 preferences = UserPreferences.from_dict(prefs_data)
             except (json.JSONDecodeError, KeyError):
                 pass  # Use defaults on error
-        user = NetworkUser(
-            username, locale, client, uuid=user_uuid, preferences=preferences,
-            trust_level=trust_level, approved=is_approved
-        )
-        self._users[username] = user
+        existing_user = self._users.get(username)
+        if existing_user:
+            await self._handoff_existing_session(existing_user, client)
+            user = existing_user
+            user.set_locale(locale)
+            user.set_preferences(preferences)
+            user.set_trust_level(trust_level)
+            user.set_approved(is_approved)
+        else:
+            client.username = username
+            client.authenticated = True
+            user = NetworkUser(
+                username, locale, client, uuid=user_uuid, preferences=preferences,
+                trust_level=trust_level, approved=is_approved
+            )
+            self._users[username] = user
+        is_new_login = existing_user is None
 
         # Send success response
         await client.send(
@@ -965,15 +1002,16 @@ class Server(AdministrationMixin):
             self._show_main_menu(user)
             return
 
-        # Broadcast online announcement (only for approved, non-banned users)
-        online_sound = "onlineadmin.ogg" if trust_level.value >= TrustLevel.ADMIN.value else "online.ogg"
-        self._broadcast_presence_l("user-online", username, online_sound)
+        # Broadcast online announcement (only for approved, non-banned users) once per login
+        if is_new_login:
+            online_sound = "onlineadmin.ogg" if trust_level.value >= TrustLevel.ADMIN.value else "online.ogg"
+            self._broadcast_presence_l("user-online", username, online_sound)
 
-        # If user is server owner, announce that; otherwise if admin, announce that
-        if trust_level.value >= TrustLevel.SERVER_OWNER.value:
-            self._broadcast_server_owner_announcement(username)
-        elif trust_level.value >= TrustLevel.ADMIN.value:
-            self._broadcast_admin_announcement(username)
+            # If user is server owner, announce that; otherwise if admin, announce that
+            if trust_level.value >= TrustLevel.SERVER_OWNER.value:
+                self._broadcast_server_owner_announcement(username)
+            elif trust_level.value >= TrustLevel.ADMIN.value:
+                self._broadcast_admin_announcement(username)
 
         # Notify admin of pending account approvals (excluding banned users)
         if trust_level.value >= TrustLevel.ADMIN.value:
@@ -991,9 +1029,17 @@ class Server(AdministrationMixin):
 
             # Attach user to table and game
             table.attach_user(username, user)
+            table.add_member(username, user, as_spectator=False)
             player = game.get_player_by_id(user.uuid)
             if player:
+                was_bot = player.is_bot
+                if was_bot:
+                    player.is_bot = False
                 game.attach_user(player.id, user)
+                if was_bot:
+                    game.broadcast_l("player-took-over", player=user.username)
+                    game.broadcast_sound("join.ogg")
+                    game.rebuild_all_menus()
 
                 # Set user state so menu selections are handled correctly
                 self._user_states[username] = {
@@ -1003,6 +1049,7 @@ class Server(AdministrationMixin):
 
                 # Rebuild menu for this player
                 game.rebuild_player_menu(player)
+                self._queue_transcript_replay(user, game, player.id)
         else:
             # Show main menu
             self._show_main_menu(user)
