@@ -125,11 +125,11 @@
     <main>
       <h1>PlayPalace V11 Web</h1>
 
-      <section class="panel" aria-label="Connection status">
+      <section class="panel">
         <div class="row">
           <button id="open-login-btn" type="button" class="secondary" tabindex="-1">Login/Reconnect</button>
           <button id="disconnect-btn" type="button" class="secondary" tabindex="-1">Disconnect</button>
-          <span id="status" class="status" role="status">Disconnected</span>
+          <span id="status" class="status" aria-live="polite" aria-atomic="true">Disconnected</span>
         </div>
       </section>
 
