@@ -128,11 +128,6 @@ export function createMenuView({
       const active = i === boundedSelection;
       if (!isCoarsePointer) {
         li.setAttribute("aria-selected", active ? "true" : "false");
-      } else {
-        const button = li.querySelector("button");
-        if (button) {
-          button.setAttribute("aria-current", active ? "true" : "false");
-        }
       }
       li.classList.toggle("active", active);
     }

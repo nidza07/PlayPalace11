@@ -112,6 +112,11 @@ const elements = {
   historyContent: document.getElementById("history-content"),
   historyToggle: document.getElementById("history-toggle"),
   historyBuffer: document.getElementById("history-buffer"),
+  actionsBtn: document.getElementById("actions-btn"),
+  actionsDialog: document.getElementById("actions-dialog"),
+  actionsDialogForm: document.getElementById("actions-dialog-form"),
+  actionsCancel: document.getElementById("actions-cancel"),
+  actionsRun: document.getElementById("actions-run"),
 
   chatForm: document.getElementById("chat-form"),
   chatInput: document.getElementById("chat-input"),
@@ -322,6 +327,37 @@ function sendKeybind(payload) {
   network.send({ type: "keybind", ...payload });
 }
 
+function runEscapeAction() {
+  const menu = store.state.currentMenu;
+  if (!menu || menu.menuId === "main_menu") {
+    return;
+  }
+  if (menu.escapeBehavior === "escape_event") {
+    sendEscape();
+    return;
+  }
+  if (menu.escapeBehavior === "select_last_option") {
+    const lastIndex = menu.items.length - 1;
+    if (lastIndex >= 0) {
+      menuView.setSelection(lastIndex);
+      sendMenuSelection(lastIndex);
+    }
+    return;
+  }
+
+  const menuIndex = menu.items.length ? menu.selection + 1 : null;
+  const currentItem = menu.items[menu.selection] || null;
+  sendKeybind({
+    key: "escape",
+    control: false,
+    alt: false,
+    shift: false,
+    menu_id: menu.menuId,
+    menu_index: menuIndex,
+    menu_item_id: currentItem?.id ?? null,
+  });
+}
+
 function sendListOnline() {
   network.send({ type: "list_online" });
 }
@@ -485,6 +521,21 @@ function installDialogTabTrap(dialogEl, focusTargets) {
   });
 }
 
+function openActionsDialog() {
+  if (!store.state.connection.authenticated) {
+    return;
+  }
+  if (store.state.currentMenu.menuId === "main_menu") {
+    return;
+  }
+  if (!elements.actionsDialog.open) {
+    elements.actionsDialog.showModal();
+  }
+  requestAnimationFrame(() => {
+    elements.actionsRun.focus();
+  });
+}
+
 function handlePacket(packet) {
   switch (packet.type) {
     case "authorize_success": {
@@ -643,12 +694,14 @@ function installAudioUnlock() {
     const unlocked = await audio.unlock();
     if (unlocked) {
       store.setAudioUnlocked(true);
+      window.removeEventListener("pointerdown", unlockOnce, true);
+      window.removeEventListener("keydown", unlockOnce, true);
     }
   };
 
   const events = ["pointerdown", "keydown"];
   for (const eventName of events) {
-    window.addEventListener(eventName, unlockOnce, { once: true, passive: true });
+    window.addEventListener(eventName, unlockOnce, { capture: true, passive: true });
   }
 }
 
@@ -761,6 +814,21 @@ async function bootstrap() {
   elements.openLoginBtn.addEventListener("click", () => {
     openLoginDialog();
   });
+  elements.actionsBtn?.addEventListener("click", () => {
+    openActionsDialog();
+  });
+  elements.actionsCancel?.addEventListener("click", () => {
+    if (elements.actionsDialog.open) {
+      elements.actionsDialog.close();
+    }
+  });
+  elements.actionsDialogForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    runEscapeAction();
+    if (elements.actionsDialog.open) {
+      elements.actionsDialog.close();
+    }
+  });
 
   elements.musicVolume?.addEventListener("input", (event) => {
     const value = event.target?.value ?? "0";
@@ -829,6 +897,10 @@ async function bootstrap() {
     elements.inputValue,
     elements.inputCancel,
     elements.inputSubmit,
+  ]);
+  installDialogTabTrap(elements.actionsDialog, [
+    elements.actionsCancel,
+    elements.actionsRun,
   ]);
   setConnectedUi(false);
   openLoginDialog();

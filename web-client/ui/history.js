@@ -96,15 +96,15 @@ export function createHistoryView({
       return;
     }
     if (!isMobileLike) {
-      historyToggleEl.hidden = true;
+      historyToggleEl.hidden = false;
+      historyToggleEl.setAttribute("aria-expanded", "true");
       historyContentEl.hidden = false;
       historyLogEl.hidden = true;
       return;
     }
-    historyToggleEl.hidden = false;
     historyContentEl.hidden = mobileCollapsed;
     historyLogEl.hidden = false;
-    historyToggleEl.textContent = mobileCollapsed ? "Expand" : "Collapse";
+    historyToggleEl.setAttribute("aria-expanded", mobileCollapsed ? "false" : "true");
   }
 
   function addEntry(text, options = {}) {
