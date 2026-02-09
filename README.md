@@ -103,6 +103,17 @@ This command rewrites `server/packet_schema.json` and `client/packet_schema.json
 
 PlayPalace now enforces TLS hostname and certificate verification for all `wss://` connections. When the server presents an unknown or self-signed certificate, the client shows the certificate details (CN, SANs, issuer, validity window, and SHA-256 fingerprint) and lets you explicitly trust it. Trusted certificates are pinned per server entry—subsequent connections will only succeed if the fingerprint matches, and you can remove a stored certificate from the Server Manager dialog at any time.
 
+#### Token-Based Auth Flow
+
+PlayPalace uses short-lived access tokens (1 hour by default) and refresh tokens to avoid sending passwords after the initial login. The login flow is:
+
+1. The client sends `authorize` with username + password (or an existing access token if it is still valid).
+2. The server responds with `authorize_success`, including the access token and a refresh token.
+3. On reconnect, if the access token is expired, the client sends `refresh_session` with the stored refresh token.
+4. The server rotates the refresh token and returns `refresh_session_success` with new tokens.
+
+Refresh tokens are stored in the client identities file (same storage used for saved accounts). Access tokens remain in memory only.
+
 ### Server Configuration
 
 Copy `server/config.example.toml` to `server/config.toml` to tweak runtime behavior. Alongside the existing `[virtual_bots]` settings, the `[auth]` section lets you clamp username and password lengths that the server will accept:
@@ -113,11 +124,14 @@ username_min_length = 3
 username_max_length = 32
 password_min_length = 8
 password_max_length = 128
+refresh_token_ttl_seconds = 2592000
 
 [auth.rate_limits]
 login_per_minute = 
 login_failures_per_minute = 3
 registration_per_minute = 2
+refresh_per_minute = 10
+refresh_window_seconds = 60
 ```
 
 If the `[auth]` table is omitted, PlayPalace falls back to the defaults shown above. Adjust these values to match your policies (for example, force longer passwords on public deployments).
@@ -132,7 +146,7 @@ allow_insecure_ws = false      # force TLS by default
 
 Values are in bytes and map directly to the `max_size` setting used by the underlying websockets server.
 Set `allow_insecure_ws` to `true` only for trusted development setups where TLS certificates are unavailable; the server will refuse to start without TLS when this flag is `false`, and it will print a loud warning whenever it runs in plaintext mode.
-`[auth.rate_limits]` caps how many login attempts each IP can make per minute, how many failed attempts a specific username can accrue, and how many registrations are allowed per minute from the same IP. Setting any of the limits to `0` disables that particular throttle.
+`[auth.rate_limits]` caps how many login attempts each IP can make per minute, how many failed attempts a specific username can accrue, how many registrations are allowed per minute from the same IP, and how often refresh tokens may be exchanged. Setting any of the limits to `0` disables that particular throttle.
 
 #### Guided Virtual Bots
 
