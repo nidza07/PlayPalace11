@@ -77,7 +77,7 @@ class DurationEstimateMixin:
             """Run a single headless simulation and collect tick counts."""
             try:
                 result = subprocess.run(
-                    base_cmd,
+                    base_cmd,  # nosec B603
                     capture_output=True,
                     text=True,
                     timeout=600,  # 10 minute timeout per simulation

@@ -581,7 +581,7 @@ class NinetyNineGame(Game):
         # Set turn order to alive players
         self.set_turn_players(self.alive_players)
 
-        self.play_sound(f"game_cards/shuffle{random.randint(1, 3)}.ogg")
+        self.play_sound(f"game_cards/shuffle{random.randint(1, 3)}.ogg")  # nosec B311
         self.broadcast_l("ninetynine-round", round=self.round)
 
         self._start_turn()
@@ -607,7 +607,7 @@ class NinetyNineGame(Game):
 
         # Set up bot thinking
         if player.is_bot:
-            BotHelper.jolt_bot(player, ticks=random.randint(20, 40))
+            BotHelper.jolt_bot(player, ticks=random.randint(20, 40))  # nosec B311
 
         self._update_all_turn_actions()
         self.rebuild_all_menus()
@@ -669,7 +669,7 @@ class NinetyNineGame(Game):
             self.turn_index = (self.turn_index + self.turn_direction) % len(self.turn_player_ids)
             attempts += 1
 
-        BotHelper.jolt_bots(self, ticks=random.randint(15, 25))
+        BotHelper.jolt_bots(self, ticks=random.randint(15, 25))  # nosec B311
         self._start_turn()
 
     def _draw_card(self) -> Card | None:
@@ -806,7 +806,7 @@ class NinetyNineGame(Game):
         self.discard_pile.append(card)
 
         # Play card sound
-        self.play_sound(f"game_cards/play{random.randint(1, 4)}.ogg", 70)
+        self.play_sound(f"game_cards/play{random.randint(1, 4)}.ogg", 70)  # nosec B311
 
         # Announce the play
         self.broadcast_personal_l(
@@ -847,7 +847,7 @@ class NinetyNineGame(Game):
             # Manual draw mode - set per-player timeout
             # Bots draw after a short delay; humans get the full window
             if player.is_bot:
-                player.draw_timeout_ticks = random.randint(15, 30)
+                player.draw_timeout_ticks = random.randint(15, 30)  # nosec B311
             else:
                 player.draw_timeout_ticks = DRAW_TIMEOUT_TICKS
             self._advance_turn()
@@ -1087,7 +1087,7 @@ class NinetyNineGame(Game):
             player.hand.append(drawn)
             self._sort_hand(player)
 
-            self.play_sound(f"game_cards/draw{random.randint(1, 4)}.ogg")
+            self.play_sound(f"game_cards/draw{random.randint(1, 4)}.ogg")  # nosec B311
 
             user = self.get_user(player)
             if user:

@@ -201,7 +201,7 @@ class MidnightGame(ActionGuardMixin, Game, DiceGameMixin):
 
         # Give bot time to think about next action
         if player.is_bot:
-            BotHelper.jolt_bot(player, ticks=random.randint(10, 20))
+            BotHelper.jolt_bot(player, ticks=random.randint(10, 20))  # nosec B311
 
         self.rebuild_all_menus()
 
@@ -275,7 +275,7 @@ class MidnightGame(ActionGuardMixin, Game, DiceGameMixin):
             )
 
         # Jolt all bots to pause for the turn change
-        BotHelper.jolt_bots(self, ticks=random.randint(20, 30))
+        BotHelper.jolt_bots(self, ticks=random.randint(20, 30))  # nosec B311
 
         self._on_turn_end()
 

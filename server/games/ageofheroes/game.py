@@ -1638,8 +1638,8 @@ class AgeOfHeroesGame(Game):
             return
 
         # Roll two dice
-        die1 = random.randint(1, 6)
-        die2 = random.randint(1, 6)
+        die1 = random.randint(1, 6)  # nosec B311
+        die2 = random.randint(1, 6)  # nosec B311
         total = die1 + die2
         player.dice_roll = total
         self.setup_rolls[player.id] = total
@@ -1700,7 +1700,7 @@ class AgeOfHeroesGame(Game):
             # Jolt bots to reroll
             for p in winners:
                 if p.is_bot:
-                    BotHelper.jolt_bot(p, ticks=random.randint(20, 30))
+                    BotHelper.jolt_bot(p, ticks=random.randint(20, 30))  # nosec B311
         else:
             # We have a winner - they go first
             first_player = winners[0]
@@ -1903,7 +1903,7 @@ class AgeOfHeroesGame(Game):
         # Jolt bots to roll dice
         for p in self.get_active_players():
             if p.is_bot:
-                BotHelper.jolt_bot(p, ticks=random.randint(20, 40))
+                BotHelper.jolt_bot(p, ticks=random.randint(20, 40))  # nosec B311
 
         self.rebuild_all_menus()
 
@@ -3093,7 +3093,7 @@ class AgeOfHeroesGame(Game):
             user.speak_l("ageofheroes-your-action")
 
         if player.is_bot:
-            BotHelper.jolt_bot(player, ticks=random.randint(30, 50))
+            BotHelper.jolt_bot(player, ticks=random.randint(30, 50))  # nosec B311
 
         self.rebuild_all_menus()
 

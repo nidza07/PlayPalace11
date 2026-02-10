@@ -247,7 +247,7 @@ def player_roll_war_dice(game: AgeOfHeroesGame, player: AgeOfHeroesPlayer) -> in
     player_index = active_players.index(player)
 
     # Roll one die (war uses 1d6, not 2d6 like setup)
-    die_roll = random.randint(1, 6)
+    die_roll = random.randint(1, 6)  # nosec B311
 
     # Store roll for this player
     if player_index == war.attacker_index:
@@ -604,7 +604,7 @@ def apply_war_outcome(game: AgeOfHeroesGame) -> None:
             for _ in range(cards_to_steal):
                 if defender.hand:
                     # Steal random card
-                    idx = random.randint(0, len(defender.hand) - 1)
+                    idx = random.randint(0, len(defender.hand) - 1)  # nosec B311
                     card = defender.hand.pop(idx)
                     attacker.hand.append(card)
                     stolen.append(card)
