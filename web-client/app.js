@@ -111,6 +111,7 @@ const elements = {
   connectForm: document.getElementById("connect-form"),
   username: document.getElementById("username"),
   password: document.getElementById("password"),
+  togglePassword: document.getElementById("toggle-password"),
   rememberMe: document.getElementById("remember-me"),
   openLoginBtn: document.getElementById("open-login-btn"),
   disconnectBtn: document.getElementById("disconnect-btn"),
@@ -481,6 +482,10 @@ function openLoginDialog() {
   }
   applyRememberedUsernameToLoginForm();
   elements.password.value = "";
+  elements.password.type = "password";
+  if (elements.togglePassword) {
+    elements.togglePassword.textContent = "Show password";
+  }
   elements.username.focus();
 }
 
@@ -999,6 +1004,12 @@ async function bootstrap() {
 
   elements.openLoginBtn.addEventListener("click", () => {
     openLoginDialog();
+  });
+  elements.togglePassword?.addEventListener("click", () => {
+    const showing = elements.password.type === "text";
+    elements.password.type = showing ? "password" : "text";
+    elements.togglePassword.textContent = showing ? "Show password" : "Hide password";
+    elements.password.focus();
   });
   elements.actionsBtn?.addEventListener("click", () => {
     requestActionsDialog();

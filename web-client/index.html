@@ -319,16 +319,20 @@
             </label>
             <label>
               Password
-              <input
-                id="password"
-                type="password"
-                required
-                autocomplete="current-password"
-                autocapitalize="none"
-                autocorrect="off"
-                spellcheck="false"
-                enterkeyhint="go"
-              />
+              <div class="row">
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  autocomplete="current-password"
+                  autocapitalize="none"
+                  autocorrect="off"
+                  spellcheck="false"
+                  enterkeyhint="go"
+                  style="flex: 1;"
+                />
+                <button id="toggle-password" type="button" class="secondary">Show password</button>
+              </div>
             </label>
             <label>
               <input id="remember-me" type="checkbox" />
