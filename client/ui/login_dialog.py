@@ -20,7 +20,7 @@ class LoginDialog(wx.Dialog):
         self.config_manager = ConfigManager()
 
         self.username = ""
-        self.password = ""
+        self.password = ""  # nosec B105 - user-entered password placeholder
         self.refresh_token = ""
         self.refresh_expires_at = None
         self.server_id = None

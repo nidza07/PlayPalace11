@@ -156,8 +156,8 @@ class ConfigManager:
                 },
                 "local_table": {
                     "start_as_visible": "always",
-                    "start_with_password": "never",
-                    "default_password_text": "",
+                    "start_with_password": "never",  # nosec B105 - config key, not a secret
+                    "default_password_text": "",  # nosec B105 - placeholder text only
                     "creation_notifications": {}},  # Will be populated dynamically
             },
             "server_options": {},  # server_id -> options_overrides dict
@@ -561,7 +561,7 @@ class ConfigManager:
         self,
         server_id: str,
         username: str,
-        password: str,
+        password: str,  # nosec B107 - user-supplied password, not a default
         email: str = "",
         notes: str = "",
         refresh_token: str = "",
