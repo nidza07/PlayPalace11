@@ -4,7 +4,6 @@ export function createA11y({ politeEl, assertiveEl }) {
   let latestAssertiveId = 0;
   let lastAnnouncementText = "";
   let lastAnnouncementAt = 0;
-  let alternatingMarker = false;
 
   function announce(text, options = {}) {
     const { assertive = false } = options;
@@ -40,9 +39,7 @@ export function createA11y({ politeEl, assertiveEl }) {
       // Reinsert as a fresh node so identical repeated text can still be announced.
       const span = document.createElement("span");
       span.setAttribute("data-announce-id", String(announcementNonce));
-      // Alternate an inaudible marker to keep repeated legitimate messages announceable.
-      alternatingMarker = !alternatingMarker;
-      span.textContent = `${normalized}${alternatingMarker ? "\u2060" : "\u2061"}`;
+      span.textContent = normalized;
       target.replaceChildren(span);
     });
   }
