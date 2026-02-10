@@ -528,72 +528,61 @@ class NetworkManager:
 
         packet_type = packet.get("type")
 
-        if packet_type == "authorize_success":
-            session_token = packet.get("session_token")
-            if session_token:
-                self.session_token = session_token
-            session_expires_at = packet.get("session_expires_at")
-            if session_expires_at:
-                self.session_expires_at = session_expires_at
-            refresh_token = packet.get("refresh_token")
-            if refresh_token:
-                self.refresh_token = refresh_token
-            refresh_expires_at = packet.get("refresh_expires_at")
-            if refresh_expires_at:
-                self.refresh_expires_at = refresh_expires_at
-            self.main_window.on_authorize_success(packet)
-        elif packet_type == "refresh_session_success":
-            self.session_token = packet.get("session_token")
-            self.session_expires_at = packet.get("session_expires_at")
-            self.refresh_token = packet.get("refresh_token")
-            self.refresh_expires_at = packet.get("refresh_expires_at")
-            self.main_window.on_authorize_success(packet)
-        elif packet_type == "refresh_session_failure":
-            self.session_token = None
-            self.session_expires_at = None
-            self.refresh_token = None
-            self.refresh_expires_at = None
-            message = packet.get("message", "Session expired. Please log in again.")
-            wx.CallAfter(self.main_window.add_history, message, "activity")
-        elif packet_type == "speak":
+        if packet_type in {"authorize_success", "refresh_session_success"}:
+            self._handle_authorize_success(packet, packet_type)
+            return
+        if packet_type == "refresh_session_failure":
+            self._handle_refresh_failure(packet)
+            return
+        if packet_type == "speak":
             self.main_window.on_server_speak(packet)
-        elif packet_type == "play_sound":
-            self.main_window.on_server_play_sound(packet)
-        elif packet_type == "play_music":
-            self.main_window.on_server_play_music(packet)
-        elif packet_type == "play_ambience":
-            self.main_window.on_server_play_ambience(packet)
-        elif packet_type == "stop_ambience":
-            self.main_window.on_server_stop_ambience(packet)
-        elif packet_type == "add_playlist":
-            self.main_window.on_server_add_playlist(packet)
-        elif packet_type == "start_playlist":
-            self.main_window.on_server_start_playlist(packet)
-        elif packet_type == "remove_playlist":
-            self.main_window.on_server_remove_playlist(packet)
-        elif packet_type == "get_playlist_duration":
-            self.main_window.on_server_get_playlist_duration(packet)
-        elif packet_type == "menu":
-            self.main_window.on_server_menu(packet)
-        elif packet_type == "request_input":
-            self.main_window.on_server_request_input(packet)
-        elif packet_type == "clear_ui":
-            self.main_window.on_server_clear_ui(packet)
-        elif packet_type == "game_list":
-            self.main_window.on_server_game_list(packet)
-        elif packet_type == "disconnect":
-            self.main_window.on_server_disconnect(packet)
-        elif packet_type == "update_options_lists":
-            self.main_window.on_update_options_lists(packet)
-        elif packet_type == "open_client_options":
-            self.main_window.on_open_client_options(packet)
-        elif packet_type == "open_server_options":
-            self.main_window.on_open_server_options(packet)
-        elif packet_type == "table_create":
-            self.main_window.on_table_create(packet)
-        elif packet_type == "pong":
-            self.main_window.on_server_pong(packet)
-        elif packet_type == "chat":
-            self.main_window.on_receive_chat(packet)
-        elif packet_type == "server_status":
-            self.main_window.on_server_status(packet)
+            return
+        if packet_type in _PACKET_DISPATCH:
+            _PACKET_DISPATCH[packet_type](self.main_window, packet)
+
+    def _handle_authorize_success(self, packet, packet_type: str) -> None:
+        session_token = packet.get("session_token")
+        if session_token:
+            self.session_token = session_token
+        session_expires_at = packet.get("session_expires_at")
+        if session_expires_at:
+            self.session_expires_at = session_expires_at
+        refresh_token = packet.get("refresh_token")
+        if refresh_token:
+            self.refresh_token = refresh_token
+        refresh_expires_at = packet.get("refresh_expires_at")
+        if refresh_expires_at:
+            self.refresh_expires_at = refresh_expires_at
+        self.main_window.on_authorize_success(packet)
+
+    def _handle_refresh_failure(self, packet) -> None:
+        self.session_token = None
+        self.session_expires_at = None
+        self.refresh_token = None
+        self.refresh_expires_at = None
+        message = packet.get("message", "Session expired. Please log in again.")
+        wx.CallAfter(self.main_window.add_history, message, "activity")
+
+
+_PACKET_DISPATCH = {
+    "play_sound": lambda window, pkt: window.on_server_play_sound(pkt),
+    "play_music": lambda window, pkt: window.on_server_play_music(pkt),
+    "play_ambience": lambda window, pkt: window.on_server_play_ambience(pkt),
+    "stop_ambience": lambda window, pkt: window.on_server_stop_ambience(pkt),
+    "add_playlist": lambda window, pkt: window.on_server_add_playlist(pkt),
+    "start_playlist": lambda window, pkt: window.on_server_start_playlist(pkt),
+    "remove_playlist": lambda window, pkt: window.on_server_remove_playlist(pkt),
+    "get_playlist_duration": lambda window, pkt: window.on_server_get_playlist_duration(pkt),
+    "menu": lambda window, pkt: window.on_server_menu(pkt),
+    "request_input": lambda window, pkt: window.on_server_request_input(pkt),
+    "clear_ui": lambda window, pkt: window.on_server_clear_ui(pkt),
+    "game_list": lambda window, pkt: window.on_server_game_list(pkt),
+    "disconnect": lambda window, pkt: window.on_server_disconnect(pkt),
+    "update_options_lists": lambda window, pkt: window.on_update_options_lists(pkt),
+    "open_client_options": lambda window, pkt: window.on_open_client_options(pkt),
+    "open_server_options": lambda window, pkt: window.on_open_server_options(pkt),
+    "table_create": lambda window, pkt: window.on_table_create(pkt),
+    "pong": lambda window, pkt: window.on_server_pong(pkt),
+    "chat": lambda window, pkt: window.on_receive_chat(pkt),
+    "server_status": lambda window, pkt: window.on_server_status(pkt),
+}
