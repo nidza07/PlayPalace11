@@ -3147,81 +3147,124 @@ class Server(AdministrationMixin):
             items: Menu item list to append to.
         """
         for config in game_class.get_leaderboard_types():
-            lb_id = config["id"]
-            path = config.get("path")
-            numerator_path = config.get("numerator")
-            denominator_path = config.get("denominator")
-            aggregate = config.get("aggregate", "sum")
-            decimals = config.get("decimals", 0)
+            custom_stat = self._build_custom_stat(user, config, game_results)
+            if not custom_stat:
+                continue
+            lb_id, text = custom_stat
+            items.append(MenuItem(text=text, id=f"custom_{lb_id}"))
 
-            # Extract values for this player from all game results
-            values = []
-            num_values = []
-            denom_values = []
+    def _build_custom_stat(
+        self, user: NetworkUser, config: dict, game_results: list
+    ) -> tuple[str, str] | None:
+        """Build a custom stat string from leaderboard config."""
+        lb_id = config["id"]
+        aggregate = config.get("aggregate", "sum")
+        decimals = config.get("decimals", 0)
+        values, num_values, denom_values = self._collect_custom_stat_values(
+            user, config, game_results
+        )
 
-            for result in game_results:
-                # Check if player participated in this game
-                player_name = None
-                for p in result.player_results:
-                    if p.player_id == user.uuid:
-                        player_name = p.player_name
-                        break
+        final_value = self._aggregate_custom_stat(
+            values, num_values, denom_values, aggregate
+        )
+        if final_value is None:
+            return None
 
-                if not player_name:
-                    continue
+        formatted_value = self._format_custom_stat_value(final_value, decimals)
+        text = self._format_custom_stat_text(user, lb_id, formatted_value)
+        return lb_id, text
 
-                custom_data = result.custom_data
+    def _collect_custom_stat_values(
+        self, user: NetworkUser, config: dict, game_results: list
+    ) -> tuple[list[float], list[float], list[float]]:
+        """Extract raw custom stat values for a user across game results."""
+        path = config.get("path")
+        numerator_path = config.get("numerator")
+        denominator_path = config.get("denominator")
 
-                if path:
-                    # Simple path extraction
-                    resolved_path = path.replace("{player_name}", player_name)
-                    resolved_path = resolved_path.replace("{player_id}", user.uuid)
-                    value = self._extract_path_value(custom_data, resolved_path)
-                    if value is not None:
-                        values.append(value)
-                elif numerator_path and denominator_path:
-                    # Ratio calculation
-                    num_path = numerator_path.replace("{player_name}", player_name)
-                    denom_path = denominator_path.replace("{player_name}", player_name)
-                    num_val = self._extract_path_value(custom_data, num_path)
-                    denom_val = self._extract_path_value(custom_data, denom_path)
-                    if num_val is not None and denom_val is not None:
-                        num_values.append(num_val)
-                        denom_values.append(denom_val)
+        values: list[float] = []
+        num_values: list[float] = []
+        denom_values: list[float] = []
 
-            # Calculate aggregated value
-            final_value = None
-            if values:
-                if aggregate == "sum":
-                    final_value = sum(values)
-                elif aggregate == "max":
-                    final_value = max(values)
-                elif aggregate == "avg":
-                    final_value = sum(values) / len(values)
-            elif num_values and denom_values:
-                total_num = sum(num_values)
-                total_denom = sum(denom_values)
-                if total_denom > 0:
-                    final_value = total_num / total_denom
+        for result in game_results:
+            player_name = self._find_player_name(result, user.uuid)
+            if not player_name:
+                continue
 
-            if final_value is not None:
-                # Format the value
-                if decimals > 0:
-                    formatted_value = f"{final_value:.{decimals}f}"
-                else:
-                    formatted_value = str(round(final_value))
+            custom_data = result.custom_data
+            if path:
+                resolved_path = self._resolve_stat_path(path, player_name, user.uuid)
+                value = self._extract_path_value(custom_data, resolved_path)
+                if value is not None:
+                    values.append(value)
+            elif numerator_path and denominator_path:
+                num_path = self._resolve_stat_path(numerator_path, player_name, user.uuid)
+                denom_path = self._resolve_stat_path(denominator_path, player_name, user.uuid)
+                num_val = self._extract_path_value(custom_data, num_path)
+                denom_val = self._extract_path_value(custom_data, denom_path)
+                if num_val is not None and denom_val is not None:
+                    num_values.append(num_val)
+                    denom_values.append(denom_val)
 
-                # Get localization key
-                loc_key = f"my-stats-{lb_id.replace('_', '-')}"
-                # Try game-specific key first, fall back to generic
-                text = Localization.get(user.locale, loc_key, value=formatted_value)
-                if text == loc_key:
-                    # Key not found, use leaderboard type name
-                    type_key = f"leaderboard-type-{lb_id.replace('_', '-')}"
-                    type_name = Localization.get(user.locale, type_key)
-                    text = f"{type_name}: {formatted_value}"
+        return values, num_values, denom_values
 
-                items.append(MenuItem(text=text, id=f"custom_{lb_id}"))
+    def _find_player_name(self, result, player_id: str) -> str | None:
+        """Find the player name for a given player id in a result."""
+        for p in result.player_results:
+            if p.player_id == player_id:
+                return p.player_name
+        return None
+
+    def _resolve_stat_path(self, path: str, player_name: str, player_id: str) -> str:
+        """Substitute player tokens in stat paths."""
+        return (
+            path.replace("{player_name}", player_name)
+            .replace("{player_id}", player_id)
+        )
+
+    def _aggregate_custom_stat(
+        self,
+        values: list[float],
+        num_values: list[float],
+        denom_values: list[float],
+        aggregate: str,
+    ) -> float | None:
+        """Aggregate raw stat values based on config rules."""
+        if values:
+            if aggregate == "sum":
+                return sum(values)
+            if aggregate == "max":
+                return max(values)
+            if aggregate == "avg":
+                return sum(values) / len(values)
+            return None
+
+        if num_values and denom_values:
+            total_num = sum(num_values)
+            total_denom = sum(denom_values)
+            if total_denom > 0:
+                return total_num / total_denom
+
+        return None
+
+    def _format_custom_stat_value(self, value: float, decimals: int) -> str:
+        """Format a custom stat value for display."""
+        if decimals > 0:
+            return f"{value:.{decimals}f}"
+        return str(round(value))
+
+    def _format_custom_stat_text(
+        self, user: NetworkUser, lb_id: str, formatted_value: str
+    ) -> str:
+        """Build the localized text for a custom stat."""
+        loc_key = f"my-stats-{lb_id.replace('_', '-')}"
+        text = Localization.get(user.locale, loc_key, value=formatted_value)
+        if text != loc_key:
+            return text
+
+        type_key = f"leaderboard-type-{lb_id.replace('_', '-')}"
+        type_name = Localization.get(user.locale, type_key)
+        return f"{type_name}: {formatted_value}"
 
     def _extract_path_value(self, data: dict, path: str) -> float | None:
         """Extract a value from nested dict using dot-notation path.
