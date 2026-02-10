@@ -3,6 +3,7 @@
 import wx
 import json
 import asyncio
+import logging
 import threading
 import websockets
 import ssl
@@ -18,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from constants import USERNAME_LENGTH_HINT, PASSWORD_LENGTH_HINT
 from certificate_prompt import CertificatePromptDialog, CertificateInfo
 
+LOG = logging.getLogger(__name__)
 
 class RegistrationDialog(wx.Dialog):
     """Registration dialog for creating new accounts."""
@@ -223,8 +225,8 @@ class RegistrationDialog(wx.Dialog):
             finally:
                 try:
                     await ws.close()
-                except Exception:
-                    pass
+                except (OSError, RuntimeError, websockets.exceptions.ConnectionClosed) as exc:
+                    LOG.debug("Failed to close registration websocket: %s", exc)
 
         except asyncio.TimeoutError:
             return "Server did not respond in time"
@@ -311,8 +313,8 @@ class RegistrationDialog(wx.Dialog):
             if websocket:
                 try:
                     await websocket.close()
-                except Exception:
-                    pass
+                except (OSError, RuntimeError, websockets.exceptions.ConnectionClosed) as exc:
+                    LOG.debug("Failed to close TLS probe websocket: %s", exc)
 
     def _prompt_trust_decision(self, cert_info: CertificateInfo) -> bool:
         decision = {"trust": False}

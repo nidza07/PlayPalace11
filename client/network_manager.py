@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import threading
 import hashlib
 import os
@@ -17,6 +18,8 @@ from websockets.asyncio.client import connect
 
 from certificate_prompt import CertificatePromptDialog, CertificateInfo
 from packet_validator import validate_incoming, validate_outgoing
+
+LOG = logging.getLogger(__name__)
 
 
 class TLSUserDeclinedError(Exception):
@@ -326,8 +329,8 @@ class NetworkManager:
             if websocket:
                 try:
                     await websocket.close()
-                except Exception:
-                    pass
+                except (OSError, RuntimeError, websockets.exceptions.ConnectionClosed) as exc:
+                    LOG.debug("Failed to close websocket during certificate fetch: %s", exc)
 
     def _prompt_trust_decision(self, cert_info: CertificateInfo) -> bool:
         """Show the trust dialog on the main thread."""
@@ -498,8 +501,8 @@ class NetworkManager:
             try:
                 # Schedule close in the async loop
                 asyncio.run_coroutine_threadsafe(self.ws.close(), self.loop)
-            except Exception:
-                pass  # Ignore errors during cleanup
+            except (OSError, RuntimeError) as exc:
+                LOG.debug("Failed to schedule websocket close: %s", exc)
 
         # Wait for thread to fully stop if requested
         if wait and self.thread and self.thread.is_alive():
