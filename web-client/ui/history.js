@@ -136,7 +136,8 @@ export function createHistoryView({
 
     store.addHistory(buffer, text);
     const incomingBufferMuted = mutedBuffers.has(buffer);
-    if (announce && !incomingBufferMuted) {
+    const shouldAnnounceExplicitly = !(isMobileLike && mobileCollapsed);
+    if (announce && !incomingBufferMuted && shouldAnnounceExplicitly) {
       a11y.announce(text, { assertive });
     }
   }
