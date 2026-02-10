@@ -73,82 +73,82 @@ def _bot_evaluate_card(
 
     # RS Games variant
     if is_rs_games:
-        if rank == 1:
-            # Ace: Always +1 in RS Games
-            return _bot_evaluate_count(game, player, current_count + 1, rank)
-        elif rank == 2:
-            # 2: Always +2 in RS Games
-            return _bot_evaluate_count(game, player, current_count + 2, rank)
-        elif 3 <= rank <= 9:
-            # Number cards 3-9
-            return _bot_evaluate_count(game, player, current_count + rank, rank)
-        elif rank == RS_RANK_PLUS_10:
-            # 10 card (always +10)
-            return _bot_evaluate_count(game, player, current_count + 10, rank)
-        elif rank == RS_RANK_MINUS_10:
-            # -10 card
-            return _bot_evaluate_count(game, player, current_count - 10, rank)
-        elif rank == RS_RANK_PASS:
-            # Pass (no change to count)
-            return _bot_evaluate_count(game, player, current_count, rank)
-        elif rank == RS_RANK_REVERSE:
-            # Reverse (no change to count)
-            return _bot_evaluate_count(game, player, current_count, rank)
-        elif rank == RS_RANK_SKIP:
-            # Skip (no change to count)
-            return _bot_evaluate_count(game, player, current_count, rank)
-        elif rank == RS_RANK_NINETY_NINE:
-            # Ninety Nine (sets count to 99)
-            return _bot_evaluate_count(game, player, 99, rank)
+        return _bot_eval_rs_card(game, player, current_count, rank)
 
     # Quentin C variant
     else:
-        if rank == 1:
-            # Ace: Try both +1 and +11
-            score_plus_11 = _bot_evaluate_count(game, player, current_count + 11, rank)
-            score_plus_1 = _bot_evaluate_count(game, player, current_count + 1, rank)
-            return max(score_plus_11, score_plus_1)
-
-        elif rank == 10 and current_count < 90:
-            # 10: Try both +10 and -10
-            score_plus = _bot_evaluate_count(game, player, current_count + 10, rank)
-            score_minus = _bot_evaluate_count(game, player, current_count - 10, rank)
-            return max(score_plus, score_minus)
-
-        elif rank == 2:
-            # 2: Calculate multiply/divide effect
-            new_count = _calculate_two_effect(current_count)
-            return _bot_evaluate_count(game, player, new_count, rank)
-
-        elif rank == 9:
-            # 9: No change to count
-            return _bot_evaluate_count(game, player, current_count, rank)
-
-        elif rank == 11 and len(game.alive_players) == 2:
-            # Jack in 2-player: evaluate the chain (skip = play again)
-            # Only worth doing lookahead if we have Jacks
-            jack_count = sum(1 for c in player.hand if c.rank == 11)
-            if jack_count >= 1:
-                new_count = current_count + 10
-                if new_count > 99:
-                    return -99999
-                # Check for milestone pass-through on this first Jack
-                if current_count < 33 < new_count:
-                    return -8000  # Passing through 33
-                if current_count < 66 < new_count:
-                    return -8000  # Passing through 66
-                remaining_hand = [c for c in player.hand if c is not card]
-                return _evaluate_jack_chain(game, current_count + 10, remaining_hand)
-            else:
-                # No Jacks, shouldn't happen but fallback
-                return _bot_evaluate_count(game, player, current_count + 10, rank)
-
-        else:
-            # Regular cards: Add face value
-            value = _get_card_value(rank)
-            return _bot_evaluate_count(game, player, current_count + value, rank)
+        return _bot_eval_quentin_card(game, player, current_count, rank, card)
 
     return 0
+
+
+def _bot_eval_rs_card(
+    game: "NinetyNineGame",
+    player: "NinetyNinePlayer",
+    current_count: int,
+    rank: int,
+) -> int:
+    if rank == 1:
+        return _bot_evaluate_count(game, player, current_count + 1, rank)
+    if rank == 2:
+        return _bot_evaluate_count(game, player, current_count + 2, rank)
+    if 3 <= rank <= 9:
+        return _bot_evaluate_count(game, player, current_count + rank, rank)
+    if rank == RS_RANK_PLUS_10:
+        return _bot_evaluate_count(game, player, current_count + 10, rank)
+    if rank == RS_RANK_MINUS_10:
+        return _bot_evaluate_count(game, player, current_count - 10, rank)
+    if rank in (RS_RANK_PASS, RS_RANK_REVERSE, RS_RANK_SKIP):
+        return _bot_evaluate_count(game, player, current_count, rank)
+    if rank == RS_RANK_NINETY_NINE:
+        return _bot_evaluate_count(game, player, 99, rank)
+    return 0
+
+
+def _bot_eval_quentin_card(
+    game: "NinetyNineGame",
+    player: "NinetyNinePlayer",
+    current_count: int,
+    rank: int,
+    card: Card,
+) -> int:
+    if rank == 1:
+        score_plus_11 = _bot_evaluate_count(game, player, current_count + 11, rank)
+        score_plus_1 = _bot_evaluate_count(game, player, current_count + 1, rank)
+        return max(score_plus_11, score_plus_1)
+    if rank == 10 and current_count < 90:
+        score_plus = _bot_evaluate_count(game, player, current_count + 10, rank)
+        score_minus = _bot_evaluate_count(game, player, current_count - 10, rank)
+        return max(score_plus, score_minus)
+    if rank == 2:
+        new_count = _calculate_two_effect(current_count)
+        return _bot_evaluate_count(game, player, new_count, rank)
+    if rank == 9:
+        return _bot_evaluate_count(game, player, current_count, rank)
+    if rank == 11 and len(game.alive_players) == 2:
+        return _bot_eval_two_player_jack(game, player, current_count, card)
+    value = _get_card_value(rank)
+    return _bot_evaluate_count(game, player, current_count + value, rank)
+
+
+def _bot_eval_two_player_jack(
+    game: "NinetyNineGame",
+    player: "NinetyNinePlayer",
+    current_count: int,
+    card: Card,
+) -> int:
+    jack_count = sum(1 for c in player.hand if c.rank == 11)
+    if jack_count < 1:
+        return _bot_evaluate_count(game, player, current_count + 10, 11)
+    new_count = current_count + 10
+    if new_count > 99:
+        return -99999
+    if current_count < 33 < new_count:
+        return -8000
+    if current_count < 66 < new_count:
+        return -8000
+    remaining_hand = [c for c in player.hand if c is not card]
+    return _evaluate_jack_chain(game, current_count + 10, remaining_hand)
 
 
 def _bot_evaluate_count(

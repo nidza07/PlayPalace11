@@ -698,19 +698,12 @@ class NinetyNineGame(Game):
         if not isinstance(player, NinetyNinePlayer):
             return
 
-        # Parse arguments
-        if len(args) == 1:
-            action_id = args[0]
-            input_value = None
-        elif len(args) == 2:
-            input_value, action_id = args
-        else:
+        action_id, input_value = self._parse_play_args(args)
+        if action_id is None:
             return
 
-        # Extract slot number
-        try:
-            slot = int(action_id.split("_")[-1]) - 1
-        except ValueError:
+        slot = self._parse_card_slot(action_id)
+        if slot is None:
             return
 
         if slot < 0 or slot >= len(player.hand):
@@ -720,48 +713,82 @@ class NinetyNineGame(Game):
         user = self.get_user(player)
         locale = user.locale if user else "en"
 
-        # Check if it's the player's turn
-        if self.current_player != player:
-            if user:
-                user.speak_l("action-not-your-turn")
-            return
-
-        if player.draw_timeout_ticks > 0:
-            if user:
-                user.speak_l("ninetynine-draw-first")
+        if not self._validate_card_play_turn(player, user):
             return
 
         old_count = self.count
 
-        # Handle ace/ten with menu input (choice was made via MenuInput)
-        if input_value is not None:
-            if card.rank == 1:  # Ace
-                add_eleven = Localization.get(locale, "ninetynine-ace-add-eleven")
-                value = 11 if input_value == add_eleven else 1
-            elif card.rank == 10:  # Ten
-                add_ten = Localization.get(locale, "ninetynine-ten-add")
-                value = 10 if input_value == add_ten else -10
-            else:
-                return
-            self._play_card(player, slot, card, old_count + value)
+        handled = self._apply_menu_choice_value(
+            player, slot, card, old_count, input_value, locale
+        )
+        if handled:
             return
 
-        # Calculate value for cards without MenuInput
+        new_count = self._calculate_new_count(card, old_count)
+        if new_count is None:
+            return
+        self._play_card(player, slot, card, new_count)
+
+    @staticmethod
+    def _parse_play_args(args) -> tuple[str | None, str | None]:
+        if len(args) == 1:
+            return args[0], None
+        if len(args) == 2:
+            return args[1], args[0]
+        return None, None
+
+    @staticmethod
+    def _parse_card_slot(action_id: str) -> int | None:
+        try:
+            return int(action_id.split("_")[-1]) - 1
+        except (ValueError, IndexError):
+            return None
+
+    def _validate_card_play_turn(self, player: NinetyNinePlayer, user) -> bool:
+        if self.current_player != player:
+            if user:
+                user.speak_l("action-not-your-turn")
+            return False
+        if player.draw_timeout_ticks > 0:
+            if user:
+                user.speak_l("ninetynine-draw-first")
+            return False
+        return True
+
+    def _apply_menu_choice_value(
+        self,
+        player: NinetyNinePlayer,
+        slot: int,
+        card: Card,
+        old_count: int,
+        input_value: str | None,
+        locale: str,
+    ) -> bool:
+        if input_value is None:
+            return False
+        if card.rank == 1:
+            add_eleven = Localization.get(locale, "ninetynine-ace-add-eleven")
+            value = 11 if input_value == add_eleven else 1
+        elif card.rank == 10:
+            add_ten = Localization.get(locale, "ninetynine-ten-add")
+            value = 10 if input_value == add_ten else -10
+        else:
+            return True
+        self._play_card(player, slot, card, old_count + value)
+        return True
+
+    def _calculate_new_count(self, card: Card, old_count: int) -> int | None:
         value = self.calculate_card_value(card, old_count)
 
-        if card.rank == 2 and self.is_quentin_c:  # 2 card special handling
-            new_count = self.calculate_two_effect(old_count)
-            self._play_card(player, slot, card, new_count)
-            return
+        if card.rank == 2 and self.is_quentin_c:
+            return self.calculate_two_effect(old_count)
 
         if card.rank == RS_RANK_NINETY_NINE and not self.is_quentin_c:
-            self._play_card(player, slot, card, MAX_COUNT)
-            return
+            return MAX_COUNT
 
-        # Normal card play
         if value is None:
             value = 0
-        self._play_card(player, slot, card, old_count + value)
+        return old_count + value
 
     def _play_card(
         self,
