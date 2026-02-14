@@ -9,4 +9,11 @@
   <ItemGroup>
     <WixLocalization Include="locales\en-us.wxl" />
   </ItemGroup>
+  <ItemGroup>
+    <HarvestDirectory Include="..\..\..\client\dist\PlayPalace">
+      <ComponentGroupName>ClientHarvestedFiles</ComponentGroupName>
+      <DirectoryRefId>CLIENTDIR</DirectoryRefId>
+      <SuppressRootDirectory>true</SuppressRootDirectory>
+    </HarvestDirectory>
+  </ItemGroup>
 </Project>
