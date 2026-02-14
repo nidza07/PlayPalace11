@@ -152,36 +152,36 @@
         <Control Id="KeyPath" Type="PathEdit" X="15" Y="192" Width="330" Height="18" Property="SERVERKEYPATH" />
 
         <Control Id="GenerateCertBtn" Type="PushButton" X="15" Y="217" Width="160" Height="17" Text="!(loc.ConfigGenerateCert)">
-          <Publish Event="SetProperty" Value="SERVERCERTPATH=[CommonAppDataFolder]PlayPalace\ssl\playpalace_cert.cer"><![CDATA[SERVERENABLESSL = "1"]]></Publish>
-          <Publish Event="SetProperty" Value="SERVERKEYPATH=[CommonAppDataFolder]PlayPalace\ssl\playpalace_key.pfx"><![CDATA[SERVERENABLESSL = "1"]]></Publish>
-          <Publish Event="DoAction" Value="SetGenerateCertCmd"><![CDATA[SERVERENABLESSL = "1"]]></Publish>
-          <Publish Event="DoAction" Value="GenerateCertAction"><![CDATA[SERVERENABLESSL = "1"]]></Publish>
+          <Publish Event="SetProperty" Value="SERVERCERTPATH=[CommonAppDataFolder]PlayPalace\ssl\playpalace_cert.cer" Condition='SERVERENABLESSL = "1"' />
+          <Publish Event="SetProperty" Value="SERVERKEYPATH=[CommonAppDataFolder]PlayPalace\ssl\playpalace_key.pfx" Condition='SERVERENABLESSL = "1"' />
+          <Publish Event="DoAction" Value="SetGenerateCertCmd" Condition='SERVERENABLESSL = "1"' />
+          <Publish Event="DoAction" Value="GenerateCertAction" Condition='SERVERENABLESSL = "1"' />
         </Control>
 
         <Control Id="ValidateCertBtn" Type="PushButton" X="185" Y="217" Width="160" Height="17" Text="!(loc.ConfigValidateCert)">
-          <Publish Event="DoAction" Value="SetValidateCertCmd"><![CDATA[SERVERENABLESSL = "1"]]></Publish>
-          <Publish Event="DoAction" Value="ValidateCertAction"><![CDATA[SERVERENABLESSL = "1"]]></Publish>
+          <Publish Event="DoAction" Value="SetValidateCertCmd" Condition='SERVERENABLESSL = "1"' />
+          <Publish Event="DoAction" Value="ValidateCertAction" Condition='SERVERENABLESSL = "1"' />
         </Control>
 
         <Control Id="Back" Type="PushButton" X="150" Y="268" Width="56" Height="17" Text="!(loc.WixUIBack)">
-          <Publish Event="NewDialog" Value="InstallDirDlg">1</Publish>
+          <Publish Event="NewDialog" Value="InstallDirDlg" Condition="1" />
         </Control>
         <Control Id="Next" Type="PushButton" X="222" Y="268" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
-          <Publish Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Condition="1" />
         </Control>
         <Control Id="Cancel" Type="PushButton" X="294" Y="268" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
-          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+          <Publish Event="SpawnDialog" Value="CancelDlg" Condition="1" />
         </Control>
       </Dialog>
 
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg">1</Publish>
-      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="ServerConfigDlg"><![CDATA[(&ServerFeature=3) AND (NOT Installed)]]></Publish>
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg"><![CDATA[NOT((&ServerFeature=3) AND (NOT Installed))]]></Publish>
-      <Publish Dialog="ServerConfigDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg">1</Publish>
-      <Publish Dialog="ServerConfigDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ServerConfigDlg"><![CDATA[(&ServerFeature=3) AND (NOT Installed)]]></Publish>
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg"><![CDATA[NOT((&ServerFeature=3) AND (NOT Installed))]]></Publish>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="1" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Condition="1" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="ServerConfigDlg" Condition="(&amp;ServerFeature=3) AND (NOT Installed)" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="NOT((&amp;ServerFeature=3) AND (NOT Installed))" />
+      <Publish Dialog="ServerConfigDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Condition="1" />
+      <Publish Dialog="ServerConfigDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="1" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ServerConfigDlg" Condition="(&amp;ServerFeature=3) AND (NOT Installed)" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Condition="NOT((&amp;ServerFeature=3) AND (NOT Installed))" />
     </UI>
 
     <WixVariable Id="WixUILicenseRtf" Value="LICENSE_PLACEHOLDER.rtf" />
