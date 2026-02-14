@@ -15,8 +15,6 @@ jobs:
   linux-packages:
     name: Linux Packaging Placeholders
     runs-on: ubuntu-latest
-    env:
-      UV_BUILD_CONSTRAINT: /tmp/build-constraints.txt
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,9 +33,6 @@ jobs:
           sudo apt-get install -y dpkg-dev rpm rpm2cpio rsync \
             libgtk-3-dev libsdl2-dev libnotify-dev libsm-dev \
             libgstreamer-gl1.0-0 freeglut3-dev pkg-config
-
-      - name: Set up build constraints
-        run: echo 'setuptools<70' > /tmp/build-constraints.txt
 
       - name: Sync client dependencies
         run: |
@@ -88,7 +83,6 @@ jobs:
       image: archlinux:base-devel
     env:
       UV_PYTHON: "3.11"
-      UV_BUILD_CONSTRAINT: /tmp/build-constraints.txt
       UV_PYTHON_INSTALL_DIR: /opt/uv/python
       UV_CACHE_DIR: /opt/uv/cache
     steps:
@@ -108,8 +102,7 @@ jobs:
           pip install --upgrade uv --break-system-packages
           mkdir -p /opt/uv/python /opt/uv/cache
           uv python install 3.11
-          echo 'setuptools<70' > /tmp/build-constraints.txt
-          chmod -R a+rwX /opt/uv /tmp/build-constraints.txt
+          chmod -R a+rwX /opt/uv
           chown -R builder:builder "$GITHUB_WORKSPACE"
 
       - name: Build Arch packages
