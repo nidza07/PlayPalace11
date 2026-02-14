@@ -1,3 +1,5 @@
+%{!?_unitdir: %define _unitdir /usr/lib/systemd/system}
+
 Name:           playpalace-server
 Version:        0.0.0
 Release:        1%{?dist}
