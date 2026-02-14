@@ -34,8 +34,8 @@ class DummyNetworkManager:
         self.disconnect_calls = []
         self.connect_calls = 0
 
-    def connect(self, url, username, password):
-        self.calls.append((url, username, password))
+    def connect(self, url, username, password, refresh_token=None, refresh_expires_at=None):
+        self.calls.append((url, username, password, refresh_token, refresh_expires_at))
         self.connect_calls += 1
         return self.should_connect
 
@@ -104,7 +104,7 @@ def test_auto_connect_uses_credentials(monkeypatch, stub_call_later):
 
     assert window.sound_manager.music_calls == ["connectloop.ogg"]
     assert window.add_history_calls[0][0].startswith("Connecting to wss://demo.example:443")
-    assert ("wss://demo.example:443", "alice", "secret") in window.network.calls
+    assert ("wss://demo.example:443", "alice", "secret", None, None) in window.network.calls
     assert stub_call_later, "CallLater should schedule timeout"
     assert stub_call_later[0].delay == 10000
 
@@ -162,6 +162,27 @@ def test_on_server_disconnect_status_mode(monkeypatch):
     assert window._show_connection_error_calls[-1].startswith("Maintenance in progress")
     assert reconnect_calls
     assert reconnect_calls[0][0] == 10000
+
+
+def test_on_server_disconnect_uses_packet_message(monkeypatch):
+    window = make_window_stub(monkeypatch, should_connect=True)
+    window.connected = False
+    window.speaker = types.SimpleNamespace(speak=lambda *args, **kwargs: None)
+
+    window.on_server_disconnect({"show_message": True, "message": "Please contact support."})
+
+    assert window._show_connection_error_calls[-1] == "Please contact support."
+
+
+def test_on_server_disconnect_falls_back_to_last_server_message(monkeypatch):
+    window = make_window_stub(monkeypatch, should_connect=True)
+    window.connected = False
+    window.speaker = types.SimpleNamespace(speak=lambda *args, **kwargs: None)
+    window.last_server_message = "Account banned."
+
+    window.on_server_disconnect({"show_message": True})
+
+    assert window._show_connection_error_calls[-1] == "Account banned."
 
 
 def test_do_reconnect_resets_after_max_attempts(monkeypatch):
