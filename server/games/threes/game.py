@@ -18,7 +18,7 @@ from ...game_utils.dice_game_mixin import DiceGameMixin
 from ...game_utils.game_result import GameResult, PlayerResult
 from ...game_utils.options import IntOption, option_field, GameOptions
 from ...messages.localization import Localization
-from ...ui.keybinds import KeybindState
+from server.core.ui.keybinds import KeybindState
 
 
 @dataclass
@@ -288,7 +288,7 @@ class ThreesGame(Game, DiceGameMixin):
         if player.is_bot:
             import random
 
-            BotHelper.jolt_bot(player, ticks=random.randint(15, 30))
+            BotHelper.jolt_bot(player, ticks=random.randint(15, 30))  # nosec B311
 
         self.rebuild_all_menus()
 
@@ -396,7 +396,7 @@ class ThreesGame(Game, DiceGameMixin):
         if player.is_bot:
             import random
 
-            BotHelper.jolt_bot(player, ticks=random.randint(20, 40))
+            BotHelper.jolt_bot(player, ticks=random.randint(20, 40))  # nosec B311
 
         self.rebuild_all_menus()
 

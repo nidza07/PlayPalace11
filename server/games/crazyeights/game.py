@@ -12,9 +12,9 @@ from ...game_utils.options import IntOption, MenuOption, option_field
 from ...game_utils.bot_helper import BotHelper
 from ...game_utils.poker_timer import PokerTurnTimer
 from ...messages.localization import Localization
-from ...ui.keybinds import KeybindState
-from ...users.bot import Bot
-from ...users.base import User
+from server.core.ui.keybinds import KeybindState
+from server.core.users.bot import Bot
+from server.core.users.base import User
 from datetime import datetime
 from .bot import bot_think
 
@@ -531,7 +531,7 @@ class CrazyEightsGame(Game):
         )
 
         if player.is_bot:
-            BotHelper.jolt_bot(player, ticks=random.randint(30, 40))
+            BotHelper.jolt_bot(player, ticks=random.randint(30, 40))  # nosec B311
 
         self._start_turn_timer()
         self._sync_turn_actions(player)
@@ -618,7 +618,7 @@ class CrazyEightsGame(Game):
             self.rebuild_all_menus()
             self._start_turn_timer()  # reset timer for suit selection
             if p.is_bot:
-                BotHelper.jolt_bot(p, ticks=random.randint(20, 30))
+                BotHelper.jolt_bot(p, ticks=random.randint(20, 30))  # nosec B311
             return
 
         self.current_suit = card.suit
@@ -670,7 +670,7 @@ class CrazyEightsGame(Game):
         selection_id = f"play_card_{card.id}"
         self.update_player_menu(p, selection_id=selection_id)
         if p.is_bot:
-            BotHelper.jolt_bot(p, ticks=random.randint(20, 30))
+            BotHelper.jolt_bot(p, ticks=random.randint(20, 30))  # nosec B311
 
     def _action_pass(self, player: Player, action_id: str) -> None:
         p = self._require_active_player(player)
@@ -700,7 +700,7 @@ class CrazyEightsGame(Game):
         self._broadcast_suit_chosen(suit)
         self.rebuild_all_menus()
         if p.is_bot:
-            BotHelper.jolt_bot(p, ticks=random.randint(20, 30))
+            BotHelper.jolt_bot(p, ticks=random.randint(20, 30))  # nosec B311
 
         self.timer.clear()
         self.wild_wait_ticks = 15
@@ -729,14 +729,14 @@ class CrazyEightsGame(Game):
         deck_count = self.deck.size()
         if deck_count > 0:
             parts.append(Localization.get(locale, "crazyeights-deck-count", count=deck_count))
-        
+
         if parts:
             text = ", ".join(parts)
         elif self.players:
             text = Localization.get(locale, "crazyeights-no-hands")
         else:
             text = Localization.get(locale, "crazyeights-no-players")
-        
+
         user.speak(text)
 
     def _action_check_turn_timer(self, player: Player, action_id: str) -> None:
@@ -1117,7 +1117,7 @@ class CrazyEightsGame(Game):
 
     def _end_round(self, winner: CrazyEightsPlayer, last_card: Card | None) -> None:
         self._stop_turn_loop()
-        
+
         # Calculate scores before clearing hands
         points_from: list[tuple[CrazyEightsPlayer, int]] = []
         total = 0
@@ -1143,7 +1143,7 @@ class CrazyEightsGame(Game):
         for p in self.players:
             if isinstance(p, CrazyEightsPlayer):
                 p.hand = []
-        
+
         self.rebuild_all_menus()
 
         if winner.score >= self.options.winning_score:
@@ -1242,12 +1242,12 @@ class CrazyEightsGame(Game):
                 continue
             card_text = self.format_card(card, user.locale)
             one_card_text = Localization.get(user.locale, 'crazyeights-one-card') if len(player.hand) == 1 else ""
-            
+
             if p.id == player.id:
                 msg = Localization.get(user.locale, "crazyeights-you-play", card=card_text)
             else:
                 msg = Localization.get(user.locale, "crazyeights-player-plays", player=player.name, card=card_text)
-            
+
             if one_card_text:
                 user.speak(f"{msg} {one_card_text}", buffer="table")
             else:

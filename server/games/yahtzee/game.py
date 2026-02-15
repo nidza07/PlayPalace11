@@ -25,7 +25,7 @@ from ...game_utils.dice_game_mixin import DiceGameMixin
 from ...game_utils.game_result import GameResult, PlayerResult
 from ...game_utils.options import IntOption, option_field
 from ...messages.localization import Localization
-from ...ui.keybinds import KeybindState
+from server.core.ui.keybinds import KeybindState
 
 
 # Scoring categories
@@ -419,7 +419,7 @@ class YahtzeeGame(ActionGuardMixin, Game, DiceGameMixin):
 
         # Bot thinking time
         if player.is_bot:
-            BotHelper.jolt_bot(player, ticks=random.randint(15, 25))
+            BotHelper.jolt_bot(player, ticks=random.randint(15, 25))  # nosec B311
 
         self.rebuild_all_menus()
 
@@ -652,7 +652,7 @@ class YahtzeeGame(ActionGuardMixin, Game, DiceGameMixin):
 
         # Bot setup
         if player.is_bot:
-            BotHelper.jolt_bot(player, ticks=random.randint(10, 20))
+            BotHelper.jolt_bot(player, ticks=random.randint(10, 20))  # nosec B311
 
         self.rebuild_all_menus()
 
@@ -678,7 +678,7 @@ class YahtzeeGame(ActionGuardMixin, Game, DiceGameMixin):
                 return
 
         # Move to next player
-        BotHelper.jolt_bots(self, ticks=random.randint(15, 25))
+        BotHelper.jolt_bots(self, ticks=random.randint(15, 25))  # nosec B311
 
         if self.turn_index >= len(self.turn_players) - 1:
             # Round complete, back to first player
