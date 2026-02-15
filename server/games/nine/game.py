@@ -13,7 +13,7 @@ from ...game_utils.game_result import GameResult, PlayerResult
 from ...game_utils.round_timer import RoundTransitionTimer  # Might not need
 from ...game_utils.teams import TeamManager  # Might not need
 from ...messages.localization import Localization
-from ...ui.keybinds import KeybindState
+from ...core.ui.keybinds import KeybindState
 from ...game_utils.cards import (
     Card,
     Deck,
