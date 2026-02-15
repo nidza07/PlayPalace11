@@ -13,7 +13,6 @@ nine-player-deal-4-players = Dealing 9 cards to each of the 4 players.
 nine-player-deal-6-players = Dealing 6 cards to each of the 6 players.
 
 # Game start
-nine-player-game-starts = The game of Nine begins!
 nine-you-start-player-announcement = You have the nine of clubs and start the game.
 nine-player-start-player-announcement = { $player } has the nine of clubs and starts the game.
 

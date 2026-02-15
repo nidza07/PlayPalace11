@@ -13,7 +13,6 @@ nine-player-deal-4-players = Deljenje 9 karata za 4 igrača.
 nine-player-deal-6-players = Deljenje 6 karata za 6 igrača.
 
 # Game start
-nine-player-game-starts = Devetka počinje!
 nine-player-start-player-announcement = { $player } ima devetku tref i počinje igru.
 nine-you-start-player-announcement = Imate devetku tref i počinjete igru.
 

@@ -119,7 +119,7 @@ class NineGame(Game):
 
     @classmethod
     def get_category(cls) -> str:
-        return "category-card-games" # Assuming this category exists
+        return "category-card-games"
 
     @classmethod
     def get_min_players(cls) -> int:
@@ -282,7 +282,6 @@ class NineGame(Game):
             self.finish_game()
             return
         
-        self._broadcast_nine_message("game-starts")
         self.play_sound(random.choice(["game_cards/shuffle1.ogg", "game_cards/shuffle2.ogg", "game_cards/shuffle3.ogg"]))
 
         self._start_turn()
@@ -430,11 +429,21 @@ class NineGame(Game):
         lines = [Localization.get(locale, "game-final-scores-header")]
 
         final_scores = result.custom_data.get("final_scores", {})
-        for i, (name, cards_left) in enumerate(final_scores.items(), 1):
-            if i == 1: # Winner
-                lines.append(Localization.get(locale, "nine-you-win") if name == result.player_results[0].player_name else Localization.get(locale, "game-winner", player=name))
+        winner_name = result.custom_data.get("winner_name")
+
+        if not final_scores:
+            return lines
+
+        # Sort players by score (cards left) for a consistent display order
+        sorted_players = sorted(final_scores.items(), key=lambda item: item[1])
+        
+        for name, cards_left in sorted_players:
+            if name == winner_name:
+                # Announce the winner by name
+                lines.append(Localization.get(locale, "game-winner", player=name))
                 lines.append(Localization.get(locale, "nine-final-score", score=cards_left))
             else:
+                # Announce other players' scores
                 lines.append(Localization.get(locale, "game-eliminated", player=name, score=cards_left))
         
         return lines
