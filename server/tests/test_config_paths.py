@@ -78,4 +78,3 @@ def test_load_full_config_parses_toml(tmp_path):
 
     data = config_paths.load_full_config(config_path)
     assert data == {"foo": "bar", "section": {"value": 7}}
-
