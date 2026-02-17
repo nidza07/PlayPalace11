@@ -53,4 +53,6 @@ nine-status-sequence = Niz { $suit }: { $sequence }.
 nine-status-no-sequence = { $suit } niz još uvek nije započeo.
 nine-none = Nema
 nine-action-check-sequences = Proveri nizove
+nine-action-check-hand-counts = Proveri broj karata u rukama
 
+nine-status-player-hand-count = { $player }: { $count } karata
