@@ -19,7 +19,7 @@ const AUDIO_MUTED_KEY = "playpalace.web.audio_muted";
 const DEFAULT_MUSIC_VOLUME = 20;
 const DEFAULT_AMBIENCE_VOLUME = 100;
 const SESSION_REFRESH_LEEWAY_SECONDS = 60;
-const DEFAULT_APP_VERSION = "2026.02.08.1";
+const DEFAULT_APP_VERSION = "2026.02.17.1";
 const DEFAULT_WEB_CLIENT_CONFIG = {
   serverUrl: "",
   serverPort: null,
@@ -99,7 +99,7 @@ function getDefaultServerUrl() {
 }
 
 function normalizeUsername(username) {
-  return String(username || "").trim().toLowerCase();
+  return String(username || "").trim();
 }
 
 function clampPercent(value, fallback) {
@@ -443,6 +443,8 @@ function buildRefreshPacket(refreshToken, username = "") {
   const packet = {
     type: "refresh_session",
     refresh_token: refreshToken,
+    client_type: "Web",
+    platform: getPlatformString(),
   };
   if (username) {
     packet.username = normalizeUsername(username);
