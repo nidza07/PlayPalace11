@@ -517,7 +517,7 @@ class NineGame(Game):
 
         # Custom keybind for status (check sequences)
         self.define_keybind(
-            "s", # Changed from 'c' to 's'
+            "c",
             Localization.get("en", "nine-action-check-sequences"),
             ["check_sequences_status"],
             state=KeybindState.ACTIVE,
