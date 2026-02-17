@@ -56,3 +56,6 @@ nine-status-sequence = { $suit } sequence: { $sequence }.
 nine-status-no-sequence = No { $suit } sequence started yet.
 nine-none = none
 nine-action-check-sequences = Check Sequences
+nine-action-check-hand-counts = Check Hand Counts
+
+nine-status-player-hand-count = { $player }: { $count } cards

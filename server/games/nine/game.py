@@ -478,10 +478,26 @@ class NineGame(Game):
             )
         )
 
-        # Reorder to put check_sequences_status first
+        action_set.add(
+            Action(
+                id="check_hand_counts_status",
+                label="",
+                handler="_action_check_hand_counts_status",
+                is_enabled="_is_check_hand_counts_status_enabled",
+                is_hidden="_is_check_hand_counts_status_hidden",
+                get_label="_get_localized_check_hand_counts_label",
+                show_in_actions_menu=True,
+            )
+        )
+
+        # Reorder to put check_sequences_status first, then check_hand_counts_status
         if "check_sequences_status" in action_set._order:
             action_set._order.remove("check_sequences_status")
         action_set._order.insert(0, "check_sequences_status")
+
+        if "check_hand_counts_status" in action_set._order:
+            action_set._order.remove("check_hand_counts_status")
+        action_set._order.insert(1, "check_hand_counts_status")
 
         # Hide generic score actions as they don't apply directly
         for action_id in ("check_scores", "check_scores_detailed"):
@@ -499,11 +515,20 @@ class NineGame(Game):
         if "s" in self._keybinds:
             self._keybinds["s"] = []
 
-        # Custom keybind for status
+        # Custom keybind for status (check sequences)
         self.define_keybind(
-            "s", # Changed from 'c' back to 's'
+            "s", # Changed from 'c' to 's'
             Localization.get("en", "nine-action-check-sequences"),
             ["check_sequences_status"],
+            state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+
+        # Custom keybind for status (check hand counts)
+        self.define_keybind(
+            "e",
+            Localization.get("en", "nine-action-check-hand-counts"),
+            ["check_hand_counts_status"],
             state=KeybindState.ACTIVE,
             include_spectators=True,
         )
@@ -630,6 +655,33 @@ class NineGame(Game):
                 )
         
         self.status_box(player, lines)
+
+    def _get_localized_check_hand_counts_label(self, player: Player, action_id: str) -> str:
+        """Get localized label for the 'Check Hand Counts' action."""
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        return Localization.get(locale, "nine-action-check-hand-counts")
+
+    def _is_check_hand_counts_status_enabled(self, player: Player) -> str | None:
+        """Check if check hand counts action is enabled."""
+        if self.status != "playing":
+            return "action-not-playing"
+        return None
+
+    def _is_check_hand_counts_status_hidden(self, player: Player) -> Visibility:
+        """Check hand counts is always hidden (keybind only)."""
+        return Visibility.HIDDEN
+
+    def _action_check_hand_counts_status(self, player: Player, action_id: str) -> None:
+        """Announce the number of cards in each player's hand to the player."""
+        user = self.get_user(player)
+        if not user:
+            return
+
+        locale = user.locale
+
+        for p in self.get_active_players():
+            user.speak_l("nine-status-player-hand-count", player=p.name, count=len(p.hand))
 
     def _action_skip_turn(self, player: Player, action_id: str) -> None:
         """Handle skipping a turn."""
