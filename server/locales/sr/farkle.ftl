@@ -59,3 +59,13 @@ farkle-option-changed-target = Krajnji rezultat podešen na { $score }.
 # Disabled action reasons
 farkle-must-take-combo = Prvo morate da uzmete neku kombinaciju.
 farkle-cannot-bank = Ne možete sada da sačuvate.
+
+# Additional Farkle options
+farkle-set-initial-bank-score = Rezultat za prvo čuvanje: { $score }
+farkle-enter-initial-bank-score = Upišite rezultat neophodan za prvo čuvanje (0-1000):
+farkle-option-changed-initial-bank-score = Rezultat za prvo čuvanje podešen na { $score }.
+farkle-toggle-hot-dice-multiplier = Množilac vrućih kockica: { $enabled }
+farkle-option-changed-hot-dice-multiplier = Množilac za vruće kockice { $enabled }.
+
+# Action feedback
+farkle-minimum-initial-bank-score = Najmanji rezultat za prvo čuvanje { $score }.
