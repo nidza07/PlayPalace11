@@ -136,3 +136,40 @@ def test_hot_dice_state_resets_on_farkle(monkeypatch):
     assert player1.turn_score == 0
     assert player1.hot_dice_multiplier == 1
     assert player1.hot_dice_chain == 0
+
+
+def test_bot_prefers_three_of_kind_over_single_five():
+    game, _, player1 = _setup_game()
+
+    player1.current_roll = [2, 2, 2, 5, 6, 6]
+    player1.banked_dice = []
+    player1.turn_score = 0
+    game.update_scoring_actions(player1)
+
+    action = game.bot_think(player1)
+    assert action == "score_three_of_kind_2"
+
+
+def test_bot_banks_with_high_multiplier_and_low_dice():
+    game, _, player1 = _setup_game(FarkleOptions(hot_dice_multiplier=True))
+
+    player1.score = 100
+    player1.turn_score = 25
+    player1.banked_dice = [1, 2, 3, 4, 5]
+    player1.current_roll = []
+    player1.hot_dice_multiplier = 4
+    player1.has_taken_combo = True
+
+    assert game.bot_think(player1) == "bank"
+
+
+def test_bot_avoids_blocked_initial_bank_attempt():
+    game, _, player1 = _setup_game(FarkleOptions(initial_bank_score=100))
+
+    player1.score = 0
+    player1.turn_score = 40
+    player1.banked_dice = [1, 2, 3, 4, 5]
+    player1.current_roll = []
+    player1.has_taken_combo = True
+
+    assert game.bot_think(player1) == "roll"

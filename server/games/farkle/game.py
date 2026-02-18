@@ -24,6 +24,7 @@ from ...game_utils.game_result import GameResult, PlayerResult
 from ...game_utils.options import BoolOption, IntOption, option_field
 from ...messages.localization import Localization
 from server.core.ui.keybinds import KeybindState
+from .bot import bot_think
 
 
 @dataclass
@@ -989,67 +990,7 @@ class FarkleGame(ActionGuardMixin, Game):
         BotHelper.on_tick(self)
 
     def bot_think(self, player: FarklePlayer) -> str | None:
-        """Bot AI decision making."""
-        turn_set = self.get_action_set(player, "turn")
-        if not turn_set:
-            return None
-
-        # Resolve actions to get enabled state
-        resolved = turn_set.resolve_actions(self, player)
-
-        # Take highest-value scoring combo first
-        for ra in resolved:
-            if ra.enabled and ra.action.id.startswith("score_"):
-                return ra.action.id
-
-        # Check roll/bank enabled state
-        roll_enabled = self._is_roll_enabled(player) is None
-        bank_enabled = self._is_bank_enabled(player) is None
-
-        if roll_enabled:
-            # Banking decision based on dice remaining and points
-            dice_remaining = 6 - len(player.banked_dice)
-            if dice_remaining == 0:
-                dice_remaining = 6  # Hot dice
-
-            # Check if someone already reached target score
-            score_to_beat = None
-            for other in self.players:
-                if other != player:
-                    other_farkle: FarklePlayer = other  # type: ignore
-                    if other_farkle.score >= self.options.target_score:
-                        if score_to_beat is None or other_farkle.score > score_to_beat:
-                            score_to_beat = other_farkle.score
-
-            potential_total = player.score + player.turn_score
-
-            # If someone has already won, must beat them or bust trying
-            if score_to_beat is not None and potential_total <= score_to_beat:
-                return "roll"
-
-            # Banking decision based on turn score and dice remaining
-            if player.turn_score >= 35:
-                # Bank probability increases as fewer dice remain
-                bank_probabilities = {
-                    6: 0.40,
-                    5: 0.50,
-                    4: 0.55,
-                    3: 0.65,
-                    2: 0.70,
-                    1: 0.75,
-                }
-                bank_prob = bank_probabilities.get(dice_remaining, 0.50)
-
-                if random.random() < bank_prob:  # nosec B311
-                    if bank_enabled:
-                        return "bank"
-
-            return "roll"
-
-        if bank_enabled:
-            return "bank"
-
-        return None
+        return bot_think(self, player)
 
     def _on_turn_end(self) -> None:
         """Handle end of a player's turn."""
