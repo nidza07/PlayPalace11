@@ -13,8 +13,8 @@ from server.games.nine.game import (
 )
 from server.games.nine.state import NineState, SequenceState
 from server.game_utils.cards import Card, Deck
-from server.users.test_user import MockUser
-from server.users.bot import Bot
+from server.core.users.test_user import MockUser
+from server.core.users.bot import Bot
 from server.messages.localization import Localization # For checking reasons
 
 class TestNineGameUnit:
