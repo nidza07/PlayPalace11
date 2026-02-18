@@ -41,16 +41,19 @@ export function createAudioEngine(options = {}) {
   let musicGain = null;
   let ambienceGain = null;
   let currentMusic = null;
+  let currentMusicNodes = null;
   let currentMusicName = "";
   let currentMusicLooping = true;
   let pendingMusicPacket = null;
   let currentAmbience = null;
+  let currentAmbienceNodes = null;
   let currentAmbienceLoop = null;
+  let currentAmbienceLoopNodes = null;
   let currentAmbienceLoopName = "";
   let pendingAmbiencePacket = null;
   const pendingEffectPackets = [];
   const MAX_PENDING_EFFECTS = 24;
-  const activeEffects = new Set();
+  const activeEffects = new Map();
   let muted = false;
 
   if (context) {
@@ -99,13 +102,13 @@ export function createAudioEngine(options = {}) {
 
   function connectElement(audio, gainNode, panValue = 0, url = "") {
     if (!context || !gainNode) {
-      return false;
+      return null;
     }
 
     if (isCrossOriginUrl(url)) {
       // Cross-origin media can be silenced by Web Audio without CORS;
       // let the element play directly as a fallback.
-      return false;
+      return null;
     }
 
     try {
@@ -115,13 +118,21 @@ export function createAudioEngine(options = {}) {
         panner.pan.value = Math.max(-1, Math.min(1, panValue));
         source.connect(panner);
         panner.connect(gainNode);
-        return true;
+        return { source, panner };
       }
       source.connect(gainNode);
-      return true;
+      return { source, panner: null };
     } catch {
       // Fallback to direct element playback if node creation fails.
-      return false;
+      return null;
+    }
+  }
+
+  function disconnectNodes(nodes) {
+    if (!nodes) return;
+    try { nodes.source.disconnect(); } catch { /* already disconnected */ }
+    if (nodes.panner) {
+      try { nodes.panner.disconnect(); } catch { /* already disconnected */ }
     }
   }
 
@@ -138,23 +149,21 @@ export function createAudioEngine(options = {}) {
     audio.volume = Math.max(0, Math.min(1, (packet.volume ?? 100) / 100));
     audio.playbackRate = Math.max(0.5, Math.min(2, (packet.pitch ?? 100) / 100));
 
-    activeEffects.add(audio);
-    audio.addEventListener("ended", () => {
-      activeEffects.delete(audio);
-    });
-    audio.addEventListener("pause", () => {
-      if (audio.currentTime === 0 || audio.ended) {
-        activeEffects.delete(audio);
-      }
-    });
-
     try {
-      const attached = connectElement(audio, effectsGain, (packet.pan ?? 0) / 100, url);
-      if (!attached && effectsGain) {
+      const nodes = connectElement(audio, effectsGain, (packet.pan ?? 0) / 100, url);
+      if (!nodes && effectsGain) {
         audio.volume *= effectsGain.gain.value;
       }
+      activeEffects.set(audio, nodes);
+      const cleanup = () => {
+        activeEffects.delete(audio);
+        disconnectNodes(nodes);
+      };
+      audio.addEventListener("ended", cleanup);
+      audio.addEventListener("error", cleanup);
       safePlay(audio, {
         onRejected: () => {
+          cleanup();
           if (pendingEffectPackets.length >= MAX_PENDING_EFFECTS) {
             pendingEffectPackets.shift();
           }
@@ -200,11 +209,12 @@ export function createAudioEngine(options = {}) {
     audio.volume = 1.0;
 
     try {
-      const attached = connectElement(audio, musicGain, 0, url);
-      if (!attached && musicGain) {
+      const nodes = connectElement(audio, musicGain, 0, url);
+      if (!nodes && musicGain) {
         audio.volume *= musicGain.gain.value;
       }
       currentMusic = audio;
+      currentMusicNodes = nodes;
       currentMusicName = name;
       currentMusicLooping = looping;
       pendingMusicPacket = null;
@@ -215,6 +225,7 @@ export function createAudioEngine(options = {}) {
       });
     } catch {
       currentMusic = audio;
+      currentMusicNodes = null;
       currentMusicName = name;
       currentMusicLooping = looping;
       pendingMusicPacket = { name, looping };
@@ -231,7 +242,9 @@ export function createAudioEngine(options = {}) {
     } catch {
       // Ignore stop failures.
     }
+    disconnectNodes(currentMusicNodes);
     currentMusic = null;
+    currentMusicNodes = null;
     currentMusicName = "";
     currentMusicLooping = true;
     pendingMusicPacket = null;
@@ -245,7 +258,9 @@ export function createAudioEngine(options = {}) {
       } catch {
         // Ignore stop failures.
       }
+      disconnectNodes(currentAmbienceNodes);
       currentAmbience = null;
+      currentAmbienceNodes = null;
     }
     if (currentAmbienceLoop) {
       try {
@@ -254,7 +269,9 @@ export function createAudioEngine(options = {}) {
       } catch {
         // Ignore stop failures.
       }
+      disconnectNodes(currentAmbienceLoopNodes);
       currentAmbienceLoop = null;
+      currentAmbienceLoopNodes = null;
     }
     currentAmbienceLoopName = "";
     pendingAmbiencePacket = null;
@@ -289,13 +306,14 @@ export function createAudioEngine(options = {}) {
     loopAudio.loop = true;
     loopAudio.volume = 1.0;
     const loopUrl = toSoundUrl(loopName, soundBaseUrl);
-    const loopAttached = connectElement(loopAudio, ambienceGain, 0, loopUrl);
-    if (!loopAttached && ambienceGain) {
+    const loopNodes = connectElement(loopAudio, ambienceGain, 0, loopUrl);
+    if (!loopNodes && ambienceGain) {
       loopAudio.volume *= ambienceGain.gain.value;
     }
 
     const startLoop = () => {
       currentAmbienceLoop = loopAudio;
+      currentAmbienceLoopNodes = loopNodes;
       currentAmbienceLoopName = loopName;
       pendingAmbiencePacket = null;
       safePlay(loopAudio, {
@@ -316,12 +334,17 @@ export function createAudioEngine(options = {}) {
       introAudio.loop = false;
       introAudio.volume = 1.0;
       const introUrl = toSoundUrl(introName, soundBaseUrl);
-      const introAttached = connectElement(introAudio, ambienceGain, 0, introUrl);
-      if (!introAttached && ambienceGain) {
+      const introNodes = connectElement(introAudio, ambienceGain, 0, introUrl);
+      if (!introNodes && ambienceGain) {
         introAudio.volume *= ambienceGain.gain.value;
       }
-      introAudio.addEventListener("ended", startLoop, { once: true });
+      introAudio.addEventListener("ended", () => {
+        disconnectNodes(introNodes);
+        currentAmbienceNodes = null;
+        startLoop();
+      }, { once: true });
       currentAmbience = introAudio;
+      currentAmbienceNodes = introNodes;
       safePlay(introAudio, {
         onRejected: () => {
           pendingAmbiencePacket = {
@@ -393,7 +416,7 @@ export function createAudioEngine(options = {}) {
     if (currentAmbienceLoop) {
       currentAmbienceLoop.muted = muted;
     }
-    for (const effect of activeEffects) {
+    for (const effect of activeEffects.keys()) {
       effect.muted = muted;
     }
   }
@@ -425,13 +448,14 @@ export function createAudioEngine(options = {}) {
   function stopAll() {
     stopMusic();
     stopAmbience();
-    for (const audio of activeEffects) {
+    for (const [audio, nodes] of activeEffects) {
       try {
         audio.pause();
         audio.currentTime = 0;
       } catch {
         // Ignore per-element stop failures.
       }
+      disconnectNodes(nodes);
     }
     activeEffects.clear();
   }
