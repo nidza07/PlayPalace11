@@ -17,9 +17,8 @@ Then, take any combinations you see fit, adding their value to your turn score; 
 The dice you haven't used in combinations (either because they didn't form any valid ones or because you chose not to take the ones they formed) can be rolled again.
 
 If you manage to use all six of your dice, you'll get a fresh new set - this is known as having obtained "Hot Dice", and can be done many times in one turn if you're lucky.
-If the Hot Dice Multiplier option is enabled, each hot dice trigger increases your turn multiplier by 1 for the rest of that turn (first hot dice: x2, second: x3, third: x4, and so on).
 
-That said, if you do not roll any valid combinations, you are considered to have Farkled; your turn ends and all your accumulated points are forfeit.
+That said, if you do not roll any valid combinations, you are considered to have Farkled; your turn ends and all your accumulated points are forfeited.
 
 If you have enough points and think the risk outweighs the reward, you bank your turn score, adding it to your total and ending your turn.
 Some tables also use an Initial Bank Score option, which requires at least that many points before your first successful bank of the game.
@@ -27,7 +26,7 @@ Some tables also use an Initial Bank Score option, which requires at least that 
 ## Options
 * Target Score (500-5000, default 500): points needed to win.
 * Initial Bank Score (0-1000, default 0): minimum points required for your first bank only.
-* Hot Dice Multiplier (off/on, default off): each hot dice increases your multiplier for the rest of your turn. It resets when you bank or Farkle.
+* Hot Dice Multiplier (off/on, default off): A high risk, high reward variant. Each time hot dice  is rolled increases your turn multiplier by 1 for the rest of that turn (first hot dice: x2, second: x3, third: x4, and so on). It resets when you bank or Farkle.
 
 ### Example Turn
 It's the start of the game and you're up first.
