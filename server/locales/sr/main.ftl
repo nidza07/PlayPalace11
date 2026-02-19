@@ -154,7 +154,6 @@ game-over = Igra je gotova
 game-final-scores = Konačni rezultat
 game-points = { $count } { $count ->
     [one] poen
-    [few] poena
     *[other] poena
 }
 status-box-closed = Zatvoreno.
@@ -257,8 +256,7 @@ waiting-for-approval = Vaš nalog čeka na odobravanje od administratora. Molimo
 account-approved-welcome = Vaš nalog je odobren! Dobro došli u PlayPalace!
 account-declined-goodbye = Vaš zahtev za nalog je odbijen.
 Razlog:
-account-banned = Vašen nalogu je zabranjen pristup.
-
+account-banned = Vašem nalogu je zabranjen pristup.
 
 # Login errors
 incorrect-username = Korisničko ime koje ste upisali ne postoji.
@@ -358,3 +356,5 @@ virtual-bots-profiles-header = Profili: { $count } definisano (podrazumevani: { 
 virtual-bots-profiles-empty = Nema definisanih profila.
 virtual-bots-profiles-line = { $profile } ({ $bot_count } robota) zamene: { $overrides }.
 virtual-bots-profiles-no-overrides = Preuzima osnovnu konfiguraciju
+
+localization-in-progress-try-again = Učitavanje prevoda u toku. Molimo pokušajte ponovo za minut.
