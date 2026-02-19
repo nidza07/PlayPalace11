@@ -380,6 +380,30 @@ class TestRollingBallsActions:
         rb_current: RollingBallsPlayer = current  # type: ignore
         assert rb_current.has_reshuffled is False
 
+    def test_option_change_rebuilds_take_actions(self):
+        """Test that changing min/max take rebuilds the take actions."""
+        # Start with defaults (min=1, max=3)
+        visible_actions = self.game.get_all_visible_actions(self.player1)
+        take_ids = [a.action.id for a in visible_actions if a.action.id.startswith("take_")]
+        assert take_ids == ["take_1", "take_2", "take_3"]
+
+        # Change max_take to 5 via the option system
+        self.game._handle_option_change("max_take", "5")
+
+        visible_actions = self.game.get_all_visible_actions(self.player1)
+        take_ids = [a.action.id for a in visible_actions if a.action.id.startswith("take_")]
+        assert take_ids == ["take_1", "take_2", "take_3", "take_4", "take_5"]
+
+    def test_option_change_clamps_min_max(self):
+        """Test that min_take is clamped when max_take is lowered below it."""
+        self.game._handle_option_change("min_take", "3")
+        assert self.game.options.min_take == 3
+
+        # Lower max_take below min_take - min should be clamped
+        self.game._handle_option_change("max_take", "2")
+        assert self.game.options.max_take == 2
+        assert self.game.options.min_take == 2
+
     def test_min_take_hides_lower_actions(self):
         """Test that take actions below min_take are not created."""
         game = RollingBallsGame(
@@ -552,6 +576,27 @@ class TestRollingBallsPlayTest:
 
         game = RollingBallsGame(
             options=RollingBallsOptions(reshuffle_penalty=5)
+        )
+        bot1 = Bot("Bot1")
+        bot2 = Bot("Bot2")
+        game.add_player("Bot1", bot1)
+        game.add_player("Bot2", bot2)
+
+        game.on_start()
+
+        for tick in range(5000):
+            if not game.game_active:
+                break
+            game.on_tick()
+
+        assert not game.game_active
+
+    def test_bot_acts_after_reshuffle(self):
+        """Test that a bot takes balls after reshuffling (doesn't freeze)."""
+        random.seed(42)
+
+        game = RollingBallsGame(
+            options=RollingBallsOptions(reshuffle_limit=100, reshuffle_penalty=0)
         )
         bot1 = Bot("Bot1")
         bot2 = Bot("Bot2")

@@ -167,6 +167,47 @@ class RollingBallsGame(ActionGuardMixin, Game):
         return RollingBallsPlayer(id=player_id, name=name, is_bot=is_bot)
 
     # ==========================================================================
+    # Option change handling
+    # ==========================================================================
+
+    def _handle_option_change(self, option_name: str, value: str) -> None:
+        """Handle option changes, rebuilding turn actions when min/max take change."""
+        super()._handle_option_change(option_name, value)
+
+        if option_name == "min_take":
+            # Clamp max_take up if needed
+            if self.options.max_take < self.options.min_take:
+                self.options.max_take = self.options.min_take
+            self._rebuild_turn_actions()
+        elif option_name == "max_take":
+            # Clamp min_take down if needed
+            if self.options.min_take > self.options.max_take:
+                self.options.min_take = self.options.max_take
+            self._rebuild_turn_actions()
+
+    def _rebuild_turn_actions(self) -> None:
+        """Rebuild the turn action set for all players to reflect min/max take changes."""
+        for player in self.players:
+            turn_set = self.get_action_set(player, "turn")
+            if turn_set:
+                # Remove old take actions
+                turn_set.remove_by_prefix("take_")
+                # Add new take actions
+                user = self.get_user(player)
+                locale = user.locale if user else "en"
+                for n in range(self.options.min_take, self.options.max_take + 1):
+                    turn_set.add(
+                        Action(
+                            id=f"take_{n}",
+                            label=Localization.get(locale, "rb-take", count=n),
+                            handler="_action_take",
+                            is_enabled="_is_take_enabled",
+                            is_hidden="_is_take_hidden",
+                        )
+                    )
+        self.rebuild_all_menus()
+
+    # ==========================================================================
     # Pipe management
     # ==========================================================================
 
