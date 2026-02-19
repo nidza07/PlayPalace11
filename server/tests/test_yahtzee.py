@@ -199,6 +199,30 @@ class TestYahtzeeGameUnit:
         loaded_game = YahtzeeGame.from_json(json_str)
         assert len(loaded_game.players) == 2
 
+    def test_turn_action_order_has_roll_after_dice_keys(self):
+        """Roll action should come after dice key actions in turn set order."""
+        game = YahtzeeGame()
+        user = MockUser("Alice")
+        player = game.add_player("Alice", user)
+        action_set = game.create_turn_action_set(player)
+        assert action_set._order.index("dice_key_1") < action_set._order.index("roll")
+
+    def test_roll_focuses_first_dice_toggle(self):
+        """After rolling, focus should move to first dice toggle item."""
+        game = YahtzeeGame()
+        user = MockUser("Alice")
+        player = game.add_player("Alice", user)
+        game.on_start()
+
+        game.execute_action(player, "roll")
+
+        assert any(
+            message.type == "update_menu"
+            and message.data.get("menu_id") == "turn_menu"
+            and message.data.get("selection_id") == "toggle_die_0"
+            for message in user.messages
+        )
+
 
 class TestYahtzeePlayTest:
     """Integration tests for complete game play."""
@@ -223,6 +247,52 @@ class TestYahtzeePlayTest:
             game.on_tick()
 
         assert game.status == "finished"
+
+
+class TestYahtzeeBotStrategy:
+    """Focused tests for Yahtzee bot decision flow."""
+
+    def test_bot_rolls_before_first_roll(self):
+        game = YahtzeeGame()
+        bot = Bot("Bot1")
+        player = game.add_player("Bot1", bot)
+        game.on_start()
+        game.current_player = player
+
+        assert game.bot_think(player) == "roll"
+
+    def test_bot_keeps_then_rolls_for_multiples(self):
+        game = YahtzeeGame()
+        bot = Bot("Bot1")
+        player: YahtzeePlayer = game.add_player("Bot1", bot)  # type: ignore
+        game.on_start()
+        game.current_player = player
+
+        player.dice.values = [6, 6, 6, 2, 3]
+        player.rolls_left = 2
+        player.dice.kept = []
+        player.dice.locked = []
+
+        first_action = game.bot_think(player)
+        assert first_action == "toggle_die_0"
+
+        player.dice.kept = [0, 1, 2]
+        second_action = game.bot_think(player)
+        assert second_action == "roll"
+
+    def test_bot_scores_when_no_rolls_left(self):
+        game = YahtzeeGame()
+        bot = Bot("Bot1")
+        player: YahtzeePlayer = game.add_player("Bot1", bot)  # type: ignore
+        game.on_start()
+        game.current_player = player
+
+        player.dice.values = [6, 6, 6, 6, 2]
+        player.rolls_left = 0
+        action = game.bot_think(player)
+
+        assert action is not None
+        assert action.startswith("score_")
 
     def test_single_player_game_completes(self):
         """Test that a single-player bot game completes."""
