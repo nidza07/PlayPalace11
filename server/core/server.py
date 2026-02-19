@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import sys
+import threading
 import time
 from collections import deque
 from datetime import datetime, timezone
@@ -575,7 +576,6 @@ class Server(AdministrationMixin):
             return
         if self._localization_warmup_task:
             return
-        self._ensure_localization_gate()
         loop = asyncio.get_running_loop()
         self._localization_warmup_task = loop.create_task(self._warm_locales_async())
         print(
@@ -583,11 +583,21 @@ class Server(AdministrationMixin):
             "(pass --preload-locales to block startup until finished)."
         )
 
+    def _is_localization_warmup_active(self) -> bool:
+        """Return whether non-blocking localization warmup is still running."""
+        task = self._localization_warmup_task
+        return task is not None and not task.done()
+
+    @staticmethod
+    def _notify_localization_in_progress(user: NetworkUser) -> None:
+        """Tell the user localization is still warming up."""
+        user.speak_l("localization-in-progress-try-again", buffer="misc")
+
     async def _warm_locales_async(self) -> None:
         """Compile all locale bundles without blocking startup."""
         logger = logging.getLogger("playpalace")
         try:
-            await asyncio.to_thread(Localization.preload_bundles)
+            await self._run_localization_warmup_in_daemon_thread()
             self._lifecycle.resolve_gate(LOCALIZATION_GATE_ID)
             print("Localization bundles compiled.")
         except SystemExit:
@@ -602,6 +612,37 @@ class Server(AdministrationMixin):
             logger.exception("Localization preload failed")
             self._lifecycle.enter_maintenance(message="Localization preload failed. Check server logs.")
             await self._disconnect_clients_for_status(self._lifecycle.snapshot())
+
+    async def _run_localization_warmup_in_daemon_thread(self) -> None:
+        """Run localization warmup in a daemon thread so shutdown isn't blocked."""
+        loop = asyncio.get_running_loop()
+        done: asyncio.Future[None] = loop.create_future()
+
+        def _finish_ok() -> None:
+            if not done.done():
+                done.set_result(None)
+
+        def _finish_err(exc: BaseException) -> None:
+            if not done.done():
+                done.set_exception(exc)
+
+        def _worker() -> None:
+            try:
+                Localization.preload_bundles()
+            except BaseException as exc:  # pragma: no cover - exercised via awaiter
+                with contextlib.suppress(RuntimeError):
+                    loop.call_soon_threadsafe(_finish_err, exc)
+            else:
+                with contextlib.suppress(RuntimeError):
+                    loop.call_soon_threadsafe(_finish_ok)
+
+        thread = threading.Thread(
+            target=_worker,
+            daemon=True,
+            name="playpalace-localization-warmup",
+        )
+        thread.start()
+        await done
 
     def _ensure_localization_gate(self) -> None:
         """Register the localization gate exactly once."""
@@ -1552,8 +1593,16 @@ class Server(AdministrationMixin):
 
     def _show_options_menu(self, user: NetworkUser) -> None:
         """Show options menu."""
-        languages = Localization.get_available_languages(user.locale, fallback= user.locale)
-        current_lang = languages.get(user.locale, user.locale)
+        if self._is_localization_warmup_active():
+            lang_key = f"language-{user.locale}"
+            current_lang = Localization.get(user.locale, lang_key)
+            if current_lang == lang_key:
+                current_lang = user.locale
+        else:
+            languages = Localization.get_available_languages(
+                user.locale, fallback=user.locale
+            )
+            current_lang = languages.get(user.locale, user.locale)
         prefs = user.preferences
 
         # Turn sound option
@@ -1611,9 +1660,16 @@ class Server(AdministrationMixin):
 
     def _show_language_menu(self, user: NetworkUser) -> None:
         """Show language selection menu."""
+        if self._is_localization_warmup_active():
+            self._notify_localization_in_progress(user)
+            self._show_options_menu(user)
+            return
+
         # Get languages in their native names and in user's locale for comparison
-        languages = Localization.get_available_languages(fallback = user.locale)
-        localized_languages = Localization.get_available_languages(user.locale, fallback= user.locale)
+        languages = Localization.get_available_languages(fallback=user.locale)
+        localized_languages = Localization.get_available_languages(
+            user.locale, fallback=user.locale
+        )
 
         items = []
         for lang_code, lang_name in languages.items():
@@ -1829,7 +1885,11 @@ class Server(AdministrationMixin):
             selection_id: Selected menu item id.
         """
         if selection_id == "language":
-            self._show_language_menu(user)
+            if self._is_localization_warmup_active():
+                self._notify_localization_in_progress(user)
+                self._show_options_menu(user)
+            else:
+                self._show_language_menu(user)
         elif selection_id == "turn_sound":
             # Toggle turn sound
             prefs = user.preferences
@@ -1905,8 +1965,12 @@ class Server(AdministrationMixin):
             selection_id: Selected language id.
         """
         if selection_id.startswith("lang_"):
+            if self._is_localization_warmup_active():
+                self._notify_localization_in_progress(user)
+                self._show_options_menu(user)
+                return
             lang_code = selection_id[5:]  # Remove "lang_" prefix
-            languages = Localization.get_available_languages(fallback= user.locale)
+            languages = Localization.get_available_languages(fallback=user.locale)
             if lang_code in languages:
                 user.set_locale(lang_code)
                 self._db.update_user_locale(user.username, lang_code)

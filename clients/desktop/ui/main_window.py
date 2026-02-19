@@ -1022,7 +1022,12 @@ class MainWindow(wx.Frame):
             self.switch_to_list_mode()
             return  # Don't process the Escape key
 
-        if key_code in self._NAVIGATION_KEYS or event.ShiftDown() or event.ControlDown() or event.AltDown() or event.MetaDown():
+        if (
+            key_code in self._NAVIGATION_KEYS
+            or event.ControlDown()
+            or event.AltDown()
+            or event.MetaDown()
+        ):
             self._pending_edit_clear = False
             event.Skip()
             return
@@ -1090,7 +1095,6 @@ class MainWindow(wx.Frame):
     def _should_defer_multiline_to_default(self, event, key_code: int) -> bool:
         if (
             key_code in self._NAVIGATION_KEYS
-            or event.ShiftDown()
             or event.ControlDown()
             or event.AltDown()
             or event.MetaDown()
