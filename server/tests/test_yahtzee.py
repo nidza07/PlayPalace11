@@ -199,6 +199,14 @@ class TestYahtzeeGameUnit:
         loaded_game = YahtzeeGame.from_json(json_str)
         assert len(loaded_game.players) == 2
 
+    def test_turn_action_order_has_roll_after_dice_keys(self):
+        """Roll action should come after dice key actions in turn set order."""
+        game = YahtzeeGame()
+        user = MockUser("Alice")
+        player = game.add_player("Alice", user)
+        action_set = game.create_turn_action_set(player)
+        assert action_set._order.index("dice_key_1") < action_set._order.index("roll")
+
 
 class TestYahtzeePlayTest:
     """Integration tests for complete game play."""

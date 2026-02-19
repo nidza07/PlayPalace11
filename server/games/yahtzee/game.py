@@ -248,6 +248,9 @@ class YahtzeeGame(ActionGuardMixin, Game, DiceGameMixin):
 
         action_set = ActionSet(name="turn")
 
+        # Dice toggle actions (1-5 keys) - shown after first roll
+        self.add_dice_toggle_actions(action_set)
+
         # Roll action
         action_set.add(
             Action(
@@ -259,9 +262,6 @@ class YahtzeeGame(ActionGuardMixin, Game, DiceGameMixin):
                 get_label="_get_roll_label",
             )
         )
-
-        # Dice toggle actions (1-5 keys) - shown after first roll
-        self.add_dice_toggle_actions(action_set)
 
         # Scoring category actions
         for cat in ALL_CATEGORIES:
