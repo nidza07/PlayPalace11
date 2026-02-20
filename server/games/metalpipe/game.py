@@ -20,7 +20,7 @@ from ...messages.localization import Localization
 class MetalPipePlayer(Player):
     """Player state for Metal Pipe game."""
 
-    alive: bool = True
+    pass
 
 
 @dataclass
@@ -94,9 +94,6 @@ class MetalPipeGame(Game):
         self.game_active = True
 
         active_players = self.get_active_players()
-        for player in active_players:
-            player.alive = True
-
         self._winner_names = []
 
         self._run_bonks(active_players)
@@ -140,10 +137,6 @@ class MetalPipeGame(Game):
                     winner_names = [bonker.name] if bonker else []
                 break
 
-            self.schedule_event("eliminate", {
-                "player_id": bonked_id,
-            }, delay_ticks=delay + 2)
-
             delay += 5
 
         # Multiple bonks: determine winner from last alive
@@ -162,7 +155,7 @@ class MetalPipeGame(Game):
 
         self.schedule_event("winner", {
             "winner_names": winner_names,
-        }, delay_ticks=delay + 5)
+        }, delay_ticks=delay + 30)
 
     def on_game_event(self, event_type: str, data: dict) -> None:
         """Handle scheduled game events."""
@@ -172,7 +165,7 @@ class MetalPipeGame(Game):
             if not bonker or not bonked:
                 return
 
-            self.play_sound("lsmack.ogg", volume=100)
+            self.play_sound("lsmack.ogg")
 
             if data["is_self"]:
                 self.broadcast_l("metalpipe-hit-self", bonker=bonker.name)
@@ -182,12 +175,6 @@ class MetalPipeGame(Game):
                     bonker=bonker.name,
                     bonked=bonked.name,
                 )
-
-        elif event_type == "eliminate":
-            player = self.get_player_by_id(data["player_id"])
-            if player:
-                player.alive = False
-                self.broadcast_l("metalpipe-eliminated", player=player.name)
 
         elif event_type == "winner":
             winner_names = data["winner_names"]

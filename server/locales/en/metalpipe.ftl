@@ -8,7 +8,6 @@ metalpipe-hit-other = { $bonker } hits { $bonked } over the head with a metal pi
 metalpipe-hit-self = Oh no! { $bonker } hit their own head on a metal pipe!
 metalpipe-winner = { $player } wins, congratulations you did great!
 metalpipe-everyone-else-wins = Everyone except { $player } wins!
-metalpipe-eliminated = { $player } has been eliminated!
 
 # Options
 metalpipe-set-multiple-bonks = Multiple bonks: { $enabled }
