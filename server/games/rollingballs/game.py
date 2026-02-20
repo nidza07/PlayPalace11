@@ -17,7 +17,7 @@ from ...game_utils.action_guard_mixin import ActionGuardMixin
 from ...game_utils.actions import Action, ActionSet, Visibility
 from ...game_utils.bot_helper import BotHelper
 from ...game_utils.game_result import GameResult, PlayerResult
-from ...game_utils.options import IntOption, MenuOption, option_field
+from ...game_utils.options import IntOption, MultiSelectOption, multi_select_field, option_field
 from ...messages.localization import Localization
 from server.core.ui.keybinds import KeybindState
 
@@ -111,16 +111,16 @@ class RollingBallsOptions(GameOptions):
             label="rb-set-reshuffle-penalty",
             prompt="rb-enter-reshuffle-penalty",
             change_msg="rb-option-changed-reshuffle-penalty",
-        )
+        ),
+        visible_when=("reshuffle_limit", lambda v: v > 0),
     )
-    ball_pack: str = option_field(
-        MenuOption(
-            default=get_pack_names()[0],
-            choices=lambda game, player: get_pack_names(),
-            value_key="pack",
-            label="rb-set-ball-pack",
-            prompt="rb-select-ball-pack",
-            change_msg="rb-option-changed-ball-pack",
+    ball_packs: list[str] = multi_select_field(
+        MultiSelectOption(
+            default=[get_pack_names()[0]],
+            choices=get_pack_names,
+            label="rb-set-ball-packs",
+            change_msg="rb-option-changed-ball-packs",
+            min_selected=1,
         )
     )
 
@@ -215,8 +215,8 @@ class RollingBallsGame(ActionGuardMixin, Game):
     # ==========================================================================
 
     def _get_active_packs(self) -> list[str]:
-        """Get list of active pack IDs. Currently single-select, ready for multi."""
-        return [self.options.ball_pack]
+        """Get list of active pack IDs."""
+        return list(self.options.ball_packs)
 
     def fill_pipe(self) -> int:
         """Fill the pipe with balls based on player count."""

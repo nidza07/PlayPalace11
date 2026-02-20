@@ -38,6 +38,17 @@ game-team-mode-x-teams-of-y = { $num_teams } teams of { $team_size }
 option-on = on
 option-off = off
 
+# Option navigation
+option-back = Back
+option-min-selected = At least { $count } { $count ->
+    [one] option
+   *[other] options
+} must be selected.
+option-max-selected = At most { $count } { $count ->
+    [one] option
+   *[other] options
+} can be selected.
+
 # Status box
 status-box-closed = Status information closed.
 
