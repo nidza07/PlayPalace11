@@ -74,9 +74,8 @@ rb-set-reshuffle-penalty = Kazna za mešanje: { $points }
 rb-enter-reshuffle-penalty = Upišite kaznu za mešanje (0-5):
 rb-option-changed-reshuffle-penalty = Kazna za mešanje podešena na { $points }.
 
-rb-set-ball-pack = Paket loptica: { $pack }
-rb-select-ball-pack = Izaberite paket loptica:
-rb-option-changed-ball-pack = Paket loptica podešen na { $pack }.
+rb-set-ball-packs = Paketi loptica ({ $count } od { $total } izabrano)
+rb-option-changed-ball-packs = Paketi loptica ažurirani ({ $count } od { $total } izabrano).
 
 # Disabled reasons
 rb-not-enough-balls = Nema dovoljno loptica u cevi.

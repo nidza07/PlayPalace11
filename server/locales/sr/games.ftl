@@ -38,6 +38,19 @@ game-team-mode-x-teams-of-y = { $num_teams } timova sa po { $team_size }
 option-on = Uključeno
 option-off = Isključeno
 
+# Option navigation
+option-back = Nazad
+option-min-selected = Bar { $count } { $count ->
+    [one] opcija mora biti izabrana
+    [few] opcije moraju biti izabrane
+   *[other] opcija mora biti izabrano
+}.
+option-max-selected = Najviše { $count } { $count ->
+    [one] opcija može biti izabrana
+    [few] opcije mogu biti izabrane
+   *[other] opcija može biti izabrano
+}.
+
 # Status box
 status-box-closed = Informacije o stanju zatvorene.
 
