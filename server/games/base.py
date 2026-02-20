@@ -149,6 +149,11 @@ class Game(
         default_factory=list
     )  # [[tick, sound, vol, pan, pitch], ...]
     sound_scheduler_tick: int = 0  # Current tick counter
+    # Event queue state (serialized for persistence)
+    event_queue: list[tuple[int, str, dict]] = field(
+        default_factory=list
+    )  # [(tick, event_type, data), ...]
+    is_animating: bool = False  # True while event sequence is playing
     # Action sets (serialized - actions are pure data now)
     player_action_sets: dict[str, list[ActionSet]] = field(default_factory=dict)
     # Team manager (serialized for persistence)
@@ -178,6 +183,7 @@ class Game(
         self._estimate_running: bool = False  # Whether estimation is in progress
         self._estimate_lock: threading.Lock = threading.Lock()  # Protect results list
         self._transcripts: dict[str, list[dict[str, str]]] = {}
+        self._options_path: dict[str, list[str]] = {}  # player_id -> options nav stack
 
     def rebuild_runtime_state(self) -> None:
         """Rebuild runtime-only state after deserialization.
