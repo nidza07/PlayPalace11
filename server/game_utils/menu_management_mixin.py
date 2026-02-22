@@ -41,6 +41,8 @@ class MenuManagementMixin:
             return  # Don't rebuild menus after game is destroyed
         if self.status == "finished":
             return  # Don't rebuild turn menu after game has ended
+        if player.id in self._status_box_open:
+            return  # Don't clobber status box with turn menu
         user = self.get_user(player)
         if not user:
             return
@@ -72,6 +74,8 @@ class MenuManagementMixin:
             return
         if self.status == "finished":
             return
+        if player.id in self._status_box_open:
+            return  # Don't clobber status box with turn menu
         user = self.get_user(player)
         if not user:
             return

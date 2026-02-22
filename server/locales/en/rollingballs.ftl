@@ -36,8 +36,8 @@ rb-reshuffle-penalty = { $player } loses { $points } { $points ->
 } for reshuffling.
 
 # View pipe
-rb-view-pipe-header = Viewing the pipe. There are { $count } balls:
-rb-view-pipe-ball = Ball { $num }: { $description }. Value: { $value } points.
+rb-view-pipe-header = There are { $count } balls:
+rb-view-pipe-ball = { $num }: { $description }. Value: { $value } points.
 
 # Game start
 rb-pipe-filled = The pipe has been filled with { $count } balls!
