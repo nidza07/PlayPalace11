@@ -74,6 +74,21 @@ game-player-deals = { $player } deals out the cards.
 card-name = { $rank } of { $suit }
 no-cards = No cards
 
+# Colors
+color-black = black
+color-blue = blue
+color-brown = brown
+color-gray = gray
+color-green = green
+color-indigo = indigo
+color-orange = orange
+color-pink = pink
+color-purple = purple
+color-red = red
+color-violet = violet
+color-white = white
+color-yellow = yellow
+
 # Suit names
 suit-diamonds = diamonds
 suit-clubs = clubs
@@ -107,6 +122,20 @@ rank-queen = queen
 rank-queen-plural = queens
 rank-king = king
 rank-king-plural = kings
+rank-joker = joker
+rank-joker-plural = jokers
+
+# Shapes
+shape-circle = circle
+shape-cone = cone
+shape-cylinder = cylinder
+shape-hexagon = hexagon
+shape-oval = oval
+shape-pentagon = pentagon
+shape-prism = prism
+shape-rectangle = rectangle
+shape-square = square
+shape-triangle = triangle
 
 # Poker hand descriptions
 poker-high-card-with = { $high } high, with { $rest }
