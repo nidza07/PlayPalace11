@@ -52,6 +52,7 @@ class RollingBallsPlayer(Player):
     view_pipe_uses: int = 0  # Total uses this game
     reshuffle_uses: int = 0  # Total uses this game
     last_viewed_pipe: list[dict] | None = None  # Snapshot of pipe at last view
+    bot_pipe_memory: int = 0  # Balls from front the bot remembers (bots only)
 
 
 @dataclass
@@ -428,6 +429,13 @@ class RollingBallsGame(ActionGuardMixin, Game):
                 break
             balls.append(self.pipe.pop(0))
 
+        # Erode bot pipe memory (balls removed from front)
+        taken = len(balls)
+        for p in self.players:
+            rb_p: RollingBallsPlayer = p  # type: ignore
+            if rb_p.is_bot:
+                rb_p.bot_pipe_memory = max(0, rb_p.bot_pipe_memory - taken)
+
         # Apply scores immediately (game state is updated now)
         for ball in balls:
             rb_player.score += ball["value"]
@@ -501,6 +509,12 @@ class RollingBallsGame(ActionGuardMixin, Game):
         random.shuffle(section)
         self.pipe[:shuffle_count] = section
 
+        # Invalidate bot pipe memory (pipe order changed)
+        for p in self.players:
+            rb_p: RollingBallsPlayer = p  # type: ignore
+            if rb_p.is_bot:
+                rb_p.bot_pipe_memory = 0
+
         self.broadcast_l("rb-reshuffled")
 
         # Apply penalty
@@ -533,18 +547,21 @@ class RollingBallsGame(ActionGuardMixin, Game):
             rb_player.view_pipe_uses += 1
             rb_player.last_viewed_pipe = [b.copy() for b in self.pipe]
 
-        # Build pipe description
-        user.speak_l(
-            "rb-view-pipe-header",
-            count=len(self.pipe),
-        )
+        locale = user.locale
+
+        # Build pipe contents as a status box
+        lines = [Localization.get(locale, "rb-view-pipe-header", count=len(self.pipe))]
         for i, ball in enumerate(self.pipe, 1):
-            user.speak_l(
-                "rb-view-pipe-ball",
-                num=i,
-                description=ball["description"],
-                value=ball["value"],
+            lines.append(
+                Localization.get(
+                    locale,
+                    "rb-view-pipe-ball",
+                    num=i,
+                    description=ball["description"],
+                    value=ball["value"],
+                )
             )
+        self.status_box(player, lines)
 
         # Rebuild menus to reflect updated remaining count
         self.rebuild_all_menus()
@@ -612,6 +629,7 @@ class RollingBallsGame(ActionGuardMixin, Game):
             rb_p.view_pipe_uses = 0
             rb_p.reshuffle_uses = 0
             rb_p.last_viewed_pipe = None
+            rb_p.bot_pipe_memory = 0
 
         # Fill pipe
         total_balls = self.fill_pipe()
@@ -696,8 +714,37 @@ class RollingBallsGame(ActionGuardMixin, Game):
 
         BotHelper.on_tick(self)
 
+    def _get_bot_perceived_pipe(self, player: RollingBallsPlayer) -> list[dict]:
+        """Get the pipe as the bot perceives it, with limited information.
+
+        Bots auto-use view pipe charges and remember up to 6 balls.
+        Beyond their memory, ball values are randomized.
+        """
+        # Auto-use a view if available and the pipe has changed
+        if (
+            player.view_pipe_uses < self.options.view_pipe_limit
+            and player.last_viewed_pipe != self.pipe
+        ):
+            player.view_pipe_uses += 1
+            player.last_viewed_pipe = [b.copy() for b in self.pipe]
+            player.bot_pipe_memory = min(6, len(self.pipe))
+            self.rebuild_all_menus()
+
+        perceived = []
+        for i, ball in enumerate(self.pipe):
+            if i < player.bot_pipe_memory:
+                perceived.append(ball)
+            else:
+                perceived.append({
+                    **ball,
+                    "value": random.randint(-5, 5),  # nosec B311
+                })
+        return perceived
+
     def bot_think(self, player: RollingBallsPlayer) -> str | None:
         """Bot AI decision making."""
+        perceived_pipe = self._get_bot_perceived_pipe(player)
+
         # Check if we should reshuffle
         if (
             not player.has_reshuffled
@@ -706,7 +753,7 @@ class RollingBallsGame(ActionGuardMixin, Game):
         ):
             # Count negative balls in the first 3 positions
             negative_count = sum(
-                1 for i in range(min(3, len(self.pipe))) if self.pipe[i]["value"] <= -2
+                1 for i in range(min(3, len(self.pipe))) if perceived_pipe[i]["value"] <= -2
             )
             if negative_count >= 2:
                 return "reshuffle"
@@ -721,7 +768,7 @@ class RollingBallsGame(ActionGuardMixin, Game):
         best_value = -999
         for test_take in range(min_take, max_take + 1):
             cumulative = sum(
-                self.pipe[i]["value"] for i in range(test_take)
+                perceived_pipe[i]["value"] for i in range(test_take)
             )
             if cumulative > best_value or (
                 cumulative == best_value and random.randint(0, 1) == 0  # nosec B311
