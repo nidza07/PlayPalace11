@@ -228,6 +228,30 @@ def test_monopoly_income_tax_space_deducts_cash(monkeypatch):
     assert game.turn_pending_purchase_space_id == ""
 
 
+def test_monopoly_free_parking_jackpot_preset_collects_bank_payments(monkeypatch):
+    game = _start_two_player_game(MonopolyOptions(preset_id="free_parking_jackpot"))
+    host = game.current_player
+    assert host is not None
+    guest = game.players[1]
+
+    rolls = iter([1, 3])  # host to Income Tax (200)
+    monkeypatch.setattr("server.games.monopoly.game.random.randint", lambda a, b: next(rolls))
+    game.execute_action(host, "roll_dice")
+
+    assert host.cash == STARTING_CASH - 200
+    assert game.free_parking_pool == 200
+
+    game.execute_action(host, "end_turn")
+    guest.position = 17
+    rolls = iter([1, 2])  # guest to Free Parking
+    monkeypatch.setattr("server.games.monopoly.game.random.randint", lambda a, b: next(rolls))
+    game.execute_action(guest, "roll_dice")
+
+    assert guest.position == 20
+    assert guest.cash == STARTING_CASH + 200
+    assert game.free_parking_pool == 0
+
+
 def test_monopoly_go_to_jail_space_moves_player_to_jail(monkeypatch):
     game = _start_two_player_game()
     host = game.current_player

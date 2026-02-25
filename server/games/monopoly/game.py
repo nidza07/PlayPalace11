@@ -425,6 +425,7 @@ class MonopolyGame(ActionGuardMixin, Game):
     mortgaged_space_ids: list[str] = field(default_factory=list)
     building_levels: dict[str, int] = field(default_factory=dict)
     pending_trade_offer: MonopolyTradeOffer | None = None
+    free_parking_pool: int = 0
 
     turn_has_rolled: bool = False
     turn_last_roll: list[int] = field(default_factory=list)
@@ -659,7 +660,10 @@ class MonopolyGame(ActionGuardMixin, Game):
 
     def get_available_preset_ids(self) -> list[str]:
         """Return selectable preset ids from generated catalog artifacts."""
-        return _catalog_preset_ids()
+        preset_ids = list(_catalog_preset_ids())
+        if "free_parking_jackpot" not in preset_ids:
+            preset_ids.append("free_parking_jackpot")
+        return preset_ids
 
     def _fallback_preset(self) -> MonopolyPreset:
         """Return a safe fallback preset if artifacts are missing."""
@@ -678,6 +682,16 @@ class MonopolyGame(ActionGuardMixin, Game):
 
     def _resolve_selected_preset(self) -> MonopolyPreset:
         """Resolve currently selected lobby preset, applying fallback when needed."""
+        if self.options.preset_id == "free_parking_jackpot":
+            base = _catalog_get_preset(DEFAULT_PRESET_ID) or self._fallback_preset()
+            return MonopolyPreset(
+                preset_id="free_parking_jackpot",
+                family_key=base.family_key,
+                name="Free Parking Jackpot",
+                description="Classic rules with jackpot payout on Free Parking.",
+                anchor_edition_id=base.anchor_edition_id,
+                edition_ids=tuple(base.edition_ids),
+            )
         selected = _catalog_get_preset(self.options.preset_id)
         if selected:
             return selected
@@ -1223,6 +1237,10 @@ class MonopolyGame(ActionGuardMixin, Game):
             return None
         return SPACE_BY_ID.get(self.turn_pending_purchase_space_id)
 
+    def _is_free_parking_jackpot_enabled(self) -> bool:
+        """Return True when current preset enables jackpot on Free Parking."""
+        return self.active_preset_id == "free_parking_jackpot"
+
     def _can_buy_pending_space(self, player: MonopolyPlayer) -> bool:
         """Return True if the active player can buy pending space now."""
         space = self._pending_purchase_space()
@@ -1320,6 +1338,8 @@ class MonopolyGame(ActionGuardMixin, Game):
 
         paid = min(player.cash, amount)
         player.cash -= paid
+        if self._is_free_parking_jackpot_enabled():
+            self.free_parking_pool += paid
 
         if tax_name:
             self.broadcast_l(
@@ -1643,6 +1663,19 @@ class MonopolyGame(ActionGuardMixin, Game):
                 depth=depth,
                 dice_total=dice_total,
             )
+
+        if landed_space.kind == "free_parking":
+            if self._is_free_parking_jackpot_enabled() and self.free_parking_pool > 0:
+                payout = self.free_parking_pool
+                self.free_parking_pool = 0
+                player.cash += payout
+                self.broadcast_l(
+                    "monopoly-free-parking-jackpot",
+                    player=player.name,
+                    amount=payout,
+                    cash=player.cash,
+                )
+            return "resolved"
 
         return "resolved"
 
@@ -2520,6 +2553,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             space.space_id: 0 for space in CLASSIC_STANDARD_BOARD if self._is_street_property(space)
         }
         self.pending_trade_offer = None
+        self.free_parking_pool = 0
         self._reset_turn_state()
         self.turn_doubles_count = 0
 

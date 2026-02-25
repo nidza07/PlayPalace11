@@ -106,6 +106,7 @@ monopoly-trade-offered = { $proposer } offered { $target } a trade: { $offer }.
 monopoly-trade-completed = Trade completed between { $proposer } and { $target }: { $offer }.
 monopoly-trade-declined = { $target } declined trade from { $proposer }: { $offer }.
 monopoly-trade-cancelled = Trade cancelled: { $offer }.
+monopoly-free-parking-jackpot = { $player } collected the Free Parking jackpot of { $amount } (cash: { $cash }).
 monopoly-mortgaged-no-rent = { $player } landed on mortgaged { $property }; no rent is due.
 
 # Card engine
