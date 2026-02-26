@@ -77,3 +77,22 @@ def test_star_wars_complete_saga_card_cash_override_contract():
 
 def test_star_wars_mandalorian_audio_capability_contract():
     assert supports_capability("star_wars_mandalorian", "audio_theme_event") is True
+
+
+def test_disney_princesses_card_id_remap_contract():
+    assert get_card_id_remap("disney_princesses", "chance", "poor_tax_15") == "bank_dividend_50"
+
+
+def test_disney_princesses_card_cash_override_contract():
+    assert get_card_cash_override("disney_princesses", "bank_dividend_50") == 90
+
+
+def test_marvel_avengers_card_id_remap_contract():
+    assert (
+        get_card_id_remap("marvel_avengers", "community_chest", "doctor_fee_pay_50")
+        == "bank_error_collect_200"
+    )
+
+
+def test_marvel_avengers_card_cash_override_contract():
+    assert get_card_cash_override("marvel_avengers", "bank_error_collect_200") == 220
