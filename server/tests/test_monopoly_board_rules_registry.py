@@ -1,5 +1,7 @@
 """Tests for Monopoly board rules registry."""
 
+import pytest
+
 from server.games.monopoly.board_rules_registry import (
     get_card_cash_override,
     get_card_id_remap,
@@ -119,3 +121,45 @@ def test_fortnite_card_cash_override_contract():
 
 def test_stranger_things_card_id_remap_contract():
     assert get_card_id_remap("stranger_things", "chance", "bank_dividend_50") == "go_to_jail"
+
+
+@pytest.mark.parametrize(
+    ("rule_pack_id", "deck_type", "source_card_id", "target_card_id"),
+    (
+        ("disney_star_wars_dark_side", "chance", "poor_tax_15", "bank_dividend_50"),
+        ("star_wars_40th", "chance", "bank_dividend_50", "advance_to_go"),
+        ("star_wars_boba_fett", "chance", "bank_dividend_50", "go_back_three"),
+        ("star_wars_classic_edition", "chance", "go_back_three", "bank_dividend_50"),
+        ("star_wars_legacy", "community_chest", "doctor_fee_pay_50", "income_tax_refund_20"),
+        ("star_wars_light_side", "chance", "bank_dividend_50", "go_to_jail"),
+        ("star_wars_mandalorian_s2", "chance", "poor_tax_15", "bank_dividend_50"),
+        ("star_wars_saga", "community_chest", "doctor_fee_pay_50", "bank_error_collect_200"),
+        ("star_wars_solo", "chance", "go_back_three", "advance_to_go"),
+        ("star_wars_the_child", "chance", "bank_dividend_50", "go_to_jail"),
+    ),
+)
+def test_star_wars_family_card_id_remap_contract(
+    rule_pack_id: str,
+    deck_type: str,
+    source_card_id: str,
+    target_card_id: str,
+):
+    assert get_card_id_remap(rule_pack_id, deck_type, source_card_id) == target_card_id
+
+
+@pytest.mark.parametrize(
+    ("rule_pack_id", "card_id", "amount"),
+    (
+        ("disney_star_wars_dark_side", "bank_dividend_50", 95),
+        ("star_wars_classic_edition", "bank_dividend_50", 75),
+        ("star_wars_legacy", "income_tax_refund_20", 65),
+        ("star_wars_mandalorian_s2", "bank_dividend_50", 85),
+        ("star_wars_saga", "bank_error_collect_200", 205),
+    ),
+)
+def test_star_wars_family_card_cash_override_contract(
+    rule_pack_id: str,
+    card_id: str,
+    amount: int,
+):
+    assert get_card_cash_override(rule_pack_id, card_id) == amount
