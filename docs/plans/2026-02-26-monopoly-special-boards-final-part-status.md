@@ -19,7 +19,23 @@ Head: `20fb60f`
 - `cd server && ../.venv/bin/pytest tests/test_monopoly_manual_rule_payload_completeness.py -v`
   - Result: `55 passed`
 - `cd server && ../.venv/bin/pytest -k monopoly -q`
-  - Result: `1081 passed, 598 deselected`
+  - Result: `1083 passed, 598 deselected`
+
+## New Progress: Manual Source Extraction (Marvel + Star Wars)
+
+- Added extractor: `server/scripts/monopoly/extract_manual_text.py`
+- Added extracted artifacts:
+  - `server/games/monopoly/manual_rules/extracted/manifest.json`
+  - `server/games/monopoly/manual_rules/extracted/*.txt`
+  - `server/games/monopoly/manual_rules/extracted/*.json`
+- Added coverage test:
+  - `server/tests/test_monopoly_manual_source_extraction_artifacts.py`
+- Extraction run status:
+  - selected boards: `21`
+  - extracted successfully: `20`
+  - known failure: `marvel_flip` (`pypdf` decompression-limit failure)
+- Rerun command:
+  - `./.venv/bin/python server/scripts/monopoly/extract_manual_text.py --family marvel --family star`
 
 ## What Has Been Done (Whole Rollout to Date)
 
