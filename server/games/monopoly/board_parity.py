@@ -28,6 +28,8 @@ _FIDELITY_OVERRIDES: dict[str, str] = {
     "mario_collectors": "partial_plus",
     "mario_celebration": "partial_plus",
     "junior_super_mario": "manual_core",
+    "star_wars_mandalorian": "partial_plus",
+    "star_wars_complete_saga": "partial_plus",
 }
 
 

@@ -65,4 +65,5 @@ def test_wave2_stub_exposes_anchor_and_status(module, rule_pack_id: str, anchor_
     assert module.ANCHOR_EDITION_ID == anchor_id
     assert module.RULE_PACK_STATUS == "partial"
     assert isinstance(module.PASS_GO_CREDIT_OVERRIDE, int)
-    assert module.CAPABILITY_IDS == ("pass_go_credit_override", "startup_board_announcement")
+    assert "pass_go_credit_override" in module.CAPABILITY_IDS
+    assert "startup_board_announcement" in module.CAPABILITY_IDS

@@ -2229,6 +2229,8 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Resolve board-specific remap for one drawn card id."""
         if self.active_board_effective_mode != "board_rules":
             return card_id
+        if self.active_board_deck_mode != "board_specific":
+            return card_id
         rule_pack_id = self.active_board_rule_pack_id
         if not rule_pack_id:
             return card_id
@@ -2240,6 +2242,8 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Resolve board-specific card cash override when active."""
         amount = max(0, default_amount)
         if self.active_board_effective_mode != "board_rules":
+            return amount
+        if self.active_board_deck_mode != "board_specific":
             return amount
         rule_pack_id = self.active_board_rule_pack_id
         if not rule_pack_id:

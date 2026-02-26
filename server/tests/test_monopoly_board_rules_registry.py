@@ -55,3 +55,21 @@ def test_junior_super_mario_manual_core_capability_contract():
 
 def test_junior_super_mario_sound_ready_capability_contract():
     assert supports_capability("junior_super_mario", "junior_powerup_sound_ready") is True
+
+
+def test_star_wars_mandalorian_card_id_remap_contract():
+    assert (
+        get_card_id_remap("star_wars_mandalorian", "chance", "bank_dividend_50")
+        == "go_back_three"
+    )
+
+
+def test_star_wars_complete_saga_card_id_remap_contract():
+    assert (
+        get_card_id_remap("star_wars_complete_saga", "community_chest", "bank_error_collect_200")
+        == "income_tax_refund_20"
+    )
+
+
+def test_star_wars_complete_saga_card_cash_override_contract():
+    assert get_card_cash_override("star_wars_complete_saga", "income_tax_refund_20") == 80
