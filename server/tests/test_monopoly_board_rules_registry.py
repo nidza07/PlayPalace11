@@ -31,3 +31,11 @@ def test_mario_movie_card_cash_override_contract():
 
 def test_card_cash_override_returns_none_when_missing():
     assert get_card_cash_override("mario_movie", "advance_to_go") is None
+
+
+def test_mario_collectors_card_id_remap_contract():
+    assert get_card_id_remap("mario_collectors", "chance", "go_back_three") == "bank_dividend_50"
+
+
+def test_mario_collectors_card_cash_override_contract():
+    assert get_card_cash_override("mario_collectors", "bank_error_collect_200") == 250
