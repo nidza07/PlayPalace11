@@ -349,6 +349,11 @@ def get_available_board_ids() -> list[str]:
     return ids
 
 
+def get_board_label_keys() -> dict[str, str]:
+    """Return mapping of board ids to localization label keys."""
+    return {board_id: profile.label_key for board_id, profile in BOARD_PROFILES.items()}
+
+
 def get_available_board_rules_modes() -> list[str]:
     """Return selectable board rules mode ids."""
     return list(BOARD_RULES_MODES)

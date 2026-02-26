@@ -26,6 +26,7 @@ from .banking_sim import (
 from .board_profile import (
     DEFAULT_BOARD_ID,
     DEFAULT_BOARD_RULES_MODE,
+    get_board_label_keys as _board_label_keys,
     get_board_profile,
     get_available_board_ids as _board_profile_ids,
     get_available_board_rules_modes as _board_rules_modes,
@@ -73,14 +74,7 @@ PRESET_LABEL_KEYS = {
     "knockout": "monopoly-preset-knockout",
     "free_parking_jackpot": "monopoly-preset-free-parking-jackpot",
 }
-BOARD_LABEL_KEYS = {
-    "classic_default": "monopoly-board-classic-default",
-    "mario_collectors": "monopoly-board-mario-collectors",
-    "mario_kart": "monopoly-board-mario-kart",
-    "mario_celebration": "monopoly-board-mario-celebration",
-    "mario_movie": "monopoly-board-mario-movie",
-    "junior_super_mario": "monopoly-board-junior-super-mario",
-}
+BOARD_LABEL_KEYS = _board_label_keys()
 BOARD_RULES_MODE_LABEL_KEYS = {
     "auto": "monopoly-board-rules-mode-auto",
     "skin_only": "monopoly-board-rules-mode-skin-only",
