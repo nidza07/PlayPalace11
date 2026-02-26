@@ -53,6 +53,7 @@ from .voice_banking_profile import (
     VoiceBankingProfile,
     resolve_voice_banking_profile,
 )
+from .hardware_emulation import HardwareEvent, HardwareResult, resolve_hardware_event
 from .deck_provider import resolve_deck_provider
 from .presets import (
     DEFAULT_PRESET_ID,
@@ -565,6 +566,7 @@ class MonopolyGame(ActionGuardMixin, Game):
     active_board_deck_mode: str = "classic"
     active_board_parity_fidelity_status: str = "none"
     active_board_hardware_capability_ids: tuple[str, ...] = ()
+    active_sound_mode: str = "none"
     junior_ruleset: JuniorRuleset | None = None
     cheaters_profile: CheatersProfile | None = None
     cheaters_engine: CheatersEngine | None = None
@@ -2276,6 +2278,19 @@ class MonopolyGame(ActionGuardMixin, Game):
         for player in self.turn_players:
             if isinstance(player, MonopolyPlayer):
                 player.cash = starting_cash
+
+    def _resolve_board_hardware_event(
+        self,
+        event_id: str,
+        payload: dict[str, object] | None = None,
+    ) -> HardwareResult:
+        """Resolve one board hardware event through global emulation framework."""
+        event = HardwareEvent(
+            board_id=self.active_board_id,
+            event_id=event_id,
+            payload=payload or {},
+        )
+        return resolve_hardware_event(event, sound_mode=self.active_sound_mode)
 
     def _resolve_junior_super_mario_powerup_sound_outcome(self, power_up_die: int) -> str | None:
         """Resolve sound-specific power-up outcome when future sound mode is enabled."""
