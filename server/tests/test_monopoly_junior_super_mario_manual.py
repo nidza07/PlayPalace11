@@ -55,3 +55,37 @@ def test_junior_super_mario_roll_moves_by_numbered_die_only(monkeypatch):
 
     assert host.position == 13
     assert game.turn_last_roll == [4, 6]
+
+
+def test_junior_super_mario_zero_coin_player_does_not_enter_timeout(monkeypatch):
+    game = _start_manual_board_game(2)
+    host = game.current_player
+    assert host is not None
+
+    host.cash = 0
+    host.position = 29
+    rolls = iter([1, 5])  # land on go_to_jail space, then unused power-up
+    monkeypatch.setattr("server.games.monopoly.game.random.randint", lambda a, b: next(rolls))
+
+    game.execute_action(host, "roll_dice")
+
+    assert host.in_jail is False
+    assert host.position == 30
+
+
+def test_junior_super_mario_timeout_exit_by_one_coin_then_roll(monkeypatch):
+    game = _start_manual_board_game(2)
+    host = game.current_player
+    assert host is not None
+
+    host.in_jail = True
+    host.position = 10
+    host.cash = 3
+    rolls = iter([2, 1])  # numbered die, power-up die
+    monkeypatch.setattr("server.games.monopoly.game.random.randint", lambda a, b: next(rolls))
+
+    game.execute_action(host, "roll_dice")
+
+    assert host.in_jail is False
+    assert host.cash == 2
+    assert host.position == 12

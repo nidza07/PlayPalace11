@@ -2881,6 +2881,11 @@ class MonopolyGame(ActionGuardMixin, Game):
             return "resolved"
 
         if landed_space.kind == "go_to_jail":
+            if (
+                self._is_junior_super_mario_manual_core_active()
+                and self._current_liquid_balance(player) <= 0
+            ):
+                return "resolved"
             self._send_to_jail(player)
             return "forced_end"
 
@@ -3629,6 +3634,53 @@ class MonopolyGame(ActionGuardMixin, Game):
         self.turn_has_rolled = True
         self.turn_pending_purchase_space_id = ""
         if mono_player.in_jail:
+            if self._is_junior_super_mario_manual_core_active():
+                if mono_player.get_out_of_jail_cards > 0:
+                    mono_player.get_out_of_jail_cards -= 1
+                    mono_player.in_jail = False
+                    mono_player.jail_turns = 0
+                    self.broadcast_l(
+                        "monopoly-jail-card-used",
+                        player=mono_player.name,
+                        cards=mono_player.get_out_of_jail_cards,
+                    )
+                elif self._current_liquid_balance(mono_player) >= 1:
+                    paid = self._debit_player_to_bank(mono_player, 1, "pay_bail")
+                    if paid < 1:
+                        self.turn_doubles_count = 0
+                        self._sync_cash_scores()
+                        self.rebuild_all_menus()
+                        return
+                    mono_player.in_jail = False
+                    mono_player.jail_turns = 0
+                    self.broadcast_l(
+                        "monopoly-bail-paid",
+                        player=mono_player.name,
+                        amount=paid,
+                        cash=mono_player.cash,
+                    )
+                else:
+                    self.turn_doubles_count = 0
+                    self._sync_cash_scores()
+                    self.rebuild_all_menus()
+                    return
+
+                landed_space = self._move_player(
+                    mono_player, total, collect_pass_go=False
+                )
+                self.broadcast_l(
+                    "monopoly-roll-result",
+                    player=mono_player.name,
+                    die1=die_1,
+                    die2=die_2,
+                    total=total,
+                    space=landed_space.name,
+                )
+                self._resolve_space(mono_player, landed_space, dice_total=total)
+                self.turn_doubles_count = 0
+                self._sync_cash_scores()
+                self.rebuild_all_menus()
+                return
             if is_doubles:
                 mono_player.in_jail = False
                 mono_player.jail_turns = 0
