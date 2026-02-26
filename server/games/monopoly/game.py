@@ -570,6 +570,16 @@ class MonopolyGame(ActionGuardMixin, Game):
     active_board_parity_fidelity_status: str = "none"
     active_board_hardware_capability_ids: tuple[str, ...] = ()
     active_manual_rule_set: ManualRuleSet | None = None
+    active_board_spaces: list[MonopolySpace] = field(
+        default_factory=lambda: CLASSIC_STANDARD_BOARD.copy()
+    )
+    active_space_by_id: dict[str, MonopolySpace] = field(default_factory=lambda: SPACE_BY_ID.copy())
+    active_color_group_to_space_ids: dict[str, list[str]] = field(
+        default_factory=lambda: {
+            key: values.copy() for key, values in COLOR_GROUP_TO_SPACE_IDS.items()
+        }
+    )
+    active_board_size: int = BOARD_SIZE
     active_sound_mode: str = "none"
     last_hardware_event_id: str = ""
     last_hardware_event_status: str = "none"
@@ -1168,13 +1178,79 @@ class MonopolyGame(ActionGuardMixin, Game):
             count=len(self.active_edition_ids),
         )
 
+    def _build_space_from_manual_row(self, row: dict[str, object], fallback_index: int) -> MonopolySpace:
+        """Build one MonopolySpace from a manual rule artifact row."""
+        index = int(row.get("position", fallback_index))
+        space_id = str(row.get("space_id", f"space_{index}"))
+        name = str(row.get("name", space_id.replace("_", " ").title()))
+        kind = str(row.get("kind", "property"))
+        price = int(row.get("price", 0))
+        rent = int(row.get("rent", 0))
+        color_group = str(row.get("color_group", ""))
+        house_cost = int(row.get("house_cost", 0))
+        rents_raw = row.get("rents", ())
+        rents: tuple[int, ...]
+        if isinstance(rents_raw, list):
+            rents = tuple(int(value) for value in rents_raw)
+        else:
+            rents = ()
+        return MonopolySpace(
+            index=index,
+            space_id=space_id,
+            name=name,
+            kind=kind,
+            price=price,
+            rent=rent,
+            color_group=color_group,
+            house_cost=house_cost,
+            rents=rents,
+        )
+
+    def _resolve_active_board_structures(
+        self,
+    ) -> tuple[list[MonopolySpace], dict[str, MonopolySpace], dict[str, list[str]]]:
+        """Resolve active board maps from manual rule set when available."""
+        if self.active_manual_rule_set is None:
+            return (
+                CLASSIC_STANDARD_BOARD.copy(),
+                SPACE_BY_ID.copy(),
+                {key: values.copy() for key, values in COLOR_GROUP_TO_SPACE_IDS.items()},
+            )
+
+        board_payload = self.active_manual_rule_set.board
+        spaces_payload = board_payload.get("spaces", [])
+        if not isinstance(spaces_payload, list):
+            spaces_payload = []
+
+        spaces: list[MonopolySpace] = []
+        for idx, row in enumerate(spaces_payload):
+            if not isinstance(row, dict):
+                continue
+            spaces.append(self._build_space_from_manual_row(row, idx))
+
+        if not spaces:
+            return (
+                CLASSIC_STANDARD_BOARD.copy(),
+                SPACE_BY_ID.copy(),
+                {key: values.copy() for key, values in COLOR_GROUP_TO_SPACE_IDS.items()},
+            )
+
+        spaces.sort(key=lambda space: space.index)
+        space_by_id = {space.space_id: space for space in spaces}
+        color_groups: dict[str, list[str]] = {}
+        for space in spaces:
+            if not self._is_street_property(space):
+                continue
+            color_groups.setdefault(space.color_group, []).append(space.space_id)
+        return spaces, space_by_id, color_groups
+
     def _space_at(self, position: int) -> MonopolySpace:
         """Get board space by board index."""
-        return CLASSIC_STANDARD_BOARD[position % BOARD_SIZE]
+        return self.active_board_spaces[position % self.active_board_size]
 
     def _space_label(self, space_id: str) -> str:
         """Return display label for a space id."""
-        space = SPACE_BY_ID.get(space_id)
+        space = self.active_space_by_id.get(space_id)
         return space.name if space else space_id
 
     def _mortgage_value(self, space: MonopolySpace) -> int:
@@ -1196,7 +1272,7 @@ class MonopolyGame(ActionGuardMixin, Game):
 
     def _set_building_level(self, space_id: str, level: int) -> None:
         """Set building level for a street property (0-5)."""
-        if space_id not in SPACE_BY_ID:
+        if space_id not in self.active_space_by_id:
             return
         clamped = max(0, min(5, level))
         self.building_levels[space_id] = clamped
@@ -1207,14 +1283,14 @@ class MonopolyGame(ActionGuardMixin, Game):
 
     def _owner_has_full_color_set(self, owner_id: str, color_group: str) -> bool:
         """Check whether owner controls an entire color set."""
-        group_ids = COLOR_GROUP_TO_SPACE_IDS.get(color_group, [])
+        group_ids = self.active_color_group_to_space_ids.get(color_group, [])
         if not group_ids:
             return False
         return all(self.property_owners.get(space_id) == owner_id for space_id in group_ids)
 
     def _group_space_ids(self, color_group: str) -> list[str]:
         """Get all board space ids in one color group."""
-        return COLOR_GROUP_TO_SPACE_IDS.get(color_group, [])
+        return self.active_color_group_to_space_ids.get(color_group, [])
 
     def _group_levels(self, color_group: str, owner_id: str | None = None) -> list[int]:
         """Get building levels for one color group, optionally filtered by owner."""
@@ -1283,7 +1359,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         ranked = sorted(
             space_ids,
             key=lambda space_id: (
-                SPACE_BY_ID[space_id].house_cost,
+                self.active_space_by_id[space_id].house_cost,
                 self._building_level(space_id),
                 self._space_label(space_id),
             ),
@@ -1298,8 +1374,8 @@ class MonopolyGame(ActionGuardMixin, Game):
         ranked = sorted(
             space_ids,
             key=lambda space_id: (
-                self._mortgage_value(SPACE_BY_ID[space_id]),
-                SPACE_BY_ID[space_id].price,
+                self._mortgage_value(self.active_space_by_id[space_id]),
+                self.active_space_by_id[space_id].price,
                 self._space_label(space_id),
             ),
             reverse=True,
@@ -1334,7 +1410,7 @@ class MonopolyGame(ActionGuardMixin, Game):
 
     def _property_trade_value(self, space_id: str) -> int:
         """Estimate trade value for a property."""
-        space = SPACE_BY_ID.get(space_id)
+        space = self.active_space_by_id.get(space_id)
         if not space:
             return 100
         return max(1, space.price)
@@ -1343,7 +1419,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Return True when a property can be traded in a private deal."""
         if self.property_owners.get(space_id) != owner_id:
             return False
-        space = SPACE_BY_ID.get(space_id)
+        space = self.active_space_by_id.get(space_id)
         if not space or space.kind not in PURCHASABLE_KINDS:
             return False
         if self._is_street_property(space) and self._group_has_any_buildings(space.color_group):
@@ -1709,7 +1785,10 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Pick the mortgage option that raises the most cash."""
         if not options:
             return None
-        return max(options, key=lambda space_id: self._mortgage_value(SPACE_BY_ID[space_id]))
+        return max(
+            options,
+            key=lambda space_id: self._mortgage_value(self.active_space_by_id[space_id]),
+        )
 
     def _bot_select_unmortgage_property(
         self, player: MonopolyPlayer, options: list[str]
@@ -1718,11 +1797,15 @@ class MonopolyGame(ActionGuardMixin, Game):
         affordable = [
             space_id
             for space_id in options
-            if self._current_liquid_balance(player) >= self._unmortgage_cost(SPACE_BY_ID[space_id])
+            if self._current_liquid_balance(player)
+            >= self._unmortgage_cost(self.active_space_by_id[space_id])
         ]
         if not affordable:
             return options[0] if options else None
-        return min(affordable, key=lambda space_id: self._unmortgage_cost(SPACE_BY_ID[space_id]))
+        return min(
+            affordable,
+            key=lambda space_id: self._unmortgage_cost(self.active_space_by_id[space_id]),
+        )
 
     def _bot_select_build_house(
         self, player: MonopolyPlayer, options: list[str]
@@ -1732,7 +1815,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             return None
 
         def _score(space_id: str) -> tuple[int, int, str]:
-            space = SPACE_BY_ID[space_id]
+            space = self.active_space_by_id[space_id]
             level = self._building_level(space_id)
             if space.rents:
                 current_rent = space.rents[min(level, len(space.rents) - 1)]
@@ -1753,7 +1836,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         for space_id, space_owner_id in self.property_owners.items():
             if space_owner_id != owner_id:
                 continue
-            space = SPACE_BY_ID.get(space_id)
+            space = self.active_space_by_id.get(space_id)
             if space and space.kind == kind:
                 total += 1
         return total
@@ -1833,13 +1916,13 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Get the currently pending purchasable space for this turn."""
         if not self.turn_pending_purchase_space_id:
             return None
-        return SPACE_BY_ID.get(self.turn_pending_purchase_space_id)
+        return self.active_space_by_id.get(self.turn_pending_purchase_space_id)
 
     def _pending_auction_space(self) -> MonopolySpace | None:
         """Get active auction space when an interactive auction is running."""
         if not self.pending_auction_space_id:
             return None
-        return SPACE_BY_ID.get(self.pending_auction_space_id)
+        return self.active_space_by_id.get(self.pending_auction_space_id)
 
     def _is_auction_active(self) -> bool:
         """Return True when an interactive property auction is running."""
@@ -2428,9 +2511,9 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Move player by steps and return landed space."""
         old_position = player.position
         absolute_position = old_position + steps
-        player.position = absolute_position % BOARD_SIZE
+        player.position = absolute_position % self.active_board_size
 
-        if collect_pass_go and absolute_position >= BOARD_SIZE:
+        if collect_pass_go and absolute_position >= self.active_board_size:
             pass_go_cash = max(0, self.rule_profile.pass_go_cash)
             if self._is_electronic_banking_preset() and self.banking_profile:
                 pass_go_cash = max(0, self.banking_profile.pass_go_credit)
@@ -2597,7 +2680,7 @@ class MonopolyGame(ActionGuardMixin, Game):
                 continue
             if space_id in self.mortgaged_space_ids:
                 continue
-            space = SPACE_BY_ID.get(space_id)
+            space = self.active_space_by_id.get(space_id)
             if not space or not self._is_street_property(space):
                 continue
             total += max(0, self._calculate_rent_due(space, player.id, dice_total=None))
@@ -2662,7 +2745,7 @@ class MonopolyGame(ActionGuardMixin, Game):
 
     def _junior_property_pool_limit(self) -> int:
         """Return purchasable property count for junior completion checks."""
-        return sum(1 for space in CLASSIC_STANDARD_BOARD if space.kind in PURCHASABLE_KINDS)
+        return sum(1 for space in self.active_board_spaces if space.kind in PURCHASABLE_KINDS)
 
     def _owned_property_count(self, player: MonopolyPlayer) -> int:
         """Return how many currently owned board spaces belong to a player."""
@@ -2872,7 +2955,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             return "resolved"
 
         if card_id == "go_back_three":
-            player.position = (player.position - 3) % BOARD_SIZE
+            player.position = (player.position - 3) % self.active_board_size
             landed_space = self._space_at(player.position)
             self.broadcast_l(
                 "monopoly-card-move",
@@ -3347,7 +3430,7 @@ class MonopolyGame(ActionGuardMixin, Game):
                 continue
             if space_id in self.mortgaged_space_ids:
                 continue
-            space = SPACE_BY_ID.get(space_id)
+            space = self.active_space_by_id.get(space_id)
             if not space:
                 continue
             if self._is_street_property(space) and self._group_has_any_buildings(space.color_group):
@@ -3374,7 +3457,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         for space_id in mono_player.owned_space_ids:
             if self.property_owners.get(space_id) != mono_player.id:
                 continue
-            space = SPACE_BY_ID.get(space_id)
+            space = self.active_space_by_id.get(space_id)
             if not space or not self._is_street_property(space):
                 continue
             if space_id in self.mortgaged_space_ids:
@@ -3410,7 +3493,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         for space_id in mono_player.owned_space_ids:
             if self.property_owners.get(space_id) != mono_player.id:
                 continue
-            space = SPACE_BY_ID.get(space_id)
+            space = self.active_space_by_id.get(space_id)
             if not space or not self._is_street_property(space):
                 continue
             level = self._building_level(space_id)
@@ -4111,7 +4194,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         mono_player: MonopolyPlayer = player  # type: ignore
         if space_id not in self._options_for_mortgage_property(player):
             return
-        space = SPACE_BY_ID.get(space_id)
+        space = self.active_space_by_id.get(space_id)
         if not space:
             return
 
@@ -4140,7 +4223,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         mono_player: MonopolyPlayer = player  # type: ignore
         if space_id not in self._options_for_unmortgage_property(player):
             return
-        space = SPACE_BY_ID.get(space_id)
+        space = self.active_space_by_id.get(space_id)
         if not space:
             return
 
@@ -4169,7 +4252,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         mono_player: MonopolyPlayer = player  # type: ignore
         if space_id not in self._options_for_build_house(player):
             return
-        space = SPACE_BY_ID.get(space_id)
+        space = self.active_space_by_id.get(space_id)
         if not space or not self._is_street_property(space):
             return
 
@@ -4212,7 +4295,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         mono_player: MonopolyPlayer = player  # type: ignore
         if space_id not in self._options_for_sell_house(player):
             return
-        space = SPACE_BY_ID.get(space_id)
+        space = self.active_space_by_id.get(space_id)
         if not space or not self._is_street_property(space):
             return
 
@@ -4766,6 +4849,12 @@ class MonopolyGame(ActionGuardMixin, Game):
             self.active_board_deck_mode,
         ).mode
         self.active_manual_rule_set = self._load_active_manual_rule_set()
+        (
+            self.active_board_spaces,
+            self.active_space_by_id,
+            self.active_color_group_to_space_ids,
+        ) = self._resolve_active_board_structures()
+        self.active_board_size = len(self.active_board_spaces)
         self.active_sound_mode = "none"
         self.last_hardware_event_id = ""
         self.last_hardware_event_status = "none"
@@ -4822,7 +4911,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         self.property_owners.clear()
         self.mortgaged_space_ids.clear()
         self.building_levels = {
-            space.space_id: 0 for space in CLASSIC_STANDARD_BOARD if self._is_street_property(space)
+            space.space_id: 0 for space in self.active_board_spaces if self._is_street_property(space)
         }
         self.pending_trade_offer = None
         self.free_parking_pool = 0
