@@ -602,6 +602,22 @@ def test_twentyone_play_modifier_option_reads_name_once() -> None:
     assert "increase opponent damage by 1" in options[0].lower()
 
 
+def test_twentyone_broadcast_formatted_uses_each_users_locale() -> None:
+    game, p1, p2 = setup_game()
+    host_user = game.get_user(p1)
+    guest_user = game.get_user(p2)
+    assert host_user is not None
+    assert guest_user is not None
+    guest_user._locale = "es"
+
+    host_user.clear_messages()
+    guest_user.clear_messages()
+    game._broadcast_formatted(lambda locale: f"locale-{locale}")
+
+    assert "locale-en" in host_user.get_spoken_messages()
+    assert "locale-es" in guest_user.get_spoken_messages()
+
+
 def test_twentyone_action_input_menu_selection_index_fallback_plays_choice() -> None:
     game, p1, p2 = setup_game()
     game.status = "playing"
@@ -1472,6 +1488,29 @@ def test_twentyone_bot_select_prefers_defend_when_likely_losing() -> None:
 
     assert chosen is not None
     assert chosen.startswith(f"2:{Localization.get('en', MODIFIER_LABELS[MODIFIER_GUARD])}")
+
+
+def test_twentyone_bot_select_play_modifier_matches_by_index_not_label() -> None:
+    game = TwentyOneGame()
+    human = MockUser("Host")
+    bot_user = Bot("GuestBot")
+    p1 = game.add_player("Host", human)
+    p2 = game.add_player("GuestBot", bot_user)
+    game.host = "Host"
+    game.status = "playing"
+    game.game_active = True
+    game.phase = "turns"
+    game.set_turn_players([p2, p1], reset_index=True)
+    p1.hp = 10
+    p2.hp = 9
+    p1.hand = [make_card(1, 10), make_card(2, 11)]
+    p2.hand = [make_card(3, 7), make_card(4, 6)]
+    p2.modifiers = [MODIFIER_REDRAFT, MODIFIER_GUARD]
+    p2.table_modifiers = []
+
+    # Bot should pick guard (index 2), regardless of localized label text.
+    options = ["1:alpha", "2:beta"]
+    assert game._bot_select_play_modifier(p2, options) == "2:beta"
 
 
 def test_twentyone_bot_select_uses_raise_when_confident_winning() -> None:

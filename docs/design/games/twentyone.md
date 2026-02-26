@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented in `server/games/twentyone.py`.
+Implemented in `server/games/twentyone/game.py`.
 
 ## Attribution
 
