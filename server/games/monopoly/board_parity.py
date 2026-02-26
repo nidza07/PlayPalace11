@@ -61,6 +61,23 @@ _FIDELITY_OVERRIDES: dict[str, str] = {
     "harry_potter": "partial_plus",
     "fortnite": "partial_plus",
     "stranger_things": "partial_plus",
+    "animal_crossing": "partial_plus",
+    "barbie": "partial_plus",
+    "black_panther": "partial_plus",
+    "deadpool_collectors": "partial_plus",
+    "fortnite_collectors": "partial_plus",
+    "fortnite_flip": "partial_plus",
+    "game_of_thrones": "partial_plus",
+    "ghostbusters": "partial_plus",
+    "jurassic_park": "partial_plus",
+    "lord_of_the_rings": "partial_plus",
+    "lord_of_the_rings_trilogy": "partial_plus",
+    "pokemon": "partial_plus",
+    "stranger_things_collectors": "partial_plus",
+    "stranger_things_netflix": "partial_plus",
+    "toy_story": "partial_plus",
+    "transformers": "partial_plus",
+    "transformers_beast_wars": "partial_plus",
 }
 
 

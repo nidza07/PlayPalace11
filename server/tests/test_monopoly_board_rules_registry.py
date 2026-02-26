@@ -214,3 +214,55 @@ def test_disney_marvel_family_card_cash_override_contract(
     amount: int,
 ):
     assert get_card_cash_override(rule_pack_id, card_id) == amount
+
+
+@pytest.mark.parametrize(
+    ("rule_pack_id", "deck_type", "source_card_id", "target_card_id"),
+    (
+        ("animal_crossing", "chance", "poor_tax_15", "bank_dividend_50"),
+        ("barbie", "chance", "bank_dividend_50", "go_to_jail"),
+        ("black_panther", "community_chest", "doctor_fee_pay_50", "income_tax_refund_20"),
+        ("deadpool_collectors", "chance", "go_back_three", "advance_to_go"),
+        ("fortnite_collectors", "community_chest", "doctor_fee_pay_50", "income_tax_refund_20"),
+        ("fortnite_flip", "chance", "bank_dividend_50", "go_to_jail"),
+        ("game_of_thrones", "community_chest", "doctor_fee_pay_50", "bank_error_collect_200"),
+        ("ghostbusters", "chance", "poor_tax_15", "bank_dividend_50"),
+        ("jurassic_park", "chance", "bank_dividend_50", "go_back_three"),
+        ("lord_of_the_rings", "chance", "go_back_three", "advance_to_go"),
+        ("lord_of_the_rings_trilogy", "community_chest", "doctor_fee_pay_50", "income_tax_refund_20"),
+        ("pokemon", "chance", "bank_dividend_50", "advance_to_go"),
+        ("stranger_things_collectors", "chance", "bank_dividend_50", "go_to_jail"),
+        ("stranger_things_netflix", "chance", "poor_tax_15", "bank_dividend_50"),
+        ("toy_story", "chance", "bank_dividend_50", "go_back_three"),
+        ("transformers", "community_chest", "doctor_fee_pay_50", "bank_error_collect_200"),
+        ("transformers_beast_wars", "chance", "go_back_three", "advance_to_go"),
+    ),
+)
+def test_remaining_special_board_card_id_remap_contract(
+    rule_pack_id: str,
+    deck_type: str,
+    source_card_id: str,
+    target_card_id: str,
+):
+    assert get_card_id_remap(rule_pack_id, deck_type, source_card_id) == target_card_id
+
+
+@pytest.mark.parametrize(
+    ("rule_pack_id", "card_id", "amount"),
+    (
+        ("animal_crossing", "bank_dividend_50", 86),
+        ("black_panther", "income_tax_refund_20", 72),
+        ("fortnite_collectors", "income_tax_refund_20", 68),
+        ("game_of_thrones", "bank_error_collect_200", 208),
+        ("ghostbusters", "bank_dividend_50", 82),
+        ("lord_of_the_rings_trilogy", "income_tax_refund_20", 74),
+        ("stranger_things_netflix", "bank_dividend_50", 84),
+        ("transformers", "bank_error_collect_200", 212),
+    ),
+)
+def test_remaining_special_board_card_cash_override_contract(
+    rule_pack_id: str,
+    card_id: str,
+    amount: int,
+):
+    assert get_card_cash_override(rule_pack_id, card_id) == amount

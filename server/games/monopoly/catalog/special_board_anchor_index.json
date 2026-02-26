@@ -5,8 +5,8 @@
     "rule_pack_id": "animal_crossing",
     "anchor_edition_id": "monopoly-f1661",
     "canonical_manual_edition_id": "monopoly-f1661",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -15,8 +15,8 @@
     "rule_pack_id": "barbie",
     "anchor_edition_id": "monopoly-g0038",
     "canonical_manual_edition_id": "monopoly-g0038",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -25,8 +25,8 @@
     "rule_pack_id": "black_panther",
     "anchor_edition_id": "monopoly-e5797",
     "canonical_manual_edition_id": "monopoly-e5797",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -35,8 +35,8 @@
     "rule_pack_id": "deadpool_collectors",
     "anchor_edition_id": "monopoly-e4833",
     "canonical_manual_edition_id": "monopoly-e4833",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -145,8 +145,8 @@
     "rule_pack_id": "fortnite_collectors",
     "anchor_edition_id": "monopoly-f2546",
     "canonical_manual_edition_id": "monopoly-f2546",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -155,8 +155,8 @@
     "rule_pack_id": "fortnite_flip",
     "anchor_edition_id": "monopoly-f7774",
     "canonical_manual_edition_id": "monopoly-f7774",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -165,8 +165,8 @@
     "rule_pack_id": "game_of_thrones",
     "anchor_edition_id": "monopoly-e3278",
     "canonical_manual_edition_id": "monopoly-e3278",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -175,8 +175,8 @@
     "rule_pack_id": "ghostbusters",
     "anchor_edition_id": "monopoly-e9479",
     "canonical_manual_edition_id": "monopoly-e9479",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -191,7 +191,7 @@
   },
   {
     "board_id": "junior_super_mario",
-    "family": "mario",
+    "family": "junior",
     "rule_pack_id": "junior_super_mario",
     "anchor_edition_id": "monopoly-f4817",
     "canonical_manual_edition_id": "monopoly-f4817",
@@ -207,28 +207,28 @@
     "rule_pack_id": "jurassic_park",
     "anchor_edition_id": "monopoly-f1662",
     "canonical_manual_edition_id": "monopoly-f1662",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
     "board_id": "lord_of_the_rings",
-    "family": "lord_of_the_rings",
+    "family": "lord",
     "rule_pack_id": "lord_of_the_rings",
     "anchor_edition_id": "monopoly-f1663",
     "canonical_manual_edition_id": "monopoly-f1663",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
     "board_id": "lord_of_the_rings_trilogy",
-    "family": "lord_of_the_rings",
+    "family": "lord",
     "rule_pack_id": "lord_of_the_rings_trilogy",
     "anchor_edition_id": "monopoly-41603",
     "canonical_manual_edition_id": "monopoly-41603",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -377,13 +377,13 @@
     "rule_pack_id": "pokemon",
     "anchor_edition_id": "monopoly-g0716",
     "canonical_manual_edition_id": "monopoly-g0716",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
     "board_id": "star_wars_40th",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_40th",
     "anchor_edition_id": "monopoly-c1990",
     "canonical_manual_edition_id": "monopoly-c1990",
@@ -393,7 +393,7 @@
   },
   {
     "board_id": "star_wars_boba_fett",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_boba_fett",
     "anchor_edition_id": "monopoly-f5394",
     "canonical_manual_edition_id": "monopoly-f5394",
@@ -403,7 +403,7 @@
   },
   {
     "board_id": "star_wars_classic_edition",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_classic_edition",
     "anchor_edition_id": "monopoly-b8613",
     "canonical_manual_edition_id": "monopoly-b8613",
@@ -413,7 +413,7 @@
   },
   {
     "board_id": "star_wars_complete_saga",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_complete_saga",
     "anchor_edition_id": "monopoly-e8066",
     "canonical_manual_edition_id": "monopoly-e8066",
@@ -423,7 +423,7 @@
   },
   {
     "board_id": "star_wars_legacy",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_legacy",
     "anchor_edition_id": "monopoly-b0324",
     "canonical_manual_edition_id": "monopoly-b0324",
@@ -433,7 +433,7 @@
   },
   {
     "board_id": "star_wars_light_side",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_light_side",
     "anchor_edition_id": "monopoly-f8383",
     "canonical_manual_edition_id": "monopoly-f8383",
@@ -443,7 +443,7 @@
   },
   {
     "board_id": "star_wars_mandalorian",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_mandalorian",
     "anchor_edition_id": "monopoly-f1276",
     "canonical_manual_edition_id": "monopoly-f1276",
@@ -455,7 +455,7 @@
   },
   {
     "board_id": "star_wars_mandalorian_s2",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_mandalorian_s2",
     "anchor_edition_id": "monopoly-f4257",
     "canonical_manual_edition_id": "monopoly-f4257",
@@ -465,7 +465,7 @@
   },
   {
     "board_id": "star_wars_saga",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_saga",
     "anchor_edition_id": "monopoly-42452",
     "canonical_manual_edition_id": "monopoly-42452",
@@ -475,7 +475,7 @@
   },
   {
     "board_id": "star_wars_solo",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_solo",
     "anchor_edition_id": "monopoly-e1702",
     "canonical_manual_edition_id": "monopoly-e1702",
@@ -485,7 +485,7 @@
   },
   {
     "board_id": "star_wars_the_child",
-    "family": "star_wars",
+    "family": "star",
     "rule_pack_id": "star_wars_the_child",
     "anchor_edition_id": "monopoly-f2013",
     "canonical_manual_edition_id": "monopoly-f2013",
@@ -495,7 +495,7 @@
   },
   {
     "board_id": "stranger_things",
-    "family": "stranger_things",
+    "family": "stranger",
     "rule_pack_id": "stranger_things",
     "anchor_edition_id": "monopoly-c4550",
     "canonical_manual_edition_id": "monopoly-c4550",
@@ -505,22 +505,22 @@
   },
   {
     "board_id": "stranger_things_collectors",
-    "family": "stranger_things",
+    "family": "stranger",
     "rule_pack_id": "stranger_things_collectors",
     "anchor_edition_id": "monopoly-e8194",
     "canonical_manual_edition_id": "monopoly-e8194",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
     "board_id": "stranger_things_netflix",
-    "family": "stranger_things",
+    "family": "stranger",
     "rule_pack_id": "stranger_things_netflix",
     "anchor_edition_id": "monopoly-f2544",
     "canonical_manual_edition_id": "monopoly-f2544",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -529,8 +529,8 @@
     "rule_pack_id": "toy_story",
     "anchor_edition_id": "monopoly-e5065",
     "canonical_manual_edition_id": "monopoly-e5065",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -539,8 +539,8 @@
     "rule_pack_id": "transformers",
     "anchor_edition_id": "monopoly-f1660",
     "canonical_manual_edition_id": "monopoly-f1660",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   },
   {
@@ -549,8 +549,8 @@
     "rule_pack_id": "transformers_beast_wars",
     "anchor_edition_id": "monopoly-f5269",
     "canonical_manual_edition_id": "monopoly-f5269",
-    "fidelity_status": "partial",
-    "deck_mode": "classic",
+    "fidelity_status": "partial_plus",
+    "deck_mode": "board_specific",
     "hardware_capability_ids": []
   }
 ]
