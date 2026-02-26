@@ -53,3 +53,19 @@ def test_voice_balance_and_ledger_and_repeat_flow():
 
     game.execute_action(host, "voice_command", input_value="voice: repeat")
     assert game.voice_last_response_by_player_id[host.id] == "repeat_last_bank_result"
+
+
+def test_voice_transfer_requires_confirm_then_executes():
+    game = _start_two_player_game(MonopolyOptions(preset_id="voice_banking"))
+    host = game.current_player
+    assert host is not None
+    guest = game.players[1]
+
+    game.execute_action(host, "voice_command", input_value=f"voice: transfer 200 to {guest.name}")
+    assert host.id in game.voice_pending_transfer_by_player_id
+    assert game._bank_balance(host) == 1500
+
+    game.execute_action(host, "voice_command", input_value="voice: confirm transfer")
+    assert host.id not in game.voice_pending_transfer_by_player_id
+    assert game._bank_balance(host) == 1300
+    assert game._bank_balance(guest) == 1700

@@ -140,6 +140,7 @@ monopoly-banking-ledger-empty = No banking transactions yet.
 monopoly-voice-command-error = Voice command error: { $reason }.
 monopoly-voice-command-accepted = Voice command accepted: { $intent }.
 monopoly-voice-command-repeat = Repeating last banking response code: { $response }.
+monopoly-voice-transfer-staged = Voice transfer staged: { $amount } to { $target }. Say voice: confirm transfer.
 
 # Card engine
 monopoly-card-drawn = { $player } drew a { $deck } card: { $card }.

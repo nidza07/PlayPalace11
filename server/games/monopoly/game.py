@@ -3822,12 +3822,81 @@ class MonopolyGame(ActionGuardMixin, Game):
                 user.speak_l("monopoly-voice-command-repeat", response=previous)
             return
 
+        if parsed.intent == "transfer_amount_to_player":
+            target: MonopolyPlayer | None = None
+            wanted_name = parsed.target_name.strip().lower()
+            for turn_player in self.turn_players:
+                if not isinstance(turn_player, MonopolyPlayer):
+                    continue
+                if turn_player.id == mono_player.id or turn_player.bankrupt:
+                    continue
+                if turn_player.name.lower() == wanted_name:
+                    target = turn_player
+                    break
+
+            if target is None:
+                self.voice_last_response_by_player_id[mono_player.id] = "invalid_target"
+                if user:
+                    user.speak_l("monopoly-voice-command-error", reason="invalid_target")
+                return
+
+            self.voice_pending_transfer_by_player_id[mono_player.id] = (target.id, parsed.amount)
+            self.voice_last_response_by_player_id[mono_player.id] = "transfer_pending_confirm"
+            if user:
+                user.speak_l(
+                    "monopoly-voice-transfer-staged",
+                    amount=parsed.amount,
+                    target=target.name,
+                )
+            return
+
+        if parsed.intent == "confirm_transfer":
+            pending = self.voice_pending_transfer_by_player_id.get(mono_player.id)
+            if not pending:
+                self.voice_last_response_by_player_id[mono_player.id] = "no_pending_transfer"
+                if user:
+                    user.speak_l("monopoly-voice-command-error", reason="no_pending_transfer")
+                return
+
+            target_id, amount = pending
+            target = self.get_player_by_id(target_id)
+            if not target or not isinstance(target, MonopolyPlayer) or target.bankrupt:
+                self.voice_pending_transfer_by_player_id.pop(mono_player.id, None)
+                self.voice_last_response_by_player_id[mono_player.id] = "invalid_target"
+                if user:
+                    user.speak_l("monopoly-voice-command-error", reason="invalid_target")
+                return
+
+            transferred = self._transfer_between_players(
+                mono_player,
+                target,
+                amount,
+                "voice_transfer",
+            )
+            self.voice_pending_transfer_by_player_id.pop(mono_player.id, None)
+            if transferred == amount:
+                self.voice_last_response_by_player_id[mono_player.id] = "transfer_confirmed"
+                self.broadcast_l(
+                    "monopoly-banking-transfer-success",
+                    from_player=mono_player.name,
+                    to_player=target.name,
+                    amount=transferred,
+                )
+                self._sync_cash_scores()
+                self.rebuild_all_menus()
+            else:
+                self.voice_last_response_by_player_id[mono_player.id] = "insufficient_funds"
+                if user:
+                    user.speak_l("monopoly-voice-command-error", reason="insufficient_funds")
+            return
+
         self.voice_last_response_by_player_id[mono_player.id] = parsed.intent
         if user:
             user.speak_l("monopoly-voice-command-accepted", intent=parsed.intent)
 
     def _action_end_turn(self, player: Player, action_id: str) -> None:
         """End current player's turn and advance."""
+        self.voice_pending_transfer_by_player_id.pop(player.id, None)
         if self._is_junior_preset() and self._check_junior_endgame():
             self.rebuild_all_menus()
             return
