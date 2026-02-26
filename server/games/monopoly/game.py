@@ -567,6 +567,9 @@ class MonopolyGame(ActionGuardMixin, Game):
     active_board_parity_fidelity_status: str = "none"
     active_board_hardware_capability_ids: tuple[str, ...] = ()
     active_sound_mode: str = "none"
+    last_hardware_event_id: str = ""
+    last_hardware_event_status: str = "none"
+    last_hardware_event_details: str = ""
     junior_ruleset: JuniorRuleset | None = None
     cheaters_profile: CheatersProfile | None = None
     cheaters_engine: CheatersEngine | None = None
@@ -2296,6 +2299,30 @@ class MonopolyGame(ActionGuardMixin, Game):
         )
         return resolve_hardware_event(event, sound_mode=self.active_sound_mode)
 
+    def _emit_board_hardware_event(
+        self,
+        event_id: str,
+        payload: dict[str, object] | None = None,
+    ) -> HardwareResult | None:
+        """Resolve and record one board hardware event when hardware capabilities are active."""
+        if self.active_board_effective_mode != "board_rules":
+            return None
+        if not self.active_board_hardware_capability_ids:
+            return None
+        result = self._resolve_board_hardware_event(event_id, payload)
+        self.last_hardware_event_id = event_id
+        self.last_hardware_event_status = result.status
+        self.last_hardware_event_details = result.details
+        return result
+
+    def _resolve_card_hardware_event_id(self, deck_type: str) -> str | None:
+        """Map card draws to optional board hardware events."""
+        if deck_type not in {"chance", "community_chest"}:
+            return None
+        if self.active_board_id.startswith("star_wars"):
+            return "star_wars_theme"
+        return None
+
     def _resolve_junior_super_mario_powerup_sound_outcome(self, power_up_die: int) -> str | None:
         """Resolve sound-specific power-up outcome when future sound mode is enabled."""
         if not self._is_junior_super_mario_manual_core_active():
@@ -2780,6 +2807,12 @@ class MonopolyGame(ActionGuardMixin, Game):
             deck=deck_label,
             card=card_text,
         )
+        hardware_event_id = self._resolve_card_hardware_event_id(deck_type)
+        if hardware_event_id is not None:
+            self._emit_board_hardware_event(
+                hardware_event_id,
+                payload={"deck_type": deck_type, "card_id": card_id},
+            )
 
         if card_id == "advance_to_go":
             player.position = 0
@@ -4700,6 +4733,10 @@ class MonopolyGame(ActionGuardMixin, Game):
             self.active_board_id,
             self.active_board_deck_mode,
         ).mode
+        self.active_sound_mode = "none"
+        self.last_hardware_event_id = ""
+        self.last_hardware_event_status = "none"
+        self.last_hardware_event_details = ""
         self.junior_ruleset = (
             get_junior_ruleset(self.active_preset_id)
             if is_junior_ruleset_preset(self.active_preset_id)

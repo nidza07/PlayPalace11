@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+SUPPORTED_EVENT_IDS = {
+    "play_theme",
+    "star_wars_theme",
+}
+
 
 @dataclass(frozen=True)
 class HardwareEvent:
@@ -30,5 +35,8 @@ def resolve_hardware_event(event: HardwareEvent, sound_mode: str) -> HardwareRes
     # Explicit product-scope exclusion: Pac-Man game-unit behavior is out-of-scope.
     if event.board_id == "pacman":
         return HardwareResult(status="ignored", details="pacman_excluded")
+
+    if event.event_id not in SUPPORTED_EVENT_IDS:
+        return HardwareResult(status="ignored", details="unsupported_event")
 
     return HardwareResult(status="emulated", details=event.event_id)

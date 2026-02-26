@@ -31,3 +31,11 @@ def test_parity_manifest_exposes_hardware_capability_subset():
     assert profile is not None
     assert "junior_powerup_sound_ready" in profile.capability_ids
     assert "junior_powerup_sound_ready" in profile.hardware_capability_ids
+
+
+def test_parity_manifest_exposes_star_wars_audio_hardware_capability_subset():
+    profile = get_board_parity_profile("star_wars_mandalorian")
+
+    assert profile is not None
+    assert "audio_theme_event" in profile.capability_ids
+    assert "audio_theme_event" in profile.hardware_capability_ids

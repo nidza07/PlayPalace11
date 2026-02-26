@@ -73,3 +73,7 @@ def test_star_wars_complete_saga_card_id_remap_contract():
 
 def test_star_wars_complete_saga_card_cash_override_contract():
     assert get_card_cash_override("star_wars_complete_saga", "income_tax_refund_20") == 80
+
+
+def test_star_wars_mandalorian_audio_capability_contract():
+    assert supports_capability("star_wars_mandalorian", "audio_theme_event") is True
