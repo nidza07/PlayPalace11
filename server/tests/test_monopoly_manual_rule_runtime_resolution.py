@@ -57,7 +57,7 @@ def test_board_rules_mode_uses_loaded_manual_rule_set(monkeypatch):
 
 
 def test_board_rules_mode_falls_back_when_manual_rule_file_missing():
-    game = _start_game("mario_kart")
+    game = _start_game("star_wars_40th")
 
     assert game.active_board_effective_mode == "board_rules"
     assert game.active_manual_rule_set is None

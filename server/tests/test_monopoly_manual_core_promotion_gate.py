@@ -5,7 +5,7 @@ from server.games.monopoly.manual_rules.models import ManualRuleSet
 
 
 def test_manual_core_gate_returns_false_without_rule_artifact():
-    assert can_promote_manual_core("mario_kart") is False
+    assert can_promote_manual_core("star_wars_40th") is False
 
 
 def test_manual_core_gate_returns_true_for_valid_rule_set(monkeypatch):
