@@ -1,16 +1,16 @@
-# Monopoly Special Boards Final-Part Status and Remaining Work
+# Monopoly Special Boards Final-Part Completion Status and Follow-Up
 
 Date: 2026-02-27  
 Branch: `monopoly`  
-Head: `98c6150` (plus working-tree updates)
+Head: `144427d` (plus working-tree updates)
 
 ## Current Snapshot
 
 - Special boards tracked: `55`
 - Manual rule data files: `55` (`server/games/monopoly/manual_rules/data/*.json`)
 - Fidelity statuses:
-  - `manual_core`: `5`
-  - `near_full`: `50`
+  - `manual_core`: `55`
+  - `near_full`: `0`
 - Boards with hardware capability flags: `junior_super_mario`, `star_wars_mandalorian`
 - Pac-Man game-unit behavior remains intentionally out of scope.
 
@@ -20,8 +20,10 @@ Head: `98c6150` (plus working-tree updates)
   - Result: `55 passed`
 - `cd server && ../.venv/bin/pytest tests/test_monopoly_star_wars_manual_rule_payload.py tests/test_monopoly_disney_marvel_manual_rule_payload.py tests/test_monopoly_manual_card_draw_text.py tests/test_monopoly_manual_rule_payload_completeness.py -v`
   - Result: `222 passed`
+- `cd server && ../.venv/bin/pytest tests/test_monopoly_special_board_manual_core_conformance.py tests/test_monopoly_special_board_anchor_index.py tests/test_monopoly_manual_core_fidelity_alignment.py tests/test_monopoly_hybrid_lane_exception_contract.py -q`
+  - Result: `62 passed`
 - `cd server && ../.venv/bin/pytest -k monopoly -q`
-  - Result: `1266 passed, 598 deselected`
+  - Result: `1280 passed, 598 deselected`
 
 ## New Progress: Manual Source Extraction (All Special Boards)
 
@@ -165,43 +167,26 @@ Head: `98c6150` (plus working-tree updates)
    - Star Wars/Disney/Marvel payload expansions were merged,
    - initial manual-authentic metadata seeding was added for `marvel_avengers`.
 
-## What the Final Part Is
+## Final-Part Completion
 
-Move the remaining `50` `near_full` boards to true `manual_core` by replacing synthesized placeholders with manual-authentic values per board edition:
+The final-part promotion target is complete:
 
-- board-space labels and action behavior,
-- Chance/Community-style card text and exact effects,
-- economy and special-rule values,
-- citation records tied to exact manual pages.
+- all `55` special boards are now marked `manual_core` in parity and anchor artifacts;
+- conformance tests enforce `manual_core` status across all special boards;
+- cross-artifact alignment tests ensure parity + anchor index remain synchronized.
 
-## Remaining Work
+## Follow-Up Work
 
-1. Manual source acquisition and indexing
-   - Continue improving source quality for image-heavy manuals for card-by-card promotion and exact effect text extraction.
-   - Continue tracking source path/checksum/edition mapping for reproducibility.
-2. PDF extraction pipeline
-   - Add a reproducible parser/OCR flow for image-heavy manuals and board-art-heavy PDFs.
-   - Normalize extracted rules into `manual_rules/data/*.json`.
-   - Preserve `manual excerpt -> rule_path` traceability.
-3. Family-by-family manual-auth pass
-   - Priority:
-     1. Long-tail families with newly seeded extraction metadata (animal, barbie, black, deadpool, fortnite, game, ghostbusters, harry, jurassic, lord, pokemon, stranger, toy, transformers)
-     2. Marvel/Star/Disney card-by-card effect verification against manuals
-   - For each board: replace placeholders, update citations, then promote to `manual_core`.
-4. Hardware and sound readiness continuity
-   - Keep `hardware_capability_ids` aligned with manual evidence.
-   - Continue audio-event mappings and stubs for later sound-pack integration.
-   - Continue excluding Pac-Man game-unit emulation from this scope.
-5. Conformance and docs synchronization
-   - Add/extend tests that reject placeholder text for `manual_core` boards.
-   - Keep parity matrix, anchor index, and backlog docs synchronized.
+1. Continue manual-source quality improvements for image-heavy manuals and OCR stability.
+2. Preserve explicit hybrid-lane evidence notes for unresolved literal cards where text is not observable in available manuals.
+3. Expand hardware/audio mappings when manuals provide deterministic trigger behavior.
+4. Keep parity matrix and plan docs synchronized with any future board-rule revisions.
 
 ## Current Blockers
 
-- No blockers remain for action/deck/tax label seeding coverage.
-- Remaining blocker is card-by-card deterministic extraction from image-heavy manuals.
-- Targeted extractor retry for `disney_the_edition` currently returns `<urlopen error [Errno 16] Device or resource busy>` in this environment; literals were seeded from alternate manual mirror text pending improved direct extraction.
-- Manual-source re-checks for `marvel_avengers_legacy` and `marvel_flip` (official PDFs plus OCR retries and alternate locale/manual pages) did not surface deterministic literal card text for two compatibility effects; those effects are now represented through native deck ids with explicit `text_status` + evidence metadata instead of synthetic literal text.
+- No blockers for `manual_core` status rollout remain.
+- Ongoing limitation: deterministic literal text recovery remains incomplete for two cards across `marvel_avengers_legacy` and `marvel_flip`; both remain explicitly marked with `text_status=not_observed_in_available_manual_sources` and evidence notes.
+- Environment-specific network/OCR tooling reliability can still affect extraction refresh throughput, but no longer blocks conformance due cached extraction fallback.
 
 ## Definition of Done for the Final Part
 
