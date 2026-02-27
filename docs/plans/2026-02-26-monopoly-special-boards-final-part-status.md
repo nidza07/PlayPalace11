@@ -40,6 +40,7 @@ Head: `98c6150` (plus working-tree updates)
     - `ocr_text_path` / `ocr_text_sha256` when OCR sidecars are present.
 - Rerun command:
   - `./.venv/bin/python server/scripts/monopoly/extract_manual_text.py --family ...` (all families from anchor index)
+  - OCR-assisted rerun (optional): add `--ocr-when-text-below <chars>` and/or `--ocr-board-id <id>`.
 
 ## New Progress: Payload Seeding from Extracted Manuals
 

@@ -8,7 +8,10 @@ import io
 import json
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from typing import Any
 from urllib.request import Request, urlopen
 
@@ -115,6 +118,78 @@ def _attach_preferred_text_metadata(meta: dict[str, Any], output_dir: Path) -> d
     return meta
 
 
+def _extract_pages_with_ocr(pdf_bytes: bytes, *, dpi: int) -> list[str]:
+    """Extract OCR page text using pdftoppm + tesseract available on PATH."""
+    pdftoppm_cmd = shutil.which("pdftoppm")
+    tesseract_cmd = shutil.which("tesseract")
+    if not pdftoppm_cmd or not tesseract_cmd:
+        raise RuntimeError("OCR tools unavailable (pdftoppm and tesseract are required on PATH)")
+
+    with tempfile.TemporaryDirectory(prefix="monopoly-manual-ocr-") as tmp_dir_name:
+        tmp_dir = Path(tmp_dir_name)
+        pdf_path = tmp_dir / "manual.pdf"
+        pdf_path.write_bytes(pdf_bytes)
+        image_prefix = tmp_dir / "page"
+
+        render = subprocess.run(
+            [pdftoppm_cmd, "-r", str(dpi), "-png", str(pdf_path), str(image_prefix)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if render.returncode != 0:
+            raise RuntimeError(f"pdftoppm failed: {render.stderr.strip()}")
+
+        image_paths = sorted(tmp_dir.glob("page-*.png"))
+        if not image_paths:
+            raise RuntimeError("pdftoppm produced no page images")
+
+        pages: list[str] = []
+        for image_path in image_paths:
+            ocr = subprocess.run(
+                [tesseract_cmd, str(image_path), "stdout", "--psm", "6"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if ocr.returncode != 0:
+                raise RuntimeError(f"tesseract failed on {image_path.name}: {ocr.stderr.strip()}")
+            pages.append(ocr.stdout.strip())
+        return pages
+
+
+def _maybe_write_ocr_sidecar(
+    *,
+    board_id: str,
+    pdf_bytes: bytes,
+    output_dir: Path,
+    text_char_count: int,
+    ocr_board_ids: set[str],
+    ocr_when_text_below: int,
+    ocr_dpi: int,
+) -> None:
+    """Optionally render OCR sidecar text for low-text or explicitly selected boards."""
+    should_ocr = board_id in ocr_board_ids
+    if ocr_when_text_below > 0 and text_char_count < ocr_when_text_below:
+        should_ocr = True
+    if not should_ocr:
+        return
+
+    try:
+        ocr_pages = _extract_pages_with_ocr(pdf_bytes, dpi=ocr_dpi)
+    except Exception as error:  # pragma: no cover - runtime dependency/tooling path
+        print(f"[ocr-fail] {board_id}: {error}")
+        return
+
+    ocr_chunks: list[str] = []
+    for idx, text in enumerate(ocr_pages, start=1):
+        ocr_chunks.append(f"=== OCR Page {idx} ===\n{text}\n")
+    ocr_text = "\n".join(ocr_chunks).strip() + "\n"
+    ocr_path = output_dir / f"{board_id}.ocr.txt"
+    ocr_path.write_text(ocr_text, encoding="utf-8")
+    print(f"[ocr] {board_id}: pages={len(ocr_pages)} chars={len(ocr_text)}")
+
+
 def _extract_pages_with_fallback(
     board_id: str,
     pdf_bytes: bytes,
@@ -185,6 +260,9 @@ def run_extraction(
     timeout: float,
     zlib_max_output_length: int,
     merge_manifest: bool,
+    ocr_board_ids: set[str],
+    ocr_when_text_below: int,
+    ocr_dpi: int,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     anchor_rows = _load_json(anchor_index_path)
@@ -271,6 +349,15 @@ def run_extraction(
         text_sha256 = hashlib.sha256(full_text.encode("utf-8")).hexdigest()
         pdf_sha256 = hashlib.sha256(pdf_bytes).hexdigest()
         text_char_count = len(full_text)
+        _maybe_write_ocr_sidecar(
+            board_id=board_id,
+            pdf_bytes=pdf_bytes,
+            output_dir=output_dir,
+            text_char_count=text_char_count,
+            ocr_board_ids=ocr_board_ids,
+            ocr_when_text_below=ocr_when_text_below,
+            ocr_dpi=ocr_dpi,
+        )
         meta = {
             "board_id": board_id,
             "family": family,
@@ -358,10 +445,32 @@ def main() -> None:
         action="store_true",
         help="Do not preserve existing manifest rows for non-target boards.",
     )
+    parser.add_argument(
+        "--ocr-board-id",
+        action="append",
+        default=[],
+        help="Board id to force OCR sidecar generation for (repeatable).",
+    )
+    parser.add_argument(
+        "--ocr-when-text-below",
+        type=int,
+        default=0,
+        help=(
+            "If >0, run OCR sidecar generation when extracted text char count "
+            "is below this threshold."
+        ),
+    )
+    parser.add_argument(
+        "--ocr-dpi",
+        type=int,
+        default=400,
+        help="DPI used for OCR rasterization when OCR sidecar generation is enabled.",
+    )
     args = parser.parse_args()
 
     families = {value.strip() for value in args.family if value.strip()}
     board_ids = {value.strip() for value in args.board_id if value.strip()}
+    ocr_board_ids = {value.strip() for value in args.ocr_board_id if value.strip()}
     if not families and not board_ids:
         raise SystemExit("Provide at least one --family or --board-id selection.")
 
@@ -374,6 +483,9 @@ def main() -> None:
         timeout=args.timeout,
         zlib_max_output_length=args.zlib_max_output_length,
         merge_manifest=not args.no_merge_manifest,
+        ocr_board_ids=ocr_board_ids,
+        ocr_when_text_below=args.ocr_when_text_below,
+        ocr_dpi=args.ocr_dpi,
     )
 
 
