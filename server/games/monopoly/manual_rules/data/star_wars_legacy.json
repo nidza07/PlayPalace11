@@ -991,6 +991,7 @@
       {
         "id": "advance_to_go",
         "text_key": "monopoly-card-advance-to-go",
+        "text": "Force Dash: Move directly to GO and collect 200 Credits.",
         "effect": {
           "type": "move_absolute",
           "position": 0,
@@ -1017,6 +1018,7 @@
       {
         "id": "go_to_jail",
         "text_key": "monopoly-card-go-to-jail",
+        "text": "Move your token to the In Jail space immediately. Do not collect 200 Credits.",
         "effect": {
           "type": "go_to_jail"
         }
@@ -1058,13 +1060,15 @@
       {
         "id": "go_to_jail",
         "text_key": "monopoly-card-go-to-jail",
+        "text": "Move your token to the In Jail space immediately. Do not collect 200 Credits.",
         "effect": {
           "type": "go_to_jail"
         }
       },
       {
         "id": "get_out_of_jail_free",
-        "text_key": "monopoly-card-get-out-of-jail"
+        "text_key": "monopoly-card-get-out-of-jail",
+        "text": "Use a Get Out of Jail Free card."
       }
     ]
   },

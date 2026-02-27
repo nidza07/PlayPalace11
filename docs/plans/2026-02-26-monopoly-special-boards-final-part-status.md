@@ -123,6 +123,9 @@ Head: `98c6150` (plus working-tree updates)
     `star_wars_light_side`, `star_wars_solo`, `star_wars_the_child`.
 - Final Star Wars Saga labels are seeded from manual OCR:
   - `star_wars_saga`: `Sith`, `Jedi`; tax labels `Trade Blockade`, `Bounty`
+- Initial literal manual card-text seeding is now present for:
+  - `star_wars_classic_edition`, `star_wars_legacy`
+  - (for `advance_to_go`, `go_to_jail`, `get_out_of_jail_free` canonical cards)
 - Remaining boards without deck-label seeding: `0` (all `55` covered)
 
 ## What Has Been Done (Whole Rollout to Date)

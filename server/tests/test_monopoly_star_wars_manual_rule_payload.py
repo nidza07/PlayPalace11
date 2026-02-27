@@ -108,3 +108,28 @@ def test_star_wars_manual_rule_payload_executes_manual_effect_for_remapped_card(
     assert "move_absolute" in seen_effect_types
     assert host.position == 0
     assert host.cash == 1700
+
+
+@pytest.mark.parametrize(
+    ("board_id", "deck_type", "card_id", "expected_substring"),
+    [
+        ("star_wars_classic_edition", "chance", "advance_to_go", "Force Dash"),
+        ("star_wars_classic_edition", "chance", "go_to_jail", "In Jail"),
+        ("star_wars_classic_edition", "community_chest", "get_out_of_jail_free", "Get Out of Jail Free"),
+        ("star_wars_legacy", "chance", "advance_to_go", "Force Dash"),
+        ("star_wars_legacy", "community_chest", "go_to_jail", "In Jail"),
+        ("star_wars_legacy", "community_chest", "get_out_of_jail_free", "Get Out of Jail Free"),
+    ],
+)
+def test_star_wars_manual_rule_payload_includes_literal_card_text(
+    board_id: str,
+    deck_type: str,
+    card_id: str,
+    expected_substring: str,
+) -> None:
+    rule_set = load_manual_rule_set(board_id)
+    deck_rows = rule_set.cards.get(deck_type, [])
+    row = next(row for row in deck_rows if row.get("id") == card_id)
+    literal_text = row.get("text")
+    assert isinstance(literal_text, str)
+    assert expected_substring in literal_text
