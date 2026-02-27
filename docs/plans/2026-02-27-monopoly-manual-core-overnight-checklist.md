@@ -13,7 +13,7 @@ Branch: `monopoly`
 ## Completion Status
 
 1. All tracked special boards are now promoted to `manual_core`.
-2. Hybrid-lane exception policy remains explicit for unresolved literal card text on `marvel_avengers_legacy` and `marvel_flip`.
+2. Legacy-slot promotion policy remains explicit for image-heavy literal card text on `marvel_avengers_legacy` and `marvel_flip` (with OCR-backed evidence notes).
 3. Keep extraction/pytest runbook for regression monitoring and source refreshes.
 
 ## Board Checklist

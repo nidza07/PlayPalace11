@@ -216,6 +216,40 @@ def test_disney_marvel_manual_rule_payload_uses_manual_deck_labels_in_card_draw_
     assert card_draw_events[0].get("deck") == expected_deck_label
 
 
+@pytest.mark.parametrize(
+    ("board_id", "deck_type", "drawn_card"),
+    [
+        ("marvel_avengers_legacy", "community_chest", "get_out_of_jail_free"),
+        ("marvel_flip", "community_chest", "get_out_of_jail_free"),
+    ],
+)
+def test_disney_marvel_manual_rule_payload_grants_jail_release_card_for_native_marvel_slots(
+    board_id: str,
+    deck_type: str,
+    drawn_card: str,
+    monkeypatch,
+) -> None:
+    game = _start_game(board_id)
+    host = game.current_player
+    assert host is not None
+
+    host.position = 0
+
+    def _draw_expected(card_deck: str) -> str:
+        assert card_deck == deck_type
+        return drawn_card
+
+    monkeypatch.setattr(game, "_draw_card", _draw_expected)
+    rolls = iter([1, 1])
+    monkeypatch.setattr("server.games.monopoly.game.random.randint", lambda a, b: next(rolls))
+
+    game.execute_action(host, "roll_dice")
+
+    assert host.position == 2
+    assert host.get_out_of_jail_cards == 1
+    assert host.in_jail is False
+
+
 @pytest.mark.parametrize("board_id", DISNEY_MARVEL_LITERAL_TEXT_BOARD_IDS)
 @pytest.mark.parametrize(
     ("deck_type", "card_id", "expected_substring"),
@@ -307,48 +341,56 @@ def test_disney_marvel_manual_rule_payload_includes_partial_literal_card_text_fo
 
 
 @pytest.mark.parametrize(
-    ("board_id", "deck_type", "card_id", "expected_evidence_substring"),
+    ("board_id", "deck_type", "card_id", "expected_literal_substring", "expected_evidence_substring"),
     [
         (
             "marvel_avengers_legacy",
             "chance",
             "shield_advance_to_go",
+            "advance to go",
             "Chance and Community Chest cards",
         ),
         (
             "marvel_avengers_legacy",
             "community_chest",
             "villains_jail_release_options",
+            "get out of jail free",
             "How do I get out of Jail?",
         ),
         (
             "marvel_flip",
             "chance",
             "event_advance_to_go",
-            "Team-Up Cards",
+            "advance to go",
+            "collect 2 BP",
         ),
         (
             "marvel_flip",
             "community_chest",
             "team_up_jail_release_options",
-            "pay BP or roll",
+            "keep this card",
+            "Keep this card",
         ),
     ],
 )
-def test_disney_marvel_manual_rule_payload_marks_unobserved_literal_card_text_for_remaining_marvel_boards(
+def test_disney_marvel_manual_rule_payload_resolves_remaining_marvel_native_card_slots(
     board_id: str,
     deck_type: str,
     card_id: str,
+    expected_literal_substring: str,
     expected_evidence_substring: str,
 ) -> None:
     rule_set = load_manual_rule_set(board_id)
     deck_rows = rule_set.cards.get(deck_type, [])
     row = next(row for row in deck_rows if row.get("id") == card_id)
 
-    assert row.get("text_status") == "not_observed_in_available_manual_sources"
+    literal_text = row.get("text")
+    assert isinstance(literal_text, str)
+    assert expected_literal_substring in literal_text.lower()
+    assert row.get("text_status") != "not_observed_in_available_manual_sources"
     note = row.get("text_note")
     assert isinstance(note, str)
-    assert "deck modeling" in note
+    assert "legacy slot mapping" in note
     evidence = row.get("text_evidence")
     assert isinstance(evidence, str)
     assert expected_evidence_substring in evidence

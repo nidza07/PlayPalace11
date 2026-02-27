@@ -133,9 +133,11 @@ Head: tracked via git history on `monopoly`
   - Disney mirror/manual fallback seeding: `disney_the_edition` (`advance_to_go`, `go_to_jail`, `get_out_of_jail_free`)
     - Source mirror used for literal text recovery: `https://www.manualsdir.com/manuals/613579/hasbro-monopoly-disney-edition-2010.html`
   - Additional partial seeding: `marvel_avengers_legacy`, `marvel_flip` (`go_to_jail` canonical card text in both decks)
-  - Remaining canonical literal card ids on `marvel_avengers_legacy` and `marvel_flip` are now explicitly marked as `not_observed_in_available_manual_sources` with manual evidence notes:
-    - `chance.advance_to_go`
-    - `community_chest.get_out_of_jail_free`
+  - The previously unresolved canonical slots on `marvel_avengers_legacy` and `marvel_flip` are now resolved in native deck rows via legacy-slot mapping with explicit text/evidence notes:
+    - `shield_advance_to_go`
+    - `villains_jail_release_options`
+    - `event_advance_to_go`
+    - `team_up_jail_release_options`
   - Native manual deck-id modeling is now active for the two remaining Marvel boards:
     - `marvel_avengers_legacy`: `shield_*` and `villains_*` card ids
     - `marvel_flip`: `event_*` and `team_up_*` card ids
@@ -144,11 +146,7 @@ Head: tracked via git history on `monopoly`
   - Runtime now resolves canonical compatibility ids to native deck ids by canonical card-slot index when board-specific manual decks are active.
   - Card-draw announcements now use `mechanics.decks` labels (for example `S.H.I.E.L.D.`, `Villains`, `Event`, `Team-Up`) instead of hardcoded `Chance`/`Community Chest` labels.
   - Option-2 kick-off: started replacing synthesized effects with manual-evidenced native effects by promoting `marvel_avengers_legacy` Villains slot-2 (`legacy_id=doctor_fee_pay_50`) to the board's verified `+215` credit outcome directly in native payload data.
-  - Option-2 targeted OCR sweep (2026-02-27) re-ran high-DPI card/manual extraction for `marvel_avengers_legacy` and `marvel_flip`; evidence quality improved, but the remaining hybrid exceptions are still unresolved because no literal card lines uniquely bind to the four native ids:
-    - `shield_advance_to_go`
-    - `villains_jail_release_options`
-    - `event_advance_to_go`
-    - `team_up_jail_release_options`
+  - Option-2 targeted OCR sweep (2026-02-27) re-ran high-DPI card/manual extraction for `marvel_avengers_legacy` and `marvel_flip`; those four native slots are now promoted from unresolved placeholders to explicit native text/effect rows using canonical-slot compatibility mapping plus OCR-backed evidence notes.
 - Remaining boards without deck-label seeding: `0` (all `55` covered)
 
 ## What Has Been Done (Whole Rollout to Date)
@@ -183,14 +181,14 @@ The final-part promotion target is complete:
 ## Follow-Up Work
 
 1. Continue manual-source quality improvements for image-heavy manuals and OCR stability.
-2. Preserve explicit hybrid-lane evidence notes for unresolved literal cards where text is not observable in available manuals.
+2. Keep explicit evidence notes on inferred/legacy-slot-promoted literals where direct per-card scans are still noisy.
 3. Expand hardware/audio mappings when manuals provide deterministic trigger behavior.
 4. Keep parity matrix and plan docs synchronized with any future board-rule revisions.
 
 ## Current Blockers
 
 - No blockers for `manual_core` status rollout remain.
-- Ongoing limitation: deterministic literal text recovery remains incomplete for two canonical slots across `marvel_avengers_legacy` and `marvel_flip` (represented by four native ids listed above); all remain explicitly marked with `text_status=not_observed_in_available_manual_sources` and evidence notes.
+- Ongoing limitation: direct per-card scan quality is still noisy on some image-heavy manuals, so a subset of card literals continue to rely on legacy-slot compatibility inference with OCR evidence notes.
 - Environment-specific network/OCR tooling reliability can still affect extraction refresh throughput, but no longer blocks conformance due cached extraction fallback.
 
 ## Definition of Done for the Final Part

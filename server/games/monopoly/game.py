@@ -1337,7 +1337,29 @@ class MonopolyGame(ActionGuardMixin, Game):
             landed_space = self._space_at(player.position)
             return self._resolve_space(player, landed_space, depth=depth + 1, dice_total=dice_total)
 
+        if effect_type in {"grant_jail_free", "get_out_of_jail_free"}:
+            return self._grant_get_out_of_jail_card(player)
+
         return None
+
+    def _grant_get_out_of_jail_card(self, player: MonopolyPlayer) -> str:
+        """Grant one get-out-of-jail card using classic Monopoly behavior."""
+        if self._is_junior_preset():
+            credited = self._credit_player(player, 1, "community_chest_junior_bonus")
+            self.broadcast_l(
+                "monopoly-card-collect",
+                player=player.name,
+                amount=credited,
+                cash=player.cash,
+            )
+            return "resolved"
+        player.get_out_of_jail_cards += 1
+        self.broadcast_l(
+            "monopoly-card-jail-free",
+            player=player.name,
+            cards=player.get_out_of_jail_cards,
+        )
+        return "resolved"
 
     def _space_at(self, position: int) -> MonopolySpace:
         """Get board space by board index."""
@@ -3191,22 +3213,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             return "resolved"
 
         if card_id == "get_out_of_jail_free":
-            if self._is_junior_preset():
-                credited = self._credit_player(player, 1, "community_chest_junior_bonus")
-                self.broadcast_l(
-                    "monopoly-card-collect",
-                    player=player.name,
-                    amount=credited,
-                    cash=player.cash,
-                )
-                return "resolved"
-            player.get_out_of_jail_cards += 1
-            self.broadcast_l(
-                "monopoly-card-jail-free",
-                player=player.name,
-                cards=player.get_out_of_jail_cards,
-            )
-            return "resolved"
+            return self._grant_get_out_of_jail_card(player)
 
         return "resolved"
 
