@@ -2,7 +2,7 @@
 
 Date: 2026-02-27  
 Branch: `monopoly`  
-Head: `144427d` (plus working-tree updates)
+Head: `6e671a8`
 
 ## Current Snapshot
 
