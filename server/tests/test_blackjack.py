@@ -112,7 +112,7 @@ def test_blackjack_hand_value_handles_soft_aces() -> None:
     assert soft is False
 
 
-def test_blackjack_on_start_deals_and_posts_bets() -> None:
+def test_blackjack_on_start_waits_for_bets_then_deals_and_posts_bets() -> None:
     game, host_player, host_user = create_game_with_host()
     game.options = BlackjackOptions(starting_chips=100, base_bet=10, deck_count=1)
     guest_user = MockUser("Guest")
@@ -121,9 +121,26 @@ def test_blackjack_on_start_deals_and_posts_bets() -> None:
     game.on_start()
 
     assert game.status == "playing"
+    assert game.phase == "settle"
+    assert game.hand_number == 0
+    assert game._is_between_hands() is True
+    assert host_player.bet == 0
+    assert guest_player.bet == 0
+    assert len(host_player.hand) == 0
+    assert len(guest_player.hand) == 0
+    assert len(game.dealer_hand) == 0
+
+    game._action_set_next_bet(host_player, "10", "set_next_bet")
+    assert game.phase == "settle"
+    assert game.hand_number == 0
+
+    game._action_set_next_bet(guest_player, "10", "set_next_bet")
+
+    assert game.status == "playing"
     assert len(host_player.hand) == 2
     assert len(guest_player.hand) == 2
     assert len(game.dealer_hand) == 2
+    assert game.hand_number == 1
     assert host_player.bet == 10
     assert guest_player.bet == 10
     assert host_player.chips == 90
@@ -142,11 +159,12 @@ def test_blackjack_on_start_single_player_does_not_end_immediately() -> None:
     game.on_start()
 
     assert game.status == "playing"
-    assert game.phase in {"players", "insurance", "settle"}
-    assert game.hand_number == 1
-    assert host_player.bet > 0
-    assert len(host_player.hand) == 2
-    assert len(game.dealer_hand) == 2
+    assert game.phase == "settle"
+    assert game._is_between_hands() is True
+    assert game.hand_number == 0
+    assert host_player.bet == 0
+    assert len(host_player.hand) == 0
+    assert len(game.dealer_hand) == 0
 
 
 def test_blackjack_settle_single_player_continues_when_player_has_chips() -> None:
@@ -789,7 +807,7 @@ def test_blackjack_blackjack_payout_modes() -> None:
 def test_blackjack_dealer_no_peek_does_not_auto_settle() -> None:
     game, host_player, _host_user = create_game_with_host()
     guest_user = MockUser("Guest")
-    game.add_player("Guest", guest_user)
+    guest_player = game.add_player("Guest", guest_user)
     game.options.dealer_peeks_blackjack = False
     game.options.allow_insurance = False
 
@@ -812,6 +830,8 @@ def test_blackjack_dealer_no_peek_does_not_auto_settle() -> None:
     game._start_turn = lambda: events.__setitem__("started_turn", events["started_turn"] + 1)  # type: ignore[method-assign]
 
     game.on_start()
+    game._action_set_next_bet(host_player, "10", "set_next_bet")
+    game._action_set_next_bet(guest_player, "10", "set_next_bet")
 
     assert events["settled"] == 0
     assert events["started_turn"] == 1

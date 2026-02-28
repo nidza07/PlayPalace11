@@ -750,7 +750,7 @@ class BlackjackGame(Game):
     def on_start(self) -> None:
         self.status = "playing"
         self.game_active = True
-        self.phase = "players"
+        self.phase = "settle"
         self.hand_number = 0
         self.next_hand_wait_ticks = 0
         self.awaiting_next_bets = False
@@ -763,10 +763,11 @@ class BlackjackGame(Game):
             if isinstance(player, BlackjackPlayer):
                 player.chips = self.options.starting_chips
                 player.next_bet = self._clamp_table_bet(self.options.base_bet)
+                player.next_bet_entered = False
 
         self._sync_team_scores()
         self.play_music("game_3cardpoker/mus.ogg")
-        self._start_new_hand()
+        self._start_between_hands()
 
     def _should_rebuild_after_keybind(self, player: Player, executed_any: bool) -> bool:
         """Skip keybind-driven menu rebuild for read-only check actions."""
