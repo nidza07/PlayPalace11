@@ -161,6 +161,7 @@ class BlackjackPlayer(Player):
     insurance_bet: int = 0
     insurance_decision_done: bool = False
     took_even_money: bool = False
+    next_bet_entered: bool = False
 
 
 @dataclass
@@ -363,6 +364,7 @@ class BlackjackGame(Game):
     timer: PokerTurnTimer = field(default_factory=PokerTurnTimer)
     dealer_hole_revealed: bool = False
     next_hand_wait_ticks: int = 0
+    awaiting_next_bets: bool = False
 
     @classmethod
     def get_name(cls) -> str:
@@ -751,6 +753,7 @@ class BlackjackGame(Game):
         self.phase = "players"
         self.hand_number = 0
         self.next_hand_wait_ticks = 0
+        self.awaiting_next_bets = False
 
         active = self.get_active_players()
         self._team_manager.team_mode = "individual"
@@ -789,10 +792,15 @@ class BlackjackGame(Game):
         if not self.game_active:
             return
 
-        if self.next_hand_wait_ticks > 0:
-            self.next_hand_wait_ticks -= 1
-            if self.next_hand_wait_ticks == 0:
+        if self._is_between_hands():
+            if self._all_between_hand_bets_entered():
                 self._start_new_hand()
+                return
+            if self.timer.tick():
+                self._apply_default_bets_for_unentered_players()
+                self._start_new_hand()
+                return
+            self.next_hand_wait_ticks = self.timer.ticks_remaining
             return
 
         if self.phase in {"players", "insurance"} and self.timer.tick():
@@ -807,6 +815,8 @@ class BlackjackGame(Game):
         self.phase = "players"
         self.hand_number += 1
         self.timer.clear()
+        self.next_hand_wait_ticks = 0
+        self.awaiting_next_bets = False
 
         total_competitors = [
             p
@@ -850,6 +860,7 @@ class BlackjackGame(Game):
             player.insurance_bet = 0
             player.insurance_decision_done = False
             player.took_even_money = False
+            player.next_bet_entered = False
 
         self.dealer_hand = []
         self.dealer_hole_revealed = False
@@ -1310,9 +1321,11 @@ class BlackjackGame(Game):
             return
 
         p.next_bet = amount
+        p.next_bet_entered = True
         self.play_sound(SOUND_BET)
         if user:
             user.speak_l("blackjack-option-changed-base-bet", count=amount)
+        self._start_next_hand_if_ready()
 
     # ======================================================================
     # Status / read actions
@@ -1869,7 +1882,35 @@ class BlackjackGame(Game):
         return self.deck.draw_one() if self.deck else None
 
     def _is_between_hands(self) -> bool:
-        return self.phase == "settle" and self.next_hand_wait_ticks > 0
+        return self.phase == "settle" and self.awaiting_next_bets
+
+    def _between_hands_players(self) -> list[BlackjackPlayer]:
+        return [
+            p
+            for p in self.get_active_players()
+            if isinstance(p, BlackjackPlayer) and p.chips > 0
+        ]
+
+    def _all_between_hand_bets_entered(self) -> bool:
+        players = self._between_hands_players()
+        if not players:
+            return True
+        return all(p.next_bet_entered for p in players)
+
+    def _apply_default_bets_for_unentered_players(self) -> None:
+        default_bet = self._clamp_table_bet(self.options.base_bet)
+        for player in self._between_hands_players():
+            if player.next_bet_entered:
+                continue
+            player.next_bet = default_bet
+            player.next_bet_entered = True
+
+    def _start_next_hand_if_ready(self) -> None:
+        if not self._is_between_hands():
+            return
+        if not self._all_between_hand_bets_entered():
+            return
+        self._start_new_hand()
 
     def _clamp_table_bet(self, amount: int) -> int:
         return max(self.options.table_min_bet, min(amount, self.options.table_max_bet))
@@ -1912,6 +1953,25 @@ class BlackjackGame(Game):
             self.play_sound(SOUND_BET)
 
         self._sync_team_scores()
+
+    def _start_between_hands(self) -> None:
+        self.awaiting_next_bets = True
+        self.next_hand_wait_ticks = 0
+
+        default_bet = self._clamp_table_bet(self.options.base_bet)
+        for player in self._between_hands_players():
+            player.next_bet_entered = False
+            if player.is_bot:
+                player.next_bet = default_bet
+                player.next_bet_entered = True
+
+        if self._all_between_hand_bets_entered():
+            self.timer.clear()
+            return
+
+        self._start_turn_timer()
+        self.next_hand_wait_ticks = self.timer.ticks_remaining
+        self.rebuild_all_menus()
 
     def _deal_initial_cards(self, players: list[BlackjackPlayer]) -> None:
         self._play_deal_sound()
@@ -2175,8 +2235,7 @@ class BlackjackGame(Game):
             self._end_game(remaining[0] if remaining else None)
             return
 
-        self.next_hand_wait_ticks = 100
-        self.rebuild_all_menus()
+        self._start_between_hands()
 
     def _broadcast_settle_result(
         self,

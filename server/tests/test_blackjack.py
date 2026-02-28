@@ -163,7 +163,9 @@ def test_blackjack_settle_single_player_continues_when_player_has_chips() -> Non
     game._settle_hand()
 
     assert game.status == "playing"
-    assert game.next_hand_wait_ticks == 100
+    assert game._is_between_hands() is True
+    assert game.next_hand_wait_ticks == 0
+    assert host_player.next_bet_entered is False
     assert host_player.chips == 110
 
 
@@ -352,25 +354,25 @@ def test_blackjack_end_game_no_winner_plays_no_winner_sound() -> None:
 
 def test_blackjack_set_next_bet_between_rounds_updates_future_posted_bet() -> None:
     game, host_player, host_user = create_game_with_host()
+    guest_user = MockUser("Guest")
+    guest_player = game.add_player("Guest", guest_user)
     game.status = "playing"
     game.game_active = True
     game.phase = "settle"
-    game.next_hand_wait_ticks = 20
+    game.awaiting_next_bets = True
     game.options.table_min_bet = 5
     game.options.table_max_bet = 100
 
     host_player.chips = 90
+    guest_player.chips = 90
 
     game._action_set_next_bet(host_player, "25", "set_next_bet")
 
     assert host_player.next_bet == 25
+    assert host_player.next_bet_entered is True
+    assert guest_player.next_bet_entered is False
     assert "Base bet set to 25" in (host_user.get_last_spoken() or "")
     assert "game_3cardpoker/bet.ogg" in host_user.get_sounds_played()
-
-    game._post_bets([host_player])
-
-    assert host_player.bet == 25
-    assert host_player.chips == 65
 
 
 def test_blackjack_set_next_bet_ignored_during_player_phase() -> None:
@@ -414,12 +416,72 @@ def test_blackjack_b_keybind_between_hands_opens_set_next_bet_input() -> None:
     game.status = "playing"
     game.game_active = True
     game.phase = "settle"
-    game.next_hand_wait_ticks = 100
+    game.awaiting_next_bets = True
 
     game._handle_keybind_event(host_player, {"key": "b"})
 
     assert game._pending_actions.get(host_player.id) == "set_next_bet"
     assert "action_input_editbox" in host_user.editboxes
+
+
+def test_blackjack_starts_next_hand_when_all_players_enter_bets() -> None:
+    game, host_player, _host_user = create_game_with_host()
+    guest_user = MockUser("Guest")
+    guest_player = game.add_player("Guest", guest_user)
+    game.status = "playing"
+    game.game_active = True
+    game.phase = "settle"
+    game.awaiting_next_bets = True
+    game.options.table_min_bet = 5
+    game.options.table_max_bet = 100
+    host_player.chips = 90
+    guest_player.chips = 90
+
+    started = {"value": False}
+
+    def _mark_started() -> None:
+        started["value"] = True
+
+    game._start_new_hand = _mark_started  # type: ignore[method-assign]
+
+    game._action_set_next_bet(host_player, "25", "set_next_bet")
+    assert started["value"] is False
+
+    game._action_set_next_bet(guest_player, "30", "set_next_bet")
+    assert started["value"] is True
+
+
+def test_blackjack_between_hands_timer_timeout_uses_base_bet_for_missing_entries() -> None:
+    game, host_player, _host_user = create_game_with_host()
+    guest_user = MockUser("Guest")
+    guest_player = game.add_player("Guest", guest_user)
+    game.status = "playing"
+    game.game_active = True
+    game.phase = "settle"
+    game.options.base_bet = 15
+    game.options.table_min_bet = 5
+    game.options.table_max_bet = 100
+    game.options.turn_timer = "1"
+    host_player.chips = 90
+    guest_player.chips = 90
+
+    started = {"value": False}
+
+    def _mark_started() -> None:
+        started["value"] = True
+
+    game._start_new_hand = _mark_started  # type: ignore[method-assign]
+    game._start_between_hands()
+    game._action_set_next_bet(host_player, "40", "set_next_bet")
+
+    for _ in range(20):
+        game.on_tick()
+
+    assert started["value"] is True
+    assert host_player.next_bet == 40
+    assert host_player.next_bet_entered is True
+    assert guest_player.next_bet == 15
+    assert guest_player.next_bet_entered is True
 
 
 def test_blackjack_insurance_wins_when_dealer_has_blackjack() -> None:
