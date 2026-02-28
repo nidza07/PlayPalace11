@@ -84,6 +84,8 @@ language = Jezik
 language-option = Jezik: { $language }
 language-changed = Jezik je postavljen na { $language }.
 
+fluent-languages-option = Fluent jezici ({ $count })
+
 # Stanja logičkih opcija
 option-on = Uključeno
 option-off = Isključeno
