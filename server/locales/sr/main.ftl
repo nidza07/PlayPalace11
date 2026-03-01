@@ -360,4 +360,12 @@ virtual-bots-profiles-empty = Nema definisanih profila.
 virtual-bots-profiles-line = { $profile } ({ $bot_count } robota) zamene: { $overrides }.
 virtual-bots-profiles-no-overrides = Preuzima osnovnu konfiguraciju
 
+# Documents
+documents = Dokumenti
+documents-menu-title = Sistem dokumenata
+documents-all = Svi dokumenti
+documents-uncategorized = Nekategorisani dokumenti
+documents-no-documents = Nema pronađenih dokumenata.
+documents-no-content = Nema dostupnog sadržaja u ovom dokumentu.
+
 localization-in-progress-try-again = Učitavanje prevoda u toku. Molimo pokušajte ponovo za minut.
