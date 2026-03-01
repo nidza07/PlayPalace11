@@ -357,4 +357,12 @@ virtual-bots-profiles-empty = No profiles are defined.
 virtual-bots-profiles-line = { $profile } ({ $bot_count } bots) overrides: { $overrides }.
 virtual-bots-profiles-no-overrides = inherits base configuration
 
+# Documents
+documents = Documents
+documents-menu-title = Documents System
+documents-all = All documents
+documents-uncategorized = Uncategorized documents
+documents-no-documents = No documents found.
+documents-no-content = No content available for this document.
+
 localization-in-progress-try-again = Localization in progress. Please try again in a minute.
