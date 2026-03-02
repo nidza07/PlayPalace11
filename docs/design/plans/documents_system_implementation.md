@@ -1,13 +1,14 @@
 # Documents System Implementation Progress
+Reference file: docs/design/plans/documents_system.md
 
-## Completed (Session 1)
+## Completed (Sessions 1 through 3)
 
-### Database Layer (prior session)
+### Database Layer (session 1)
 - `fluent_languages` column on `users` table (JSON text)
 - `transcriber_assignments` table with full CRUD methods
 - Migration support in `server/persistence/database.py`
 
-### Backend Infrastructure
+### Backend Infrastructure (session 1)
 - **NetworkUser.fluent_languages**: property, setter, plumbed from DB on login/reconnect (`server/core/users/network_user.py`, `server/core/server.py`)
 - **Fluent languages option**: toggle menu in options, uses `show_language_menu` with on/off status labels, saves to DB (`server/core/server.py`, `server/locales/en/main.ftl`)
 - **Localization.get_available_locale_codes()**: warmup-safe method that returns language codes from directory names without triggering bundle compilation (`server/messages/localization.py`)
@@ -23,46 +24,29 @@
 - **Tests**: 29 DocumentManager tests, 4 new fluent languages tests in options menu suite
 - **Locale completeness**: fixed missing .ftl files across 28 locales, added Serbian (sr)
 
----
+### Document Browsing — Read-Only (session 2)
+- "Documents" item in main menu for all users (approved and unapproved)
+- `_show_documents_menu`: category list + "All documents" + "Uncategorized"
+- `_show_documents_list`: document titles for a given category
+- `_show_document_view`: read-only editbox with locale fallback to English
+- Dispatch table entries for `documents_menu`, `documents_list_menu`
 
-## Chunk 2: Document Browsing (Read-Only)
+### Transcriber Management (session 3)
+- "View transcribers by language" and "View transcribers by user" items added to documents menu
+- **By language flow**: `show_language_menu` with per-language user counts → user list for selected language → admin can click to remove (with confirmation) or "Add users" to show toggle list of eligible users (filtered by fluent_languages)
+- **By user flow**: transcriber list with language counts → language list for selected user → admin can click to remove (with confirmation) or "Add languages" to show toggle list of unassigned fluent languages
+- Validation: only users with a language in `fluent_languages` can be assigned as transcribers
+- Toggle sounds: `checkbox_list_on.wav` / `checkbox_list_off.wav` for add/remove
+- Dispatch table entries: `transcribers_for_language_menu`, `transcriber_remove_confirm`, `transcribers_by_user_menu`, `transcriber_user_languages_menu`, `transcriber_remove_lang_confirm`
+- 20 new locale strings in `server/locales/en/main.ftl`
 
-Add the "Documents" menu item and let normal users browse and read documents.
-
-### Scope
-- Add "Documents" item to main menu in `server/core/server.py`
-- Locale strings: documents menu title, "All documents", "Uncategorized", "Back", etc.
-- `_show_documents_menu(user)`: list categories + "All documents" + "Uncategorized"
-- `_show_documents_in_category(user, slug)`: list documents with titles for user's locale
-- `_show_document_view(user, folder_name)`: read-only editbox with .md content
-- Locale fallback: if user's locale not available, show source locale content
-- Dispatch table entries for the new menus
-- Tests for browsing flow (menu construction, locale fallback, content display)
-
-### Files to modify
-- `server/core/server.py` — menu handlers and dispatch entries
-- `server/locales/en/main.ftl` — new locale strings
-
-### Files to create
-- None expected (all in server.py)
-
----
-
-## Chunk 3: Transcriber Management
-
-Admin UI for assigning transcribers and browsing transcriber data.
-
-### Scope
-- "View transcribers by language" menu: language list with user counts, drill into users per language
-- "View transcribers by user" menu: user list with language counts, drill into languages per user
-- Admin add/remove transcriber actions (uses existing DB methods: `add_transcriber`, `remove_transcriber`, `get_transcribers_for_language`, `get_user_transcriber_languages`)
-- Validation: only users with a language in `fluent_languages` can be assigned as transcribers for that language
-- Locale strings for transcriber menus and prompts
-- Tests for transcriber menu flows
-
-### Files to modify
-- `server/core/server.py` — transcriber menu handlers
-- `server/locales/en/main.ftl` — locale strings
+### Module Refactor (session 4)
+- Moved document browsing and transcriber management code out of `server/core/server.py` into mixin modules
+- Module structure under `server/core/documents/`:
+  - `manager.py` — data layer (DocumentManager)
+  - `browsing.py` — `DocumentBrowsingMixin` (document menus, list, view)
+  - `transcriber_role.py` — `TranscriberRoleMixin` (transcriber assignment/management menus)
+- Server class inherits both mixins; cross-mixin calls resolve via MRO
 
 ---
 
@@ -85,7 +69,7 @@ The action menu that appears when a transcriber or admin clicks a document.
 - Tests for action menu routing and permission checks
 
 ### Files to modify
-- `server/core/server.py` — action menu handlers
+- `server/core/documents/browsing.py` — action menu handlers (new mixin methods or extend `DocumentBrowsingMixin`)
 - `server/locales/en/main.ftl` — locale strings
 
 ---
@@ -105,7 +89,7 @@ The in-app editor with edit locks, save/cancel, and version history integration.
 - Tests for edit flow, lock integration, save with version backup
 
 ### Files to modify
-- `server/core/server.py` — editor handlers
+- `server/core/documents/browsing.py` — editor handlers (or a new `document_editor.py` mixin)
 - `server/locales/en/main.ftl` — locale strings
 
 ---
@@ -123,6 +107,6 @@ Admin flows for creating new documents and categories.
 - Tests for creation flows and edge cases (duplicate slugs, empty input)
 
 ### Files to modify
-- `server/core/server.py` — creation handlers
+- `server/core/documents/browsing.py` — creation handlers (or a new `document_creation.py` mixin)
 - `server/core/documents/manager.py` — possibly add slug generation helper, delete methods
 - `server/locales/en/main.ftl` — locale strings

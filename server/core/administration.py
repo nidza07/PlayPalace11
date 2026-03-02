@@ -218,7 +218,6 @@ class AdministrationMixin:
     def _show_promote_confirm_menu(self, user: NetworkUser, target_username: str) -> None:
         """Show confirmation menu for promoting a user to admin."""
         question = Localization.get(user.locale, "confirm-promote", player=target_username)
-        _speak_activity(user, "confirm-promote", player=target_username)
         show_yes_no_menu(user, "promote_confirm_menu", question)
         self._user_states[user.username] = {
             "menu": "promote_confirm_menu",
@@ -228,7 +227,6 @@ class AdministrationMixin:
     def _show_demote_confirm_menu(self, user: NetworkUser, target_username: str) -> None:
         """Show confirmation menu for demoting an admin."""
         question = Localization.get(user.locale, "confirm-demote", player=target_username)
-        _speak_activity(user, "confirm-demote", player=target_username)
         show_yes_no_menu(user, "demote_confirm_menu", question)
         self._user_states[user.username] = {
             "menu": "demote_confirm_menu",
@@ -280,7 +278,6 @@ class AdministrationMixin:
     def _show_transfer_ownership_confirm_menu(self, user: NetworkUser, target_username: str) -> None:
         """Show confirmation menu for transferring ownership."""
         question = Localization.get(user.locale, "confirm-transfer-ownership", player=target_username)
-        _speak_activity(user, "confirm-transfer-ownership", player=target_username)
         show_yes_no_menu(user, "transfer_ownership_confirm_menu", question)
         self._user_states[user.username] = {
             "menu": "transfer_ownership_confirm_menu",
@@ -353,7 +350,6 @@ class AdministrationMixin:
     def _show_ban_confirm_menu(self, user: NetworkUser, target_username: str) -> None:
         """Show confirmation menu for banning a user."""
         question = Localization.get(user.locale, "confirm-ban", player=target_username)
-        _speak_activity(user, "confirm-ban", player=target_username)
         show_yes_no_menu(user, "ban_confirm_menu", question)
         self._user_states[user.username] = {
             "menu": "ban_confirm_menu",
@@ -363,7 +359,6 @@ class AdministrationMixin:
     def _show_unban_confirm_menu(self, user: NetworkUser, target_username: str) -> None:
         """Show confirmation menu for unbanning a user."""
         question = Localization.get(user.locale, "confirm-unban", player=target_username)
-        _speak_activity(user, "confirm-unban", player=target_username)
         show_yes_no_menu(user, "unban_confirm_menu", question)
         self._user_states[user.username] = {
             "menu": "unban_confirm_menu",
@@ -452,7 +447,6 @@ class AdministrationMixin:
     def _show_virtual_bots_clear_confirm_menu(self, user: NetworkUser) -> None:
         """Show confirmation menu for clearing all virtual bots."""
         question = Localization.get(user.locale, "virtual-bots-clear-confirm")
-        user.speak_l("virtual-bots-clear-confirm", buffer="misc")
         show_yes_no_menu(user, "virtual_bots_clear_confirm_menu", question)
         self._user_states[user.username] = {"menu": "virtual_bots_clear_confirm_menu"}
 

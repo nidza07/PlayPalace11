@@ -17,11 +17,12 @@ Usage examples::
         on_select=self._show_transcribers_for_language,
     )
 
-    # Only specific language codes
-    available = [c for c in assigned if c not in existing]
+    # Multi-select with done/cancel — menu manages toggle state internally
     show_language_menu(
-        user, lang_codes=available,
-        on_select=self._begin_add_translation,
+        user, highlight_active_locale=False, multi_select=True,
+        selected=set(user.fluent_languages),
+        on_done=lambda u, sel: apply_selection(u, sel),
+        on_cancel=lambda u: go_back(u),
     )
 """
 
@@ -37,7 +38,7 @@ from ..users.base import MenuItem, EscapeBehavior
 if TYPE_CHECKING:
     from ..users.network_user import NetworkUser
 
-# Per-user callback storage keyed by username.
+# Per-user callback storage for single-select language menus.
 _language_menu_callbacks: dict[
     str,
     tuple[
@@ -45,6 +46,9 @@ _language_menu_callbacks: dict[
         Callable[[NetworkUser], Awaitable[None]] | None,
     ],
 ] = {}
+
+# Per-user state for multi-select language menus.
+_language_menu_multi: dict[str, dict] = {}
 
 
 def show_yes_no_menu(
@@ -85,6 +89,9 @@ def show_yes_no_menu(
     focus_positions = {item.id: i for i, item in enumerate(items, start=1)}
     position = focus_positions.get(initial_focus, 2)  # fallback to "yes"
 
+    if position != 1:
+        user.speak(question)
+
     escape = (
         EscapeBehavior.SELECT_LAST if allow_escape else EscapeBehavior.KEYBIND
     )
@@ -101,17 +108,33 @@ def show_language_menu(
     user: NetworkUser,
     highlight_active_locale: bool = True,
     include_native_names: bool = False,
+    multi_select: bool = False,
     *,
     lang_codes: list[str] | None = None,
+    selected: set[str] | None = None,
     status_labels: dict[str, str] | None = None,
     focus_lang: str | None = None,
     on_select: Callable[[NetworkUser, str], Awaitable[None]] | None = None,
     on_back: Callable[[NetworkUser], Awaitable[None]] | None = None,
+    on_done: Callable[..., Awaitable[None]] | None = None,
+    on_cancel: Callable[[NetworkUser], Awaitable[None]] | None = None,
 ) -> bool:
     """Show a language selection menu.
 
     *focus_lang* sets which language code receives initial focus.  When
     ``None`` (the default), the user's current locale is focused.
+
+    When *multi_select* is ``True``, the menu shows Done and Cancel items
+    instead of Back.  Escape selects Cancel (last item).  Pass *selected*
+    to let the menu manage toggle state internally:
+
+    - *selected* is a mutable ``set[str]`` of language codes that are
+      currently "on".  The menu modifies it in-place on each toggle and
+      auto-generates on/off status labels.  Pass ``set(original)`` if the
+      original collection must remain untouched.
+    - *on_done(user, selected)* is called when Done is pressed.
+    - *on_cancel(user)* is called when Cancel is pressed.
+    - *on_select* and *on_back* are ignored in this mode.
 
     Returns ``True`` if the menu was displayed, ``False`` if it could not be
     shown (e.g. localization warmup still running).
@@ -121,6 +144,16 @@ def show_language_menu(
         return False
 
     focus_target = focus_lang or user.locale
+
+    # Auto-generate on/off status labels when the menu manages toggle state.
+    if multi_select and selected is not None:
+        on_label = Localization.get(user.locale, "option-on")
+        off_label = Localization.get(user.locale, "option-off")
+        all_codes = Localization.get_available_locale_codes()
+        status_labels = {
+            code: on_label if code in selected else off_label
+            for code in all_codes
+        }
 
     # Native names (each language in its own script)
     native_names = Localization.get_available_languages(fallback=user.locale)
@@ -151,11 +184,32 @@ def show_language_menu(
         if lang_code == focus_target:
             selected_position = index
 
-    items.append(
-        MenuItem(text=Localization.get(user.locale, "back"), id="back")
-    )
+    if multi_select:
+        items.append(
+            MenuItem(text=Localization.get(user.locale, "done"), id="done")
+        )
+        items.append(
+            MenuItem(text=Localization.get(user.locale, "cancel"), id="cancel")
+        )
+    else:
+        items.append(
+            MenuItem(text=Localization.get(user.locale, "back"), id="back")
+        )
 
-    _language_menu_callbacks[user.username] = (on_select, on_back)
+    # Store callbacks / state for the handler.
+    if multi_select and selected is not None:
+        _language_menu_multi[user.username] = {
+            "selected": selected,
+            "on_done": on_done,
+            "on_cancel": on_cancel,
+            "highlight_active_locale": highlight_active_locale,
+            "include_native_names": include_native_names,
+            "lang_codes": lang_codes,
+        }
+        _language_menu_callbacks.pop(user.username, None)
+    else:
+        _language_menu_callbacks[user.username] = (on_select, on_back)
+        _language_menu_multi.pop(user.username, None)
 
     user.show_menu(
         "language_menu",
@@ -167,19 +221,52 @@ def show_language_menu(
     return True
 
 
+async def _invoke(callback, *args):
+    """Call *callback* with *args*, awaiting if the result is awaitable."""
+    if callback is not None:
+        result = callback(*args)
+        if inspect.isawaitable(result):
+            await result
+
+
 async def handle_language_menu_selection(
     user: NetworkUser, selection_id: str
 ) -> None:
     """Dispatch a language-menu selection to the stored callbacks."""
-    on_select, on_back = _language_menu_callbacks.pop(user.username, (None, None))
+    multi = _language_menu_multi.pop(user.username, None)
+    if multi is not None:
+        selected: set[str] = multi["selected"]
+        if selection_id.startswith("lang_"):
+            lang_code = selection_id[5:]
+            if lang_code in selected:
+                selected.discard(lang_code)
+                user.play_sound("checkbox_list_off.wav")
+            else:
+                selected.add(lang_code)
+                user.play_sound("checkbox_list_on.wav")
+            # Rebuild the menu, focusing the toggled item.
+            show_language_menu(
+                user,
+                multi["highlight_active_locale"],
+                multi["include_native_names"],
+                True,
+                lang_codes=multi["lang_codes"],
+                selected=selected,
+                focus_lang=lang_code,
+                on_done=multi["on_done"],
+                on_cancel=multi["on_cancel"],
+            )
+        elif selection_id == "done":
+            await _invoke(multi["on_done"], user, selected)
+        elif selection_id == "cancel":
+            await _invoke(multi["on_cancel"], user)
+        return
+
+    on_select, on_back = _language_menu_callbacks.pop(
+        user.username, (None, None)
+    )
     if selection_id.startswith("lang_"):
         lang_code = selection_id[5:]
-        if on_select is not None:
-            result = on_select(user, lang_code)
-            if inspect.isawaitable(result):
-                await result
+        await _invoke(on_select, user, lang_code)
     else:
-        if on_back is not None:
-            result = on_back(user)
-            if inspect.isawaitable(result):
-                await result
+        await _invoke(on_back, user)

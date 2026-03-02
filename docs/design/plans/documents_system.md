@@ -7,6 +7,7 @@ Since Play Palace is open source, contributors can edit document .md files direc
 Server admins have full control over document organization and contents. However if only admins had access to the documents system, it would make locale support very difficult.
 To account for this, admins can approve people to be transcribers. The transcriber role allows for existing documents to support new translations. Transcribers can not manage documents, or create new ones. They can only create and edit translations.
 Transcribers will be assigned a list of languages. They can only modify translations for the languages they are assigned. For example, a transcriber with Spanish and French would not be allowed to create or edit translations of an English version.
+Note: admins must make themselves a transcriber to perform all tasks that require a transcriber role. This is to cut down on the amount of code and keep things consistant.
 
 ## Storing transcriber data
 The user table has a fluent_languages column, which is a list of lang codes (e.g. ["en", "es"]). This tracks what languages a user knows and can be used for purposes beyond translation in the future.
@@ -175,7 +176,7 @@ When clicking on a document:
 - Manage visibility (x/x languages public)
 - Modify category list (admin): changes the list of categories this document is associated with via a boolean list.
 - Add translation
-- Remove this translation (admin): removes the translation for the user's current locale. This is only available for admins. The source translation can not be removed. Requires confirmation.
+- Remove this translation (admin): removes the translation for the user's current locale if the admin has this translation in their assigned languages list. This is only available for admins. The source translation can not be removed. Requires confirmation.
 - Delete document (admin): deletes this document completely including the metadata. Requires confirmation, include the number of translations in the prompt. Recovery is not possible.
 
 ## Viewing a document

@@ -204,37 +204,63 @@ async def test_fluent_languages_opens_language_menu(server, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_toggle_fluent_language_on(server, monkeypatch):
+async def test_fluent_language_toggle_deferred(server, monkeypatch):
+    """Toggling a language plays a sound but does not touch user state or DB."""
+    from server.core.ui.common_flows import handle_language_menu_selection
+
     user = DummyUser("alice")
-    user.fluent_languages = []
-    # Stub _show_fluent_languages_menu to avoid full menu rebuild
-    shown = {}
-    monkeypatch.setattr(
-        server, "_show_fluent_languages_menu",
-        lambda u, focus_lang=None: shown.update(called=True, focus=focus_lang),
-    )
+    user.fluent_languages = ["en"]
+    server._show_fluent_languages_menu(user)
 
-    await server._toggle_fluent_language(user, "es")
+    # Toggle es on — only the menu's internal selected set changes
+    await handle_language_menu_selection(user, "lang_es")
 
-    assert "es" in user.fluent_languages
     assert user.sounds_played[-1] == "checkbox_list_on.wav"
-    assert server._db.fluent_languages_updates == [("alice", ["es"])]
-    assert shown.get("called")
-    assert shown.get("focus") == "es"
+    assert user.fluent_languages == ["en"]  # unchanged
+    assert server._db.fluent_languages_updates == []
+
+    # Toggle es off again
+    await handle_language_menu_selection(user, "lang_es")
+
+    assert user.sounds_played[-1] == "checkbox_list_off.wav"
+    assert server._db.fluent_languages_updates == []
 
 
 @pytest.mark.asyncio
-async def test_toggle_fluent_language_off(server, monkeypatch):
+async def test_fluent_language_done_saves(server, monkeypatch):
+    """Pressing Done applies the selected set and writes to the DB."""
+    from server.core.ui.common_flows import handle_language_menu_selection
+
     user = DummyUser("alice")
-    user.fluent_languages = ["en", "es"]
+    user.fluent_languages = ["en"]
     shown = {}
-    monkeypatch.setattr(
-        server, "_show_fluent_languages_menu",
-        lambda u, focus_lang=None: shown.update(called=True, focus=focus_lang),
-    )
+    monkeypatch.setattr(server, "_show_options_menu", lambda u: shown.setdefault("options", True))
+    server._show_fluent_languages_menu(user)
 
-    await server._toggle_fluent_language(user, "es")
+    # Toggle es on, then press done
+    await handle_language_menu_selection(user, "lang_es")
+    await handle_language_menu_selection(user, "done")
 
-    assert "es" not in user.fluent_languages
-    assert user.sounds_played[-1] == "checkbox_list_off.wav"
-    assert server._db.fluent_languages_updates == [("alice", ["en"])]
+    assert set(user.fluent_languages) == {"en", "es"}
+    assert len(server._db.fluent_languages_updates) == 1
+    assert shown.get("options")
+
+
+@pytest.mark.asyncio
+async def test_fluent_language_cancel_reverts(server, monkeypatch):
+    """Pressing Cancel restores original fluent languages, nothing written."""
+    from server.core.ui.common_flows import handle_language_menu_selection
+
+    user = DummyUser("alice")
+    user.fluent_languages = ["en"]
+    shown = {}
+    monkeypatch.setattr(server, "_show_options_menu", lambda u: shown.setdefault("options", True))
+    server._show_fluent_languages_menu(user)
+
+    # Toggle es on, then cancel
+    await handle_language_menu_selection(user, "lang_es")
+    await handle_language_menu_selection(user, "cancel")
+
+    assert user.fluent_languages == ["en"]  # unchanged
+    assert server._db.fluent_languages_updates == []  # nothing written
+    assert shown.get("options")
