@@ -89,6 +89,9 @@ def show_yes_no_menu(
     focus_positions = {item.id: i for i, item in enumerate(items, start=1)}
     position = focus_positions.get(initial_focus, 2)  # fallback to "yes"
 
+    if position != 1:
+        user.speak(question)
+
     escape = (
         EscapeBehavior.SELECT_LAST if allow_escape else EscapeBehavior.KEYBIND
     )

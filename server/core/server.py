@@ -1983,7 +1983,6 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
     def _show_logout_confirm_menu(self, user: NetworkUser) -> None:
         """Show confirmation menu for logging out."""
         question = Localization.get(user.locale, "confirm-logout")
-        user.speak_l("confirm-logout", buffer="activity")
         show_yes_no_menu(user, "logout_confirm_menu", question)
         self._user_states[user.username] = {"menu": "logout_confirm_menu"}
 
