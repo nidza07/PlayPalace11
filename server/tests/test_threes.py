@@ -53,19 +53,19 @@ class TestThreesGameUnit:
         game.on_start()
 
         # Modify some state
-        game.current_round = 3
+        game.round = 3
 
         # Serialize
         json_str = game.to_json()
         data = json.loads(json_str)
 
         # Verify structure
-        assert data["current_round"] == 3
+        assert data["round"] == 3
         assert len(data["players"]) == 2
 
         # Deserialize
         loaded_game = ThreesGame.from_json(json_str)
-        assert loaded_game.current_round == 3
+        assert loaded_game.round == 3
 
     def test_roll_focuses_first_dice_toggle(self):
         """After rolling, focus should move to first dice toggle item."""
@@ -190,7 +190,7 @@ class TestThreesPersistence:
         game.on_start()
 
         # Set various state
-        game.current_round = 3
+        game.round = 3
 
         # Save
         json_str = game.to_json()
@@ -200,5 +200,5 @@ class TestThreesPersistence:
 
         # Verify state
         assert loaded.game_active is True
-        assert loaded.current_round == 3
+        assert loaded.round == 3
         assert loaded.options.total_rounds == 5

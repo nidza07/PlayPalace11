@@ -12,6 +12,7 @@ import random
 from ..base import Game, Player
 from ..registry import register_game
 from ...game_utils.action_guard_mixin import ActionGuardMixin
+from ...game_utils.round_based_game_mixin import RoundBasedGameMixin
 from ...game_utils.actions import Action, ActionSet, Visibility
 from ...game_utils.bot_helper import BotHelper
 from ...game_utils.dice import DiceSet
@@ -50,7 +51,7 @@ class ThreesOptions(GameOptions):
 
 @dataclass
 @register_game
-class ThreesGame(ActionGuardMixin, Game, DiceGameMixin):
+class ThreesGame(ActionGuardMixin, RoundBasedGameMixin, Game, DiceGameMixin):
     """
     Threes dice game.
 
@@ -68,7 +69,8 @@ class ThreesGame(ActionGuardMixin, Game, DiceGameMixin):
 
     players: list[ThreesPlayer] = field(default_factory=list)
     options: ThreesOptions = field(default_factory=ThreesOptions)
-    current_round: int = 0
+
+    round_start_sound = None
 
     @classmethod
     def get_name(cls) -> str:
@@ -350,18 +352,33 @@ class ThreesGame(ActionGuardMixin, Game, DiceGameMixin):
         player.total_score += score
         self._team_manager.add_to_team_score(player.name, score)
 
-        self._end_turn()
+        self._on_turn_end()
 
-    def _end_turn(self) -> None:
-        """End current player's turn."""
-        # Check if round is over
-        if self.turn_index >= len(self.turn_players) - 1:
-            self._end_round()
-        else:
-            self.advance_turn(announce=False)
-            self._start_turn()
+    # ==========================================================================
+    # RoundBasedGameMixin hooks
+    # ==========================================================================
 
-    def _end_round(self) -> None:
+    def should_reset_all_scores(self) -> bool:
+        return True
+
+    def _reset_player_for_game(self, player) -> None:
+        if isinstance(player, ThreesPlayer):
+            player.total_score = 0
+            player.dice.reset()
+
+    def _reset_player_for_turn(self, player) -> None:
+        if isinstance(player, ThreesPlayer):
+            player.dice.reset()
+            player.turn_score = 0
+
+    def _announce_turn_start(self, player) -> None:
+        self.announce_turn(turn_sound="game_3cardpoker/turn.ogg")
+
+    def _setup_bot_for_turn(self, player) -> None:
+        if player.is_bot:
+            BotHelper.jolt_bot(player, ticks=random.randint(20, 40))
+
+    def _on_round_end(self) -> None:
         """End the current round."""
         # Announce round scores
         scores = [
@@ -370,11 +387,11 @@ class ThreesGame(ActionGuardMixin, Game, DiceGameMixin):
         scores.sort(key=lambda x: x[1])  # Sort by score (lowest first)
         scores_str = ", ".join(f"{name}: {score}" for name, score in scores)
         self.broadcast_l(
-            "threes-round-scores", round=self.current_round, scores=scores_str
+            "threes-round-scores", round=self.round, scores=scores_str
         )
 
         # Check if game is over
-        if self.current_round >= self.options.total_rounds:
+        if self.round >= self.options.total_rounds:
             self._end_game()
         else:
             # Start next round
@@ -382,37 +399,14 @@ class ThreesGame(ActionGuardMixin, Game, DiceGameMixin):
 
     def _start_round(self) -> None:
         """Start a new round."""
-        self.current_round += 1
+        self.round += 1
+        self.set_turn_players(self.get_active_players())
         self.broadcast_l(
             "threes-round-start",
-            round=self.current_round,
+            round=self.round,
             total=self.options.total_rounds,
         )
-
-        # Reset turn order to start of player list
-        self.set_turn_players(self.get_active_players())
-
         self._start_turn()
-
-    def _start_turn(self) -> None:
-        """Start a player's turn."""
-        player = self.current_player
-        if not player or not isinstance(player, ThreesPlayer):
-            return
-
-        # Reset turn state
-        player.dice.reset()
-        player.turn_score = 0
-
-        # Announce turn (plays sound and broadcasts message)
-        self.announce_turn(turn_sound="game_3cardpoker/turn.ogg")
-
-        if player.is_bot:
-            import random
-
-            BotHelper.jolt_bot(player, ticks=random.randint(20, 40))  # nosec B311
-
-        self.rebuild_all_menus()
 
     def _end_game(self) -> None:
         """End the game and announce winner."""
@@ -479,7 +473,7 @@ class ThreesGame(ActionGuardMixin, Game, DiceGameMixin):
                 "winner_name": winner.name if winner else None,
                 "winner_score": winner.total_score if winner else 0,
                 "final_scores": final_scores,
-                "rounds_played": self.current_round,
+                "rounds_played": self.round,
                 "total_rounds": self.options.total_rounds,
                 "scoring_mode": "lowest_wins",
             },
@@ -495,33 +489,6 @@ class ThreesGame(ActionGuardMixin, Game, DiceGameMixin):
             lines.append(f"{i}. {name}: {points_str}")
 
         return lines
-
-    def on_start(self) -> None:
-        """Called when the game starts."""
-        self.status = "playing"
-        self.game_active = True
-        self.current_round = 0
-
-        # Reset player scores
-        for player in self.players:
-            if isinstance(player, ThreesPlayer):
-                player.total_score = 0
-                player.dice.reset()
-
-        # Initialize turn order
-        active_players = self.get_active_players()
-        self.set_turn_players(active_players)
-
-        # Set up TeamManager for score tracking
-        self._team_manager.team_mode = "individual"
-        self._team_manager.setup_teams([p.name for p in active_players])
-        self._team_manager.reset_all_scores()
-
-        # Play music
-        self.play_music("game_pig/mus.ogg")
-
-        # Start first round
-        self._start_round()
 
     def on_tick(self) -> None:
         """Called every tick. Handle bot AI."""
