@@ -3909,8 +3909,8 @@ class MonopolyGame(ActionGuardMixin, Game):
             return "unmortgage_property"
         return "end_turn"
 
-    def on_start(self) -> None:
-        """Start scaffold mode using the selected preset metadata."""
+    def _initialize_start_runtime(self) -> list[Player]:
+        """Initialize generic game runtime state and return active players."""
         self.status = "playing"
         self.game_active = True
         self.round = 1
@@ -3919,7 +3919,10 @@ class MonopolyGame(ActionGuardMixin, Game):
         self._team_manager.team_mode = "individual"
         self._team_manager.setup_teams([player.name for player in active_players])
         self.set_turn_players(active_players)
+        return active_players
 
+    def _resolve_start_board_plan(self):
+        """Resolve board/preset compatibility and persist normalized options."""
         board_plan = resolve_board_plan(
             self.options.preset_id,
             self.options.board_id,
@@ -3929,7 +3932,10 @@ class MonopolyGame(ActionGuardMixin, Game):
             self.options.preset_id = board_plan.effective_preset_id
         self.options.board_id = board_plan.effective_board_id
         self.options.board_rules_mode = board_plan.requested_mode
+        return board_plan
 
+    def _apply_start_selection(self, board_plan) -> MonopolyPreset:
+        """Resolve preset, board metadata, and board structures for startup."""
         preset = self._resolve_selected_preset()
         self.active_preset_id = preset.preset_id
         self.active_preset_name = preset.name
@@ -3970,6 +3976,10 @@ class MonopolyGame(ActionGuardMixin, Game):
         self.last_hardware_event_id = ""
         self.last_hardware_event_status = "none"
         self.last_hardware_event_details = ""
+        return preset
+
+    def _apply_start_profiles(self) -> None:
+        """Resolve preset-specific runtime profiles and clear voice/banking caches."""
         self.junior_ruleset = (
             get_junior_ruleset(self.active_preset_id)
             if is_junior_ruleset_preset(self.active_preset_id)
@@ -4018,6 +4028,9 @@ class MonopolyGame(ActionGuardMixin, Game):
         self.banking_state = None
         self.voice_last_response_by_player_id.clear()
         self.voice_pending_transfer_by_player_id.clear()
+
+    def _reset_start_state(self) -> None:
+        """Reset board, turn, and deck state for a fresh match start."""
         self.rule_profile = self._resolve_rule_profile(self.active_preset_id)
         self.property_owners.clear()
         self.mortgaged_space_ids.clear()
@@ -4043,6 +4056,8 @@ class MonopolyGame(ActionGuardMixin, Game):
         self.chance_deck_index = 0
         self.community_chest_deck_index = 0
 
+    def _reset_players_for_start(self, active_players: list[Player]) -> None:
+        """Reset per-player Monopoly runtime fields for startup."""
         for player in active_players:
             if isinstance(player, MonopolyPlayer):
                 player.position = 0
@@ -4060,17 +4075,18 @@ class MonopolyGame(ActionGuardMixin, Game):
 
         self._apply_junior_super_mario_starting_cash()
 
-        if self.banking_profile is not None:
-            player_ids = [
-                player.id for player in active_players if isinstance(player, MonopolyPlayer)
-            ]
-            self.banking_state = init_bank_accounts(player_ids, self.banking_profile)
-            self._sync_all_player_cash_from_banking()
+    def _initialize_banking_for_start(self, active_players: list[Player]) -> None:
+        """Create banking simulator accounts when preset uses electronic cash."""
+        if self.banking_profile is None:
+            return
+        player_ids = [
+            player.id for player in active_players if isinstance(player, MonopolyPlayer)
+        ]
+        self.banking_state = init_bank_accounts(player_ids, self.banking_profile)
+        self._sync_all_player_cash_from_banking()
 
-        self._sync_cash_scores()
-        self._start_cheaters_turn(self.current_player)
-        self._start_city_turn(self.current_player)
-
+    def _announce_start_configuration(self, preset: MonopolyPreset) -> None:
+        """Broadcast active startup configuration messages to the table."""
         self.broadcast_l(
             "monopoly-scaffold-started",
             preset=preset.name,
@@ -4096,6 +4112,22 @@ class MonopolyGame(ActionGuardMixin, Game):
                 "monopoly-board-rules-simplified",
                 board=self.active_board_id,
             )
+
+    def on_start(self) -> None:
+        """Start scaffold mode using the selected preset metadata."""
+        active_players = self._initialize_start_runtime()
+        board_plan = self._resolve_start_board_plan()
+        preset = self._apply_start_selection(board_plan)
+        self._apply_start_profiles()
+        self._reset_start_state()
+        self._reset_players_for_start(active_players)
+        self._initialize_banking_for_start(active_players)
+
+        self._sync_cash_scores()
+        self._start_cheaters_turn(self.current_player)
+        self._start_city_turn(self.current_player)
+
+        self._announce_start_configuration(preset)
 
         self.announce_turn(turn_sound="game_pig/turn.ogg")
         BotHelper.jolt_bots(self, ticks=random.randint(12, 20))
