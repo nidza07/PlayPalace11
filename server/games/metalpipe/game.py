@@ -20,7 +20,7 @@ from ...messages.localization import Localization
 class MetalPipePlayer(Player):
     """Player state for Metal Pipe game."""
 
-    pass
+    alive: bool = True
 
 
 @dataclass
@@ -166,6 +166,7 @@ class MetalPipeGame(Game):
                 return
 
             self.play_sound("lsmack.ogg")
+            bonked.alive = False
 
             if data["is_self"]:
                 self.broadcast_l("metalpipe-hit-self", bonker=bonker.name)
