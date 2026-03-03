@@ -3310,6 +3310,219 @@ class MonopolyGame(ActionGuardMixin, Game):
 
         return "resolved"
 
+    def _resolve_unowned_purchasable_space(
+        self,
+        player: MonopolyPlayer,
+        landed_space: MonopolySpace,
+    ) -> str:
+        if self._is_junior_super_mario_manual_core_active():
+            self.turn_pending_purchase_space_id = ""
+            self._buy_property_for_player(player, landed_space)
+            return "resolved"
+        if self.rule_profile.auto_auction_unowned_property:
+            self.broadcast_l(
+                "monopoly-property-available",
+                player=player.name,
+                property=landed_space.name,
+                price=landed_space.price,
+            )
+            self._run_property_auction(landed_space, player)
+            return "resolved"
+        self.turn_pending_purchase_space_id = landed_space.space_id
+        self.broadcast_l(
+            "monopoly-property-available",
+            player=player.name,
+            property=landed_space.name,
+            price=landed_space.price,
+        )
+        return "pending_purchase"
+
+    def _resolve_owned_purchasable_space(
+        self,
+        player: MonopolyPlayer,
+        landed_space: MonopolySpace,
+        owner_id: str,
+        dice_total: int | None,
+    ) -> str:
+        if owner_id == player.id:
+            self.broadcast_l(
+                "monopoly-landed-owned",
+                player=player.name,
+                property=landed_space.name,
+            )
+            return "resolved"
+
+        if self._is_space_mortgaged(landed_space.space_id):
+            self.broadcast_l(
+                "monopoly-mortgaged-no-rent",
+                player=player.name,
+                property=landed_space.name,
+            )
+            return "resolved"
+
+        owner = self.get_player_by_id(owner_id)
+        rent_due = self._calculate_rent_due(landed_space, owner_id, dice_total)
+        manual_core = self._is_junior_super_mario_manual_core_active()
+        if self.cheaters_engine is not None:
+            required_outcome = self.cheaters_engine.on_payment_required(
+                player.id,
+                f"rent:{landed_space.space_id}",
+                rent_due,
+                context={
+                    "payment_type": "rent",
+                    "space_id": landed_space.space_id,
+                    "owner_id": owner_id,
+                },
+            )
+            if not self._apply_cheaters_outcome(
+                player,
+                required_outcome,
+                reason="payment_required",
+            ):
+                return "bankrupt" if player.bankrupt else "resolved"
+        if not manual_core and self._current_liquid_balance(player) < rent_due:
+            self._liquidate_assets_for_debt(player, rent_due)
+        paid = 0
+        if owner and isinstance(owner, MonopolyPlayer):
+            paid = self._transfer_between_players(
+                player,
+                owner,
+                rent_due,
+                f"rent:{landed_space.space_id}",
+                allow_partial=True,
+            )
+        else:
+            paid = self._debit_player_to_bank(
+                player,
+                rent_due,
+                f"rent:{landed_space.space_id}",
+                allow_partial=True,
+            )
+
+        self.broadcast_l(
+            "monopoly-rent-paid",
+            player=player.name,
+            owner=owner.name if owner else "Bank",
+            amount=paid,
+            property=landed_space.name,
+        )
+        self._apply_sore_loser_rebate(player, paid)
+        if self.cheaters_engine is not None and not player.bankrupt:
+            result_outcome = self.cheaters_engine.on_payment_result(
+                player.id,
+                paid,
+                rent_due,
+                context={
+                    "payment_type": "rent",
+                    "space_id": landed_space.space_id,
+                    "owner_id": owner_id,
+                },
+            )
+            if not self._apply_cheaters_outcome(
+                player,
+                result_outcome,
+                reason="payment_result",
+            ):
+                return "bankrupt" if player.bankrupt else "resolved"
+        if player.bankrupt:
+            return "bankrupt"
+        if paid < rent_due:
+            if manual_core:
+                return "resolved"
+            creditor_name = owner.name if owner else "Bank"
+            creditor_id = owner.id if owner and isinstance(owner, MonopolyPlayer) else None
+            self._declare_bankrupt(
+                player,
+                creditor_name=creditor_name,
+                creditor_id=creditor_id,
+            )
+            return "bankrupt"
+        return "resolved"
+
+    def _resolve_purchasable_space(
+        self,
+        player: MonopolyPlayer,
+        landed_space: MonopolySpace,
+        dice_total: int | None,
+    ) -> str:
+        owner_id = self.property_owners.get(landed_space.space_id)
+        if owner_id is None:
+            return self._resolve_unowned_purchasable_space(player, landed_space)
+        return self._resolve_owned_purchasable_space(
+            player,
+            landed_space,
+            owner_id,
+            dice_total,
+        )
+
+    def _resolve_tax_space(self, player: MonopolyPlayer, landed_space: MonopolySpace) -> str:
+        if not self._apply_bank_payment(
+            player,
+            TAX_AMOUNTS[landed_space.space_id],
+            tax_name=landed_space.name,
+        ):
+            return "bankrupt"
+        return "resolved"
+
+    def _resolve_go_to_jail_space(self, player: MonopolyPlayer) -> str:
+        if self._is_junior_super_mario_manual_core_active() and self._current_liquid_balance(player) <= 0:
+            return "resolved"
+        self._send_to_jail(player)
+        return "forced_end"
+
+    def _resolve_chance_space(
+        self,
+        player: MonopolyPlayer,
+        *,
+        depth: int,
+        dice_total: int | None,
+    ) -> str:
+        qb_outcome = self._resolve_question_block_outcome()
+        if qb_outcome is not None:
+            return self._apply_question_block_outcome(
+                player,
+                qb_outcome,
+                depth=depth,
+                dice_total=dice_total,
+            )
+        card = self._draw_card("chance")
+        return self._resolve_card_effect(
+            player,
+            "chance",
+            card,
+            depth=depth,
+            dice_total=dice_total,
+        )
+
+    def _resolve_community_chest_space(
+        self,
+        player: MonopolyPlayer,
+        *,
+        depth: int,
+        dice_total: int | None,
+    ) -> str:
+        card = self._draw_card("community_chest")
+        return self._resolve_card_effect(
+            player,
+            "community_chest",
+            card,
+            depth=depth,
+            dice_total=dice_total,
+        )
+
+    def _resolve_free_parking_space(self, player: MonopolyPlayer) -> str:
+        if self._is_free_parking_jackpot_enabled() and self.free_parking_pool > 0:
+            payout = self.free_parking_pool
+            self.free_parking_pool = 0
+            payout = self._credit_player(player, payout, "free_parking_jackpot")
+            self.broadcast_l(
+                "monopoly-free-parking-jackpot",
+                player=player.name,
+                amount=payout,
+                cash=player.cash,
+            )
+        return "resolved"
+
     def _resolve_space(
         self,
         player: MonopolyPlayer,
@@ -3330,180 +3543,30 @@ class MonopolyGame(ActionGuardMixin, Game):
             return "resolved"
 
         if landed_space.kind in PURCHASABLE_KINDS:
-            owner_id = self.property_owners.get(landed_space.space_id)
-            if owner_id is None:
-                if self._is_junior_super_mario_manual_core_active():
-                    self.turn_pending_purchase_space_id = ""
-                    self._buy_property_for_player(player, landed_space)
-                    return "resolved"
-                if self.rule_profile.auto_auction_unowned_property:
-                    self.broadcast_l(
-                        "monopoly-property-available",
-                        player=player.name,
-                        property=landed_space.name,
-                        price=landed_space.price,
-                    )
-                    self._run_property_auction(landed_space, player)
-                    return "resolved"
-                self.turn_pending_purchase_space_id = landed_space.space_id
-                self.broadcast_l(
-                    "monopoly-property-available",
-                    player=player.name,
-                    property=landed_space.name,
-                    price=landed_space.price,
-                )
-                return "pending_purchase"
-
-            if owner_id == player.id:
-                self.broadcast_l(
-                    "monopoly-landed-owned",
-                    player=player.name,
-                    property=landed_space.name,
-                )
-                return "resolved"
-
-            if self._is_space_mortgaged(landed_space.space_id):
-                self.broadcast_l(
-                    "monopoly-mortgaged-no-rent",
-                    player=player.name,
-                    property=landed_space.name,
-                )
-                return "resolved"
-
-            owner = self.get_player_by_id(owner_id)
-            rent_due = self._calculate_rent_due(landed_space, owner_id, dice_total)
-            manual_core = self._is_junior_super_mario_manual_core_active()
-            if self.cheaters_engine is not None:
-                required_outcome = self.cheaters_engine.on_payment_required(
-                    player.id,
-                    f"rent:{landed_space.space_id}",
-                    rent_due,
-                    context={
-                        "payment_type": "rent",
-                        "space_id": landed_space.space_id,
-                        "owner_id": owner_id,
-                    },
-                )
-                if not self._apply_cheaters_outcome(
-                    player,
-                    required_outcome,
-                    reason="payment_required",
-                ):
-                    return "bankrupt" if player.bankrupt else "resolved"
-            if not manual_core and self._current_liquid_balance(player) < rent_due:
-                self._liquidate_assets_for_debt(player, rent_due)
-            paid = 0
-            if owner and isinstance(owner, MonopolyPlayer):
-                paid = self._transfer_between_players(
-                    player,
-                    owner,
-                    rent_due,
-                    f"rent:{landed_space.space_id}",
-                    allow_partial=True,
-                )
-            else:
-                paid = self._debit_player_to_bank(
-                    player,
-                    rent_due,
-                    f"rent:{landed_space.space_id}",
-                    allow_partial=True,
-                )
-
-            self.broadcast_l(
-                "monopoly-rent-paid",
-                player=player.name,
-                owner=owner.name if owner else "Bank",
-                amount=paid,
-                property=landed_space.name,
-            )
-            self._apply_sore_loser_rebate(player, paid)
-            if self.cheaters_engine is not None and not player.bankrupt:
-                result_outcome = self.cheaters_engine.on_payment_result(
-                    player.id,
-                    paid,
-                    rent_due,
-                    context={
-                        "payment_type": "rent",
-                        "space_id": landed_space.space_id,
-                        "owner_id": owner_id,
-                    },
-                )
-                if not self._apply_cheaters_outcome(
-                    player,
-                    result_outcome,
-                    reason="payment_result",
-                ):
-                    return "bankrupt" if player.bankrupt else "resolved"
-            if player.bankrupt:
-                return "bankrupt"
-            if paid < rent_due:
-                if manual_core:
-                    return "resolved"
-                creditor_name = owner.name if owner else "Bank"
-                creditor_id = owner.id if owner and isinstance(owner, MonopolyPlayer) else None
-                self._declare_bankrupt(
-                    player,
-                    creditor_name=creditor_name,
-                    creditor_id=creditor_id,
-                )
-                return "bankrupt"
-            return "resolved"
+            return self._resolve_purchasable_space(player, landed_space, dice_total)
 
         if landed_space.space_id in TAX_AMOUNTS:
-            if not self._apply_bank_payment(
-                player,
-                TAX_AMOUNTS[landed_space.space_id],
-                tax_name=landed_space.name,
-            ):
-                return "bankrupt"
-            return "resolved"
+            return self._resolve_tax_space(player, landed_space)
 
         if landed_space.kind == "go_to_jail":
-            if (
-                self._is_junior_super_mario_manual_core_active()
-                and self._current_liquid_balance(player) <= 0
-            ):
-                return "resolved"
-            self._send_to_jail(player)
-            return "forced_end"
+            return self._resolve_go_to_jail_space(player)
 
         if landed_space.kind == "chance":
-            qb_outcome = self._resolve_question_block_outcome()
-            if qb_outcome is not None:
-                return self._apply_question_block_outcome(
-                    player, qb_outcome, depth=depth, dice_total=dice_total
-                )
-            card = self._draw_card("chance")
-            return self._resolve_card_effect(
+            return self._resolve_chance_space(
                 player,
-                "chance",
-                card,
                 depth=depth,
                 dice_total=dice_total,
             )
 
         if landed_space.kind == "community_chest":
-            card = self._draw_card("community_chest")
-            return self._resolve_card_effect(
+            return self._resolve_community_chest_space(
                 player,
-                "community_chest",
-                card,
                 depth=depth,
                 dice_total=dice_total,
             )
 
         if landed_space.kind == "free_parking":
-            if self._is_free_parking_jackpot_enabled() and self.free_parking_pool > 0:
-                payout = self.free_parking_pool
-                self.free_parking_pool = 0
-                payout = self._credit_player(player, payout, "free_parking_jackpot")
-                self.broadcast_l(
-                    "monopoly-free-parking-jackpot",
-                    player=player.name,
-                    amount=payout,
-                    cash=player.cash,
-                )
-            return "resolved"
+            return self._resolve_free_parking_space(player)
 
         return "resolved"
 
