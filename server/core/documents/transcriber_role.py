@@ -22,6 +22,21 @@ class TranscriberRoleMixin:
     _db: "Database"
     _user_states: dict[str, dict]
 
+    def _get_transcriber_menu_handlers(
+        self, user: "NetworkUser", selection_id: str, state: dict
+    ) -> dict[str, tuple]:
+        """Return menu dispatch entries for transcriber management."""
+        return {
+            "transcribers_for_language_menu": (self._handle_transcribers_for_language_selection, (user, selection_id, state)),
+            "transcriber_remove_confirm": (self._handle_transcriber_remove_confirm, (user, selection_id, state)),
+            "add_transcriber_users_menu": (self._handle_add_transcriber_users_selection, (user, selection_id, state)),
+            "transcribers_by_user_menu": (self._handle_transcribers_by_user_selection, (user, selection_id, state)),
+            "add_transcriber_user_picker_menu": (self._handle_add_transcriber_user_picker_selection, (user, selection_id, state)),
+            "transcriber_user_languages_menu": (self._handle_transcriber_user_languages_selection, (user, selection_id, state)),
+            "transcriber_remove_lang_confirm": (self._handle_transcriber_remove_lang_confirm, (user, selection_id, state)),
+            "transcriber_remove_all_confirm": (self._handle_transcriber_remove_all_confirm, (user, selection_id, state)),
+        }
+
     # -- Transcriber management menus --
 
     def _show_transcribers_by_language(self, user: NetworkUser) -> None:

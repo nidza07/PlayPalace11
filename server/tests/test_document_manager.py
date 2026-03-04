@@ -69,7 +69,7 @@ class TestLoad:
         with open(doc_dir / "_metadata.json", encoding="utf-8") as f:
             meta = json.load(f)
         assert "en" in meta["locales"]
-        assert meta["locales"]["en"]["title"] == "My Doc"
+        assert meta["titles"]["en"] == "My Doc"
         assert meta["source_locale"] == "en"
 
     def test_load_existing_documents_with_metadata(self, manager, docs_dir):
@@ -79,11 +79,11 @@ class TestLoad:
         meta = {
             "categories": ["rules"],
             "source_locale": "en",
+            "titles": {"en": "Custom Title"},
             "locales": {
                 "en": {
                     "created": "2026-01-01T00:00:00Z",
                     "modified_contents": "2026-01-01T00:00:00Z",
-                    "title": "Custom Title",
                     "public": True,
                 }
             },
@@ -176,11 +176,11 @@ class TestGetDocumentsInCategory:
             meta = {
                 "categories": cats,
                 "source_locale": "en",
+                "titles": {"en": name.replace("_", " ").title()},
                 "locales": {
                     "en": {
                         "created": "2026-01-01T00:00:00Z",
                         "modified_contents": "2026-01-01T00:00:00Z",
-                        "title": name.replace("_", " ").title(),
                         "public": True,
                     }
                 },

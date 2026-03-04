@@ -1,6 +1,25 @@
 # Documents System Implementation Progress
 Reference file: docs/design/plans/documents_system.md
 
+## Architecture Rule
+**No document-related code in `server/core/server.py`.** All document system
+logic — menu handlers, editbox handlers, dispatch entries — must live in the
+mixin modules under `server/core/documents/`:
+
+| Module | Responsibility |
+|---|---|
+| `manager.py` | Data layer (`DocumentManager`): metadata, content, locks, history |
+| `browsing.py` | `DocumentBrowsingMixin`: browsing menus, action menu, settings, editing flows |
+| `transcriber_role.py` | `TranscriberRoleMixin`: transcriber assignment and management menus |
+
+The Server class inherits both mixins and wires them into the central dispatch
+via two hooks — **do not add individual entries to `server.py`**:
+
+- **Menu dispatch**: `_get_document_menu_handlers(user, selection_id, state)` on `DocumentBrowsingMixin` returns a dict of all document + transcriber menu handlers. It is unpacked into the `handlers` dict inside `_dispatch_menu_selection`.
+- **Editbox dispatch**: `_handle_document_editbox(user, current_menu, packet, state)` on `DocumentBrowsingMixin` is called early in `_handle_editbox` and returns `True` if handled.
+
+New document menus or editboxes should be added to these methods (or to `_get_transcriber_menu_handlers` for transcriber-specific menus), never directly to `server.py`.
+
 ## Completed (Sessions 1 through 3)
 
 ### Database Layer (session 1)
@@ -48,6 +67,13 @@ Reference file: docs/design/plans/documents_system.md
   - `transcriber_role.py` — `TranscriberRoleMixin` (transcriber assignment/management menus)
 - Server class inherits both mixins; cross-mixin calls resolve via MRO
 
+### Document Actions (session 5)
+- Action menu for transcribers/admins (View, Edit placeholder, Document settings)
+- Document settings submenu with title, visibility, categories, add/remove translation, delete
+- New DocumentManager data methods: get/set title, visibility, categories; add/remove translation; delete document
+- Menu and editbox dispatch entries moved entirely out of `server/core/server.py` via `_get_document_menu_handlers()` and `_handle_document_editbox()` on the browsing mixin
+- Transcriber menu dispatch entries also moved out via `_get_transcriber_menu_handlers()` on the transcriber role mixin
+
 ---
 
 ## Chunk 4: Document Actions (Admin & Transcriber)
@@ -61,36 +87,50 @@ The action menu that appears when a transcriber or admin clicks a document.
   - Change title (per locale)
   - Manage visibility (public/private toggles per locale)
   - Modify category list (admin, boolean toggle list)
-  - Add translation (locale selection, title + content editboxes)
+  - ~~Add translation~~ — deferred to Chunk 5 (shares the document contents dialog for content entry)
   - Remove translation (admin, confirmation with safeguards)
   - Delete document (admin, confirmation with translation count)
 - Permission checks: transcribers limited to their assigned languages
 - Locale strings for all prompts and confirmations
 - Tests for action menu routing and permission checks
 
-### Files to modify
-- `server/core/documents/browsing.py` — action menu handlers (new mixin methods or extend `DocumentBrowsingMixin`)
-- `server/locales/en/main.ftl` — locale strings
+### Files modified
+- `server/core/documents/manager.py` — new data methods (get/set title, visibility, categories; add/remove translation; delete)
+- `server/core/documents/browsing.py` — action menu, settings submenu, all management handlers; dispatch via `_get_document_menu_handlers` and `_handle_document_editbox`
+- `server/core/documents/transcriber_role.py` — dispatch via `_get_transcriber_menu_handlers`
+- `server/locales/en/main.ftl` — 24 new locale strings
 
 ---
 
-## Chunk 5: Document Editing
+## Chunk 5: Document Editing & Add Translation
 
-The in-app editor with edit locks, save/cancel, and version history integration.
+The document contents dialog — used any time document content is shown for editing (editing an existing document, adding a translation, creating a new document). Also includes the "Add translation" flow deferred from Chunk 4, since the content entry step should reuse this same dialog. Read-only viewing remains a simple editbox.
 
 ### Scope
-- `_show_document_editor(user, folder_name, locale)`: multiline editbox with current content
+- **Document contents dialog**: multiline editbox with current content, edit locks, save/cancel
 - Side-by-side source display: if editing a non-source locale, show source content in a read-only editbox
 - Save handler: calls `DocumentManager.save_document_content()` (handles backup + lock release)
 - Cancel handler: release edit lock, return to document actions
 - Escape = cancel, with confirmation if content changed
 - Lock acquisition on edit open, conflict message if locked by another user
+- **Add translation**: locale selection + title editbox, then open the document contents dialog for content entry
 - Locale strings for editor prompts, save/cancel confirmations, lock conflict messages
 - Tests for edit flow, lock integration, save with version backup
 
+### Design notes: shared handlers and reuse
+
+**Shared title editbox**: The title editbox handler must be a single reusable handler used by all flows that set a document title: changing an existing title, naming a new translation, and naming a new document. Do not duplicate the title prompt/save logic across these flows.
+
+**Shared document contents dialog**: The document contents dialog (multiline editbox with save/cancel/lock) must be a single reusable flow. Callers: edit existing document, add translation (after title entry), create new document (Chunk 6). Each caller passes context (folder_name, locale, whether it's a new translation/document) and the dialog handles save uniformly.
+
+**Shared locale picker for document operations**: Change title, manage visibility, remove translation, and add translation all need to show the document's locales filtered by the user's assigned transcriber languages. This should be a single helper (e.g. `_get_user_accessible_locales(user, folder_name)`) rather than repeating the filter logic in each handler. Note: Chunk 4's implementation currently repeats this filter — consolidate when implementing Chunk 5.
+
+**Shared category toggle list**: Chunk 4's "modify categories" and Chunk 6's "new document category selection" both present a toggle list of categories. Reuse the same display/toggle handler for both.
+
 ### Files to modify
-- `server/core/documents/browsing.py` — editor handlers (or a new `document_editor.py` mixin)
+- `server/core/documents/browsing.py` — editor handlers (or a new `document_editor.py` mixin); add new editbox entries to `_handle_document_editbox`
 - `server/locales/en/main.ftl` — locale strings
+- **Not** `server/core/server.py` — see Architecture Rule above
 
 ---
 
@@ -99,14 +139,16 @@ The in-app editor with edit locks, save/cancel, and version history integration.
 Admin flows for creating new documents and categories.
 
 ### Scope
-- New document flow: category selection -> title editbox -> content editbox -> auto-generate folder slug from title
+- New document flow: category selection (reuse shared category toggle list) -> title editbox (reuse shared title handler) -> document contents dialog (reuse shared contents dialog) -> auto-generate folder slug from title
 - Slug collision detection with user-friendly error
 - New category flow: slug editbox -> display name editbox
 - Category management: rename (per locale), change sort method, delete (with document cleanup)
 - Locale strings for creation flows
 - Tests for creation flows and edge cases (duplicate slugs, empty input)
+- See Chunk 5 design notes for all shared handlers that must be reused here
 
 ### Files to modify
-- `server/core/documents/browsing.py` — creation handlers (or a new `document_creation.py` mixin)
+- `server/core/documents/browsing.py` — creation handlers (or a new `document_creation.py` mixin); add new menu/editbox entries to `_get_document_menu_handlers` and `_handle_document_editbox`
 - `server/core/documents/manager.py` — possibly add slug generation helper, delete methods
 - `server/locales/en/main.ftl` — locale strings
+- **Not** `server/core/server.py` — see Architecture Rule above

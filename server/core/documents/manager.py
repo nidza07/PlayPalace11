@@ -72,27 +72,31 @@ class DocumentManager:
 
         # Detect existing locale files
         locales = {}
+        locale_codes = []
         for md_file in sorted(folder.glob("*.md")):
             locale_code = md_file.stem
+            locale_codes.append(locale_code)
             locales[locale_code] = {
                 "created": now,
                 "modified_contents": now,
-                "title": title,
                 "public": True,
             }
 
         # Ensure at least an 'en' entry
         if not locales:
+            locale_codes.append("en")
             locales["en"] = {
                 "created": now,
                 "modified_contents": now,
-                "title": title,
                 "public": True,
             }
+
+        titles = {code: title for code in locale_codes}
 
         return {
             "categories": [],
             "source_locale": "en",
+            "titles": titles,
             "locales": locales,
         }
 
@@ -137,13 +141,23 @@ class DocumentManager:
                 if category_slug not in cats:
                     continue
 
-            locale_info = meta.get("locales", {})
-            loc = locale_info.get(locale) or locale_info.get("en") or {}
-            title = loc.get("title", folder_name)
+            titles = meta.get("titles", {})
+            title = titles.get(locale) or titles.get("en") or folder_name
             results.append({"folder_name": folder_name, "title": title})
 
         results.sort(key=lambda d: d["title"].lower())
         return results
+
+    def get_document_metadata(self, folder_name: str) -> dict | None:
+        """Return the full metadata dict for a document, or None."""
+        return self._documents.get(folder_name)
+
+    def get_document_locale_count(self, folder_name: str) -> int:
+        """Return the number of locales for a document."""
+        meta = self._documents.get(folder_name)
+        if meta is None:
+            return 0
+        return len(meta.get("locales", {}))
 
     def get_document_content(self, folder_name: str, locale: str) -> str | None:
         """Read a document's ``.md`` file for the given locale."""
@@ -190,7 +204,6 @@ class DocumentManager:
             locales[locale] = {
                 "created": now,
                 "modified_contents": now,
-                "title": folder_name.replace("_", " ").title(),
                 "public": True,
             }
         self._save_document_metadata(folder_name)
@@ -221,11 +234,11 @@ class DocumentManager:
         meta = {
             "categories": categories,
             "source_locale": locale,
+            "titles": {locale: title},
             "locales": {
                 locale: {
                     "created": now,
                     "modified_contents": now,
-                    "title": title,
                     "public": True,
                 }
             },
@@ -235,6 +248,120 @@ class DocumentManager:
 
         md_path = doc_dir / f"{locale}.md"
         md_path.write_text(content, encoding="utf-8")
+        return True
+
+    def set_document_title(
+        self, folder_name: str, locale: str, title: str
+    ) -> bool:
+        """Update the title for a locale in document metadata.
+
+        Titles are stored separately from locale entries, so setting a title
+        for a locale that has no translation yet does not create a locale entry.
+
+        Returns ``True`` on success, ``False`` if the document is not found.
+        """
+        meta = self._documents.get(folder_name)
+        if meta is None:
+            return False
+        titles = meta.setdefault("titles", {})
+        titles[locale] = title
+        self._save_document_metadata(folder_name)
+        return True
+
+    def set_document_visibility(
+        self, folder_name: str, locale: str, public: bool
+    ) -> bool:
+        """Update the public flag for a locale in document metadata.
+
+        Returns ``True`` on success, ``False`` if document or locale not found.
+        """
+        meta = self._documents.get(folder_name)
+        if meta is None:
+            return False
+        locales = meta.get("locales", {})
+        if locale not in locales:
+            return False
+        locales[locale]["public"] = public
+        self._save_document_metadata(folder_name)
+        return True
+
+    def set_document_categories(
+        self, folder_name: str, categories: list[str]
+    ) -> bool:
+        """Replace the category list for a document.
+
+        Returns ``True`` on success, ``False`` if document not found.
+        """
+        meta = self._documents.get(folder_name)
+        if meta is None:
+            return False
+        meta["categories"] = categories
+        self._save_document_metadata(folder_name)
+        return True
+
+    def add_document_translation(
+        self, folder_name: str, locale: str, title: str, content: str
+    ) -> bool:
+        """Create a new locale entry (private by default) and write the .md file.
+
+        Returns ``False`` if the document doesn't exist or the locale already exists.
+        """
+        meta = self._documents.get(folder_name)
+        if meta is None:
+            return False
+        locales = meta.setdefault("locales", {})
+        if locale in locales:
+            return False
+        now = datetime.now(timezone.utc).isoformat()
+        locales[locale] = {
+            "created": now,
+            "modified_contents": now,
+            "public": False,
+        }
+        titles = meta.setdefault("titles", {})
+        titles[locale] = title
+        md_path = self._dir / folder_name / f"{locale}.md"
+        md_path.write_text(content, encoding="utf-8")
+        self._save_document_metadata(folder_name)
+        return True
+
+    def remove_document_translation(self, folder_name: str, locale: str) -> bool:
+        """Delete a locale entry, its .md file, and history backups.
+
+        Returns ``False`` if the locale is the source locale or doesn't exist.
+        """
+        meta = self._documents.get(folder_name)
+        if meta is None:
+            return False
+        if meta.get("source_locale") == locale:
+            return False
+        locales = meta.get("locales", {})
+        if locale not in locales:
+            return False
+        del locales[locale]
+        meta.get("titles", {}).pop(locale, None)
+        md_path = self._dir / folder_name / f"{locale}.md"
+        if md_path.exists():
+            md_path.unlink()
+        # Remove history backups for this locale
+        history_dir = self._dir / folder_name / "_history"
+        if history_dir.exists():
+            for backup in history_dir.glob(f"{locale}_*.md"):
+                backup.unlink()
+        self._save_document_metadata(folder_name)
+        return True
+
+    def delete_document(self, folder_name: str) -> bool:
+        """Remove a document folder from disk and from memory.
+
+        Returns ``False`` if the document doesn't exist.
+        """
+        if folder_name not in self._documents:
+            return False
+        doc_dir = self._dir / folder_name
+        if doc_dir.exists():
+            shutil.rmtree(doc_dir)
+        del self._documents[folder_name]
         return True
 
     def create_category(self, slug: str, name: str, locale: str) -> bool:

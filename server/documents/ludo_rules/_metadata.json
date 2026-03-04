@@ -1,11 +1,13 @@
 {
     "categories": [],
     "source_locale": "en",
+    "titles": {
+        "en": "Ludo Rules"
+    },
     "locales": {
         "en": {
-            "created": "2026-02-28T07:15:54.990811+00:00",
-            "modified_contents": "2026-02-28T07:15:54.990811+00:00",
-            "title": "Ludo Rules",
+            "created": "2026-03-04T03:09:05.628985+00:00",
+            "modified_contents": "2026-03-04T03:09:05.628985+00:00",
             "public": true
         }
     }

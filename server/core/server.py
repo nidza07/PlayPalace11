@@ -1886,16 +1886,7 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
             "game_leaderboard": (self._handle_game_leaderboard_selection, (user, selection_id, state)),
             "my_stats_menu": (self._handle_my_stats_selection, (user, selection_id, state)),
             "my_game_stats": (self._handle_my_game_stats_selection, (user, selection_id, state)),
-            "documents_menu": (self._handle_documents_menu_selection, (user, selection_id, state)),
-            "documents_list_menu": (self._handle_documents_list_selection, (user, selection_id, state)),
-            "transcribers_for_language_menu": (self._handle_transcribers_for_language_selection, (user, selection_id, state)),
-            "transcriber_remove_confirm": (self._handle_transcriber_remove_confirm, (user, selection_id, state)),
-            "add_transcriber_users_menu": (self._handle_add_transcriber_users_selection, (user, selection_id, state)),
-            "transcribers_by_user_menu": (self._handle_transcribers_by_user_selection, (user, selection_id, state)),
-            "add_transcriber_user_picker_menu": (self._handle_add_transcriber_user_picker_selection, (user, selection_id, state)),
-            "transcriber_user_languages_menu": (self._handle_transcriber_user_languages_selection, (user, selection_id, state)),
-            "transcriber_remove_lang_confirm": (self._handle_transcriber_remove_lang_confirm, (user, selection_id, state)),
-            "transcriber_remove_all_confirm": (self._handle_transcriber_remove_all_confirm, (user, selection_id, state)),
+            **self._get_document_menu_handlers(user, selection_id, state),
             "online_users": (self._restore_previous_menu, (user, state)),
             "admin_menu": (self._handle_admin_menu_selection, (user, selection_id)),
             "account_approval_menu": (self._handle_account_approval_selection, (user, selection_id)),
@@ -3679,9 +3670,7 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
         state = self._user_states.get(username, {})
         current_menu = state.get("menu")
 
-        if current_menu == "document_view":
-            category_slug = state.get("category_slug")
-            self._show_documents_list(user, category_slug)
+        if await self._handle_document_editbox(user, current_menu, packet, state):
             return
 
         if current_menu == "decline_reason_editbox":

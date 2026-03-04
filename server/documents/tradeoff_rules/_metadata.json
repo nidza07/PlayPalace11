@@ -1,11 +1,13 @@
 {
     "categories": [],
     "source_locale": "en",
+    "titles": {
+        "en": "Tradeoff Rules"
+    },
     "locales": {
         "en": {
-            "created": "2026-02-28T07:15:54.997452+00:00",
-            "modified_contents": "2026-02-28T07:15:54.997452+00:00",
-            "title": "Tradeoff Rules",
+            "created": "2026-03-04T03:09:05.633744+00:00",
+            "modified_contents": "2026-03-04T03:09:05.633744+00:00",
             "public": true
         }
     }
