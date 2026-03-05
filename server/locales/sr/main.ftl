@@ -23,6 +23,7 @@ back = Nazad
 done = Gotovo
 context-menu = Kontekstni meni.
 no-actions-available = Nema dostupnih radnji.
+placeholder-feature = Ova opcija je u fazi razmatranja, tako da je trenutno nedostupna.
 create-table = Napravi novi sto
 join-as-player = Pridruži se kao igrač
 join-as-spectator = Pridruži se kao posmatrač
@@ -68,6 +69,10 @@ spectator-left = { $player } više ne posmatra.
 # Opšte
 welcome = Dobrodošli u PlayPalace!
 goodbye = Doviđenja!
+
+# Visibility control
+visibility-public = Javno
+visibility-private = Privatno
 
 # User presence announcements
 user-online = { $player } je na mreži.
@@ -368,6 +373,32 @@ documents-all = Svi dokumenti
 documents-uncategorized = Nekategorisani dokumenti
 documents-no-documents = Nema pronađenih dokumenata.
 documents-no-content = Nema dostupnog sadržaja u ovom dokumentu.
+
+# Document actions
+documents-view = Prikaži sadržaj dokumenta
+documents-update-contents = Uredi sadržaj dokumenta
+documents-settings = Podešavanja dokumenta
+documents-update-title = Promeni naslov
+documents-manage-visibility = Promeni vidljivost
+documents-modify-categories = Izmeni listu kategorija
+documents-add-translation = Dodaj prevod
+documents-remove-translation = Ukloni prevod
+documents-delete-document = Obriši dokument
+documents-title-prompt = Upišite naslov dokumenta za { $language } prevod:
+documents-title-changed = Naslov ažuriran za { $language }.
+documents-visibility-changed = Vidljivost ažurirana za { $language }.
+documents-visibility-no-permission = Nemate dozvolu da promenite vidljivost za { $language }.
+documents-categories-updated = Kategorije su ažurirane.
+documents-content-prompt = Upišite sadržaj za { $language } prevod:
+documents-translation-added = Prevod na { $language } je dodat.
+documents-no-languages-available = Nema dostupnih jezika za prevođenje.
+documents-remove-translation-confirm = Da li želite da uklonite { $language } prevod? Ovo se ne može poništiti.
+documents-remove-translation-source = Izvorni dokument se ne može ukloniti.
+documents-translation-removed = { $language } prevod je uklonjen.
+documents-delete-confirm = Obrisati ovaj dokument? Ima { $count } prevoda. Ovo se ne može poništiti.
+documents-deleted = Dokument je obrisan.
+documents-no-permission = Nemate nijedan aktuelan dodeljen jezik za ovaj dokument.
+documents-visibility-count = Promeni vidljivost ({ $public }/{ $total } javnih jezika)
 
 # Transcriber management
 transcribers-by-language = Prikaži prepisivače po jezicima
