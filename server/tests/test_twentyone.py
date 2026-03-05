@@ -315,6 +315,7 @@ def test_twentyone_mind_tax_discards_half_at_round_end() -> None:
     p2.modifiers = [MODIFIER_RAISE_1, MODIFIER_RAISE_2, MODIFIER_GUARD, MODIFIER_REDRAFT]
 
     game._settle_round()
+    game._resolve_pending_round()
 
     assert len(p2.modifiers) == 2
 
@@ -1259,6 +1260,52 @@ def test_twentyone_round_settle_transition_plays_resolve_sound() -> None:
     assert twentyone_module.SOUND_ROUND_RESOLVE in guest_user.get_sounds_played()
 
 
+def test_twentyone_round_settle_delays_damage_within_between_round_window() -> None:
+    game, p1, p2 = setup_game()
+    game.status = "playing"
+    game.game_active = True
+    game.phase = "turns"
+    p1.hp = 10
+    p2.hp = 10
+    p1.hand = [make_card(1, 10), make_card(2, 9)]  # 19
+    p2.hand = [make_card(3, 8), make_card(4, 9)]  # 17
+
+    game._settle_round()
+
+    assert game.phase == "between_rounds"
+    assert game.next_round_wait_ticks == 100
+    assert game.round_resolution_wait_ticks == twentyone_module.BETWEEN_ROUND_RESOLVE_DELAY_TICKS
+    assert p2.hp == 10
+
+    for _ in range(twentyone_module.BETWEEN_ROUND_RESOLVE_DELAY_TICKS - 1):
+        game.on_tick()
+    assert p2.hp == 10
+
+    game.on_tick()
+    assert p2.hp == 9
+
+
+def test_twentyone_between_round_pause_lasts_100_ticks() -> None:
+    game, p1, p2 = setup_game()
+    game.status = "playing"
+    game.game_active = True
+    game.phase = "turns"
+    p1.hp = 10
+    p2.hp = 10
+    p1.hand = [make_card(1, 10), make_card(2, 9)]  # 19
+    p2.hand = [make_card(3, 8), make_card(4, 9)]  # 17
+
+    game._settle_round()
+
+    for _ in range(99):
+        game.on_tick()
+    assert game.phase == "between_rounds"
+
+    game.on_tick()
+    assert game.phase == "turns"
+    assert game.round_number == 1
+
+
 def test_twentyone_modifier_play_between_stands_resets_pending_stands() -> None:
     game, p1, p2 = setup_game()
     game.status = "playing"
@@ -1292,6 +1339,7 @@ def test_twentyone_both_bust_closer_to_target_wins() -> None:
     p2.hand = [make_card(3, 11), make_card(4, 11), make_card(5, 1)]  # 23
 
     game._settle_round()
+    game._resolve_pending_round()
 
     assert p1.hp == 10
     assert p2.hp == 9
@@ -1314,6 +1362,7 @@ def test_twentyone_round_outcome_plays_private_win_lose_sounds() -> None:
     host_user.clear_messages()
     guest_user.clear_messages()
     game._settle_round()
+    game._resolve_pending_round()
 
     assert twentyone_module.SOUND_ROUND_WIN in host_user.get_sounds_played()
     assert twentyone_module.SOUND_ROUND_LOSE in guest_user.get_sounds_played()
@@ -1463,9 +1512,8 @@ def test_twentyone_bot_turn_advances_when_change_cards_are_unplayable() -> None:
     p2.bot_think_ticks = 0
     p2.bot_pending_action = None
 
-    game.on_tick()
-    game.on_tick()
-    game.on_tick()
+    for _ in range(twentyone_module.BOT_DRAW_STAND_DELAY_TICKS + 2):
+        game.on_tick()
 
     assert game.current_player == p1
     assert p2.stand_pending is True

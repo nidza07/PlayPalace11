@@ -225,6 +225,10 @@ SOUND_DAMAGE_HEAVY = "game_crazyeights/hitmark.ogg"
 SOUND_GAME_WIN = "game_pig/wingame.ogg"
 SOUND_GAME_NO_WIN = "game_crazyeights/pileempty.ogg"
 
+BETWEEN_ROUND_WAIT_TICKS = 100
+BETWEEN_ROUND_RESOLVE_DELAY_TICKS = 20
+BOT_DRAW_STAND_DELAY_TICKS = 40
+
 
 @dataclass
 class TwentyOneOptions(GameOptions):
@@ -235,7 +239,7 @@ class TwentyOneOptions(GameOptions):
     starting_modifiers_per_round: int = 1
     draw_modifier_chance_percent: int = 35
     deck_count: int = 1
-    next_round_wait_ticks: int = 30
+    next_round_wait_ticks: int = BETWEEN_ROUND_WAIT_TICKS
 
 
 @dataclass
@@ -263,6 +267,11 @@ class TwentyOneGame(ActionGuardMixin, Game):
     round_number: int = 0
     round_starter_index: int = 0
     next_round_wait_ticks: int = 0
+    round_resolution_wait_ticks: int = 0
+    pending_round_player_ids: tuple[str, str] | None = None
+    pending_round_totals: tuple[int, int] = (0, 0)
+    pending_round_target: int = 21
+    pending_round_outcome: str | None = None
     modifier_used_since_last_stand_resolution: bool = False
 
     @classmethod
@@ -846,6 +855,7 @@ class TwentyOneGame(ActionGuardMixin, Game):
         self.round_number = 0
         self.round_starter_index = 0
         self.next_round_wait_ticks = 0
+        self._clear_pending_round_resolution()
         self.modifier_used_since_last_stand_resolution = False
 
         active = self.get_active_players()
@@ -873,14 +883,20 @@ class TwentyOneGame(ActionGuardMixin, Game):
             return
 
         if self.phase == "between_rounds":
+            if self.round_resolution_wait_ticks > 0:
+                self.round_resolution_wait_ticks -= 1
+                if self.round_resolution_wait_ticks == 0:
+                    self._resolve_pending_round()
+                    if self.phase != "between_rounds":
+                        return
             if self.next_round_wait_ticks > 0:
                 self.next_round_wait_ticks -= 1
-            if self.next_round_wait_ticks <= 0:
+            if self.next_round_wait_ticks <= 0 and self.pending_round_outcome is None:
                 self._start_round(rotate_starter=True)
             return
 
         if self.phase == "turns":
-            BotHelper.on_tick(self)
+            self._process_bot_turn()
 
     def _start_round(self, *, rotate_starter: bool) -> None:
         alive = self._alive_players()
@@ -895,6 +911,8 @@ class TwentyOneGame(ActionGuardMixin, Game):
 
         self.phase = "turns"
         self.round_number += 1
+        self.next_round_wait_ticks = 0
+        self._clear_pending_round_resolution()
         self.modifier_used_since_last_stand_resolution = False
         self.play_sound(SOUND_ROUND_START, volume=70)
 
@@ -960,8 +978,6 @@ class TwentyOneGame(ActionGuardMixin, Game):
             self._play_target_reminder_sound(current)
             if self._modifiers_locked_for(current):
                 self._play_sound_for_player(current, SOUND_LOCKDOWN_ACTIVE, volume=65)
-            if current.is_bot:
-                BotHelper.jolt_bot(current, ticks=random.randint(8, 16))  # nosec B311
         self.rebuild_all_menus()
 
     def _advance_turn_after_action(self) -> None:
@@ -976,8 +992,6 @@ class TwentyOneGame(ActionGuardMixin, Game):
             self._play_target_reminder_sound(current)
             if self._modifiers_locked_for(current):
                 self._play_sound_for_player(current, SOUND_LOCKDOWN_ACTIVE, volume=65)
-            if current.is_bot:
-                BotHelper.jolt_bot(current, ticks=random.randint(8, 16))  # nosec B311
         self.rebuild_all_menus()
 
     def _settle_round(self) -> None:
@@ -1004,6 +1018,40 @@ class TwentyOneGame(ActionGuardMixin, Game):
         )
 
         outcome = self._resolve_round_outcome(total_1, total_2, target)
+        self.pending_round_player_ids = (p1.id, p2.id)
+        self.pending_round_totals = (total_1, total_2)
+        self.pending_round_target = target
+        self.pending_round_outcome = outcome
+        self.round_resolution_wait_ticks = BETWEEN_ROUND_RESOLVE_DELAY_TICKS
+
+        configured_wait = max(0, self.options.next_round_wait_ticks)
+        self.next_round_wait_ticks = max(BETWEEN_ROUND_WAIT_TICKS, configured_wait)
+        self.rebuild_all_menus()
+
+    def _clear_pending_round_resolution(self) -> None:
+        self.round_resolution_wait_ticks = 0
+        self.pending_round_player_ids = None
+        self.pending_round_totals = (0, 0)
+        self.pending_round_target = 21
+        self.pending_round_outcome = None
+
+    def _resolve_pending_round(self) -> None:
+        player_ids = self.pending_round_player_ids
+        outcome = self.pending_round_outcome
+        if not player_ids or outcome is None:
+            self._clear_pending_round_resolution()
+            return
+
+        p1 = self.get_player_by_id(player_ids[0])
+        p2 = self.get_player_by_id(player_ids[1])
+        if not isinstance(p1, TwentyOnePlayer) or not isinstance(p2, TwentyOnePlayer):
+            self._clear_pending_round_resolution()
+            return
+
+        target = self.pending_round_target
+        total_1, total_2 = self.pending_round_totals
+        bust_1 = total_1 > target
+        bust_2 = total_2 > target
 
         if outcome == "p1_wins":
             self._apply_round_loss_damage(p2)
@@ -1030,13 +1078,35 @@ class TwentyOneGame(ActionGuardMixin, Game):
             self._play_sound_for_player(p2, SOUND_BUST)
 
         self._sync_hp_scores()
+        self._clear_pending_round_resolution()
         survivors = self._alive_players()
         if len(survivors) <= 1:
             self._end_game(survivors[0] if survivors else None)
             return
-
-        self.next_round_wait_ticks = max(0, self.options.next_round_wait_ticks)
         self.rebuild_all_menus()
+
+    def _process_bot_turn(self) -> None:
+        current = self.current_player
+        if not isinstance(current, TwentyOnePlayer) or not current.is_bot:
+            return
+
+        if current.bot_think_ticks > 0:
+            current.bot_think_ticks -= 1
+            if current.bot_think_ticks > 0:
+                return
+
+        if current.bot_pending_action:
+            action_id = current.bot_pending_action
+            current.bot_pending_action = None
+            self.execute_action(current, action_id)
+            return
+
+        action_id = self.bot_think(current)
+        if not action_id:
+            return
+        current.bot_pending_action = action_id
+        if action_id in {"hit", "stand"}:
+            current.bot_think_ticks = BOT_DRAW_STAND_DELAY_TICKS
 
     @staticmethod
     def _resolve_round_outcome(total_1: int, total_2: int, target: int) -> str:
@@ -1719,6 +1789,7 @@ class TwentyOneGame(ActionGuardMixin, Game):
         if modifier == MODIFIER_ROUND_ERASE:
             self.phase = "between_rounds"
             self.next_round_wait_ticks = 0
+            self._clear_pending_round_resolution()
             self.broadcast_l("twentyone-round-erased")
             return
 
