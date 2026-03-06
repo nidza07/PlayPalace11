@@ -31,3 +31,14 @@ When verifying theme changes, check:
 - menu selection state
 - history and chat readability
 - both desktop and narrow/mobile widths
+
+## Session Verification
+
+The web client now retries unexpected disconnects automatically for up to 60 seconds when a saved session or refresh token is available.
+
+When verifying reconnect behavior, check:
+- valid saved auth still restores a session on page load
+- unexpected disconnect starts reconnect attempts automatically
+- manual disconnect does not auto reconnect
+- reconnect stops after 60 seconds and returns to the login dialog
+- reconnect success restores normal in-game state without reopening the login dialog mid-retry
