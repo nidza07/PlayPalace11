@@ -57,6 +57,7 @@ class FarkleOptions(GameOptions):
             label="farkle-set-target-score",
             prompt="farkle-enter-target-score",
             change_msg="farkle-option-changed-target",
+            description="farkle-desc-target-score",
         )
     )
     initial_bank_score: int = option_field(

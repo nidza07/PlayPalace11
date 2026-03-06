@@ -43,6 +43,7 @@ class PigOptions(GameOptions):
             label="game-set-target-score",
             prompt="game-enter-target-score",
             change_msg="game-option-changed-target",
+            description="pig-desc-target-score",
         )
     )
     min_bank_points: int = option_field(
@@ -54,6 +55,7 @@ class PigOptions(GameOptions):
             label="pig-set-min-bank",
             prompt="pig-enter-min-bank",
             change_msg="pig-option-changed-min-bank",
+            description="pig-desc-min-bank",
         )
     )
     dice_sides: int = option_field(
@@ -65,6 +67,7 @@ class PigOptions(GameOptions):
             label="pig-set-dice-sides",
             prompt="pig-enter-dice-sides",
             change_msg="pig-option-changed-dice",
+            description="pig-desc-dice-sides",
         )
     )
     team_mode: str = option_field(

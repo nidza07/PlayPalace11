@@ -33,6 +33,7 @@ class MetalPipeOptions(GameOptions):
             value_key="enabled",
             label="metalpipe-set-multiple-bonks",
             change_msg="metalpipe-option-changed-multiple-bonks",
+            description="metalpipe-desc-multiple-bonks",
         )
     )
     allow_self_bonk: bool = option_field(
@@ -41,6 +42,7 @@ class MetalPipeOptions(GameOptions):
             value_key="enabled",
             label="metalpipe-set-allow-self-bonk",
             change_msg="metalpipe-option-changed-allow-self-bonk",
+            description="metalpipe-desc-allow-self-bonk",
         )
     )
 

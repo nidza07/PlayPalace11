@@ -48,6 +48,7 @@ class TossUpOptions(GameOptions):
             label="game-set-target-score",
             prompt="game-enter-target-score",
             change_msg="game-option-changed-target",
+            description="tossup-desc-target-score",
         )
     )
     starting_dice: int = option_field(
@@ -59,6 +60,7 @@ class TossUpOptions(GameOptions):
             label="tossup-set-starting-dice",
             prompt="tossup-enter-starting-dice",
             change_msg="tossup-option-changed-dice",
+            description="tossup-desc-starting-dice",
         )
     )
     rules_variant: str = option_field(
@@ -69,6 +71,7 @@ class TossUpOptions(GameOptions):
             label="tossup-set-rules-variant",
             prompt="tossup-select-rules-variant",
             change_msg="tossup-option-changed-rules",
+            description="tossup-desc-rules",
         )
     )
 

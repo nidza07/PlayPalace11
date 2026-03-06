@@ -45,6 +45,7 @@ class ThreesOptions(GameOptions):
             label="threes-set-rounds",
             prompt="threes-enter-rounds",
             change_msg="threes-option-changed-rounds",
+            description="threes-desc-rounds",
         )
     )
 

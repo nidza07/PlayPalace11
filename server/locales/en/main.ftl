@@ -73,6 +73,8 @@ goodbye = Goodbye!
 # Visibility control
 visibility-public = public
 visibility-private = private
+visibility-available = available
+visibility-unavailable = unavailable
 
 # User presence announcements
 user-online = { $player } came online.
@@ -85,16 +87,20 @@ online-users-many = { $count } users: { $users }
 online-user-not-in-game = Not in game
 online-user-waiting-approval = Waiting for approval
 
+# Action states
+action-locked = This action is currently unavailable.
+
+# Option states and helpers
+option-on = On
+option-off = Off
+option-locked = This option is currently locked by another setting.
+
 # Options
 language = Language
 language-option = Language: { $language }
 language-changed = Language set to { $language }.
 
 fluent-languages-option = Fluent languages ({ $count })
-
-# Boolean option states
-option-on = On
-option-off = Off
 
 # Sound options
 turn-sound-option = Turn sound: { $status }
