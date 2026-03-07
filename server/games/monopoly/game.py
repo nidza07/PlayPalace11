@@ -13,6 +13,7 @@ from ...game_utils.actions import Action, ActionSet, EditboxInput, Visibility, M
 from ...game_utils.options import MenuOption, option_field
 from ...messages.localization import Localization
 from ...core.ui.keybinds import KeybindState
+from ...core.users.base import EscapeBehavior, MenuItem
 from .banking_sim import (
     BANK_ACCOUNT_ID,
     BankingState,
@@ -603,6 +604,7 @@ class MonopolyGame(ActionGuardMixin, Game):
     mortgaged_space_ids: list[str] = field(default_factory=list)
     building_levels: dict[str, int] = field(default_factory=dict)
     pending_trade_offer: MonopolyTradeOffer | None = None
+    deed_browse_owner_by_viewer_id: dict[str, str] = field(default_factory=dict)
     free_parking_pool: int = 0
     pending_auction_space_id: str = ""
     pending_auction_bidder_ids: list[str] = field(default_factory=list)
@@ -668,6 +670,7 @@ class MonopolyGame(ActionGuardMixin, Game):
                 handler="_action_buy_property",
                 is_enabled="_is_buy_property_enabled",
                 is_hidden="_is_buy_property_hidden",
+                get_label="_get_buy_property_label",
             )
         )
 
@@ -925,14 +928,44 @@ class MonopolyGame(ActionGuardMixin, Game):
             "shift+b", "Bank transfer", ["banking_transfer"], state=KeybindState.ACTIVE
         )
         self.define_keybind("alt+b", "Bank ledger", ["banking_ledger"], state=KeybindState.ACTIVE)
-        self.define_keybind("v", "Voice command", ["voice_command"], state=KeybindState.ACTIVE)
+        self.define_keybind("alt+v", "Voice command", ["voice_command"], state=KeybindState.ACTIVE)
         self.define_keybind("e", "End turn", ["end_turn"], state=KeybindState.ACTIVE)
 
     def _define_preset_announcement_keybind(self) -> None:
         self.define_keybind(
-            "p",
+            "o",
             "Announce current preset",
             ["announce_preset"],
+            state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+
+    def _define_deed_and_property_keybinds(self) -> None:
+        self.define_keybind(
+            "d",
+            "View active deed",
+            ["view_active_deed"],
+            state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+        self.define_keybind(
+            "shift+d",
+            "Browse all deeds",
+            ["browse_all_deeds"],
+            state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+        self.define_keybind(
+            "p",
+            "View my properties",
+            ["view_my_properties"],
+            state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+        self.define_keybind(
+            "shift+p",
+            "Browse player properties",
+            ["view_player_properties"],
             state=KeybindState.ACTIVE,
             include_spectators=True,
         )
@@ -944,15 +977,93 @@ class MonopolyGame(ActionGuardMixin, Game):
         self._define_property_trade_jail_keybinds()
         self._define_banking_and_voice_keybinds()
         self._define_preset_announcement_keybind()
+        self._define_deed_and_property_keybinds()
 
     def _add_standard_monopoly_actions(self, action_set: ActionSet, locale: str) -> None:
-        action_set.add(
+        local_actions = [
+            Action(
+                id="view_active_deed",
+                label=Localization.get(locale, "monopoly-view-active-deed"),
+                handler="_action_view_active_deed",
+                is_enabled="_is_view_active_deed_enabled",
+                is_hidden="_is_view_active_deed_hidden",
+                get_label="_get_view_active_deed_label",
+            ),
+            Action(
+                id="browse_all_deeds",
+                label=Localization.get(locale, "monopoly-browse-all-deeds"),
+                handler="_action_browse_all_deeds",
+                is_enabled="_is_browse_all_deeds_enabled",
+                is_hidden="_is_always_hidden",
+            ),
+            Action(
+                id="view_my_properties",
+                label=Localization.get(locale, "monopoly-view-my-properties"),
+                handler="_action_view_my_properties",
+                is_enabled="_is_view_my_properties_enabled",
+                is_hidden="_is_always_hidden",
+            ),
+            Action(
+                id="view_player_properties",
+                label=Localization.get(locale, "monopoly-view-player-properties"),
+                handler="_action_view_player_properties",
+                is_enabled="_is_view_player_properties_enabled",
+                is_hidden="_is_always_hidden",
+            ),
             Action(
                 id="announce_preset",
                 label=Localization.get(locale, "monopoly-announce-preset"),
                 handler="_action_announce_preset",
                 is_enabled="_is_announce_preset_enabled",
                 is_hidden="_is_announce_preset_hidden",
+            ),
+        ]
+        for action in local_actions:
+            action_set.add(action)
+        for action in reversed(local_actions):
+            if action.id in action_set._order:
+                action_set._order.remove(action.id)
+            action_set._order.insert(0, action.id)
+        action_set.add(
+            Action(
+                id="view_selected_deed",
+                label=Localization.get(locale, "monopoly-view-selected-deed"),
+                handler="_action_view_selected_deed",
+                is_enabled="_is_view_selected_deed_enabled",
+                is_hidden="_is_always_hidden",
+                show_in_actions_menu=False,
+                input_request=MenuInput(
+                    prompt="monopoly-select-property-deed",
+                    options="_options_for_deed_browser_selection",
+                ),
+            )
+        )
+        action_set.add(
+            Action(
+                id="select_player_property_owner",
+                label=Localization.get(locale, "monopoly-select-player-properties"),
+                handler="_action_select_player_property_owner",
+                is_enabled="_is_view_player_properties_enabled",
+                is_hidden="_is_always_hidden",
+                show_in_actions_menu=False,
+                input_request=MenuInput(
+                    prompt="monopoly-select-player-properties",
+                    options="_options_for_player_property_owners",
+                ),
+            )
+        )
+        action_set.add(
+            Action(
+                id="view_selected_owner_property_deed",
+                label=Localization.get(locale, "monopoly-view-selected-owner-property-deed"),
+                handler="_action_view_selected_owner_property_deed",
+                is_enabled="_is_view_selected_owner_property_deed_enabled",
+                is_hidden="_is_always_hidden",
+                show_in_actions_menu=False,
+                input_request=MenuInput(
+                    prompt="monopoly-select-player-property-deed",
+                    options="_options_for_selected_owner_property_deeds",
+                ),
             )
         )
 
@@ -963,6 +1074,25 @@ class MonopolyGame(ActionGuardMixin, Game):
         locale = user.locale if user else "en"
         self._add_standard_monopoly_actions(action_set, locale)
         return action_set
+
+    def guard_turn_action_enabled(
+        self,
+        player: Player,
+        *,
+        allow_spectators: bool = False,
+        require_current_player: bool = True,
+    ) -> str | None:
+        """Block Monopoly turn actions while movement animation is in progress."""
+        error = super().guard_turn_action_enabled(
+            player,
+            allow_spectators=allow_spectators,
+            require_current_player=require_current_player,
+        )
+        if error:
+            return error
+        if self.is_animating:
+            return "action-game-in-progress"
+        return None
 
     def get_available_preset_ids(self) -> list[str]:
         """Return selectable preset ids from generated catalog artifacts."""
@@ -1217,6 +1347,371 @@ class MonopolyGame(ActionGuardMixin, Game):
             preset=preset_name,
             count=len(self.active_edition_ids),
         )
+
+    def _deed_capable_spaces_in_board_order(self) -> list[MonopolySpace]:
+        """Return all purchasable spaces that can render deed text."""
+        return [space for space in self.active_board_spaces if space.kind in PURCHASABLE_KINDS]
+
+    def _active_deed_space(self) -> MonopolySpace | None:
+        """Return active deed target for quick deed lookup."""
+        pending = self._pending_purchase_space()
+        if pending and pending.kind in PURCHASABLE_KINDS:
+            return pending
+        auction = self._pending_auction_space()
+        if auction and auction.kind in PURCHASABLE_KINDS:
+            return auction
+        current = self.current_player
+        if not current or not isinstance(current, MonopolyPlayer) or self.active_board_size <= 0:
+            return None
+        landed = self._space_at(current.position)
+        if landed.kind not in PURCHASABLE_KINDS:
+            return None
+        return landed
+
+    def _owner_name_for_space(self, space_id: str) -> str:
+        """Return owner name for one space id."""
+        owner_id = self.property_owners.get(space_id, "")
+        if not owner_id:
+            return "Bank"
+        owner = self.get_player_by_id(owner_id)
+        return owner.name if owner else "Unknown"
+
+    def _building_status_text(self, space: MonopolySpace) -> str:
+        """Return compact building status text for property summaries."""
+        if not self._is_street_property(space):
+            return ""
+        level = self._building_level(space.space_id)
+        if level <= 0:
+            return ""
+        if level >= 5:
+            return "with hotel"
+        if level == 1:
+            return "with 1 house"
+        return f"with {level} houses"
+
+    def _deed_menu_label(self, space: MonopolySpace) -> str:
+        """Build one concise menu label for deed browsing."""
+        owner = self._owner_name_for_space(space.space_id)
+        building = self._building_status_text(space)
+        mortgaged = "mortgaged" if self._is_space_mortgaged(space.space_id) else ""
+        extras = ", ".join([part for part in (building, mortgaged) if part])
+        if extras:
+            return f"{space.name} ({owner}; {extras})"
+        return f"{space.name} ({owner})"
+
+    def _sorted_owned_space_ids(self, owner_id: str) -> list[str]:
+        """Return owner's deed-capable spaces sorted by board index."""
+        spaces: list[MonopolySpace] = []
+        for space_id, mapped_owner_id in self.property_owners.items():
+            if mapped_owner_id != owner_id:
+                continue
+            space = self.active_space_by_id.get(space_id)
+            if not space or space.kind not in PURCHASABLE_KINDS:
+                continue
+            spaces.append(space)
+        spaces.sort(key=lambda space: space.index)
+        return [space.space_id for space in spaces]
+
+    def _deed_lines(self, space: MonopolySpace) -> list[str]:
+        """Render one title deed as multiline status text."""
+        lines = [space.name]
+        if self._is_street_property(space):
+            color = space.color_group.replace("_", " ").title()
+            lines.append(f"Type: {color} color group")
+        elif space.kind == "railroad":
+            lines.append("Type: Railroad")
+        elif space.kind == "utility":
+            lines.append("Type: Utility")
+        else:
+            lines.append(f"Type: {space.kind.title()}")
+        if space.price > 0:
+            lines.append(f"Purchase price: ${space.price}")
+
+        if self._is_street_property(space):
+            base_rent = space.rents[0] if space.rents else space.rent
+            lines.append(f"Rent: ${base_rent}")
+            lines.append(f"If owner has full color set: ${base_rent * 2}")
+            if space.rents:
+                if len(space.rents) > 1:
+                    lines.append(f"With 1 house: ${space.rents[1]}")
+                if len(space.rents) > 2:
+                    lines.append(f"With 2 houses: ${space.rents[2]}")
+                if len(space.rents) > 3:
+                    lines.append(f"With 3 houses: ${space.rents[3]}")
+                if len(space.rents) > 4:
+                    lines.append(f"With 4 houses: ${space.rents[4]}")
+                if len(space.rents) > 5:
+                    lines.append(f"With hotel: ${space.rents[5]}")
+            if space.house_cost > 0:
+                lines.append(f"House cost: ${space.house_cost}")
+        elif space.kind == "railroad":
+            lines.append("Rent with 1 railroad: $25")
+            lines.append("Rent with 2 railroads: $50")
+            lines.append("Rent with 3 railroads: $100")
+            lines.append("Rent with 4 railroads: $200")
+        elif space.kind == "utility":
+            lines.append("If one utility is owned: 4x dice roll")
+            lines.append("If both utilities are owned: 10x dice roll")
+            lines.append("Utility base rent (legacy fallback): $20")
+        else:
+            lines.append(f"Rent: ${space.rent}")
+
+        lines.append(f"Mortgage value: ${self._mortgage_value(space)}")
+        lines.append(f"Unmortgage cost: ${self._unmortgage_cost(space)}")
+        lines.append(f"Owner: {self._owner_name_for_space(space.space_id)}")
+
+        building = self._building_status_text(space)
+        if building:
+            lines.append(f"Current buildings: {building}")
+        if self._is_space_mortgaged(space.space_id):
+            lines.append("Status: Mortgaged")
+        return lines
+
+    def _open_deed_selection_menu(
+        self,
+        player: Player,
+        *,
+        space_ids: list[str],
+        pending_action_id: str,
+        empty_message_key: str,
+        empty_message_kwargs: dict[str, object] | None = None,
+    ) -> None:
+        """Open a custom property-selection menu tied to a pending action."""
+        user = self.get_user(player)
+        if not user:
+            return
+        items: list[MenuItem] = []
+        for space_id in space_ids:
+            space = self.active_space_by_id.get(space_id)
+            if not space or space.kind not in PURCHASABLE_KINDS:
+                continue
+            items.append(MenuItem(text=self._deed_menu_label(space), id=space.space_id))
+        if not items:
+            kwargs = empty_message_kwargs or {}
+            user.speak_l(empty_message_key, **kwargs)
+            return
+        items.append(MenuItem(text=Localization.get(user.locale, "back"), id="_cancel"))
+        self._pending_actions[player.id] = pending_action_id
+        user.show_menu(
+            "action_input_menu",
+            items,
+            multiletter=True,
+            escape_behavior=EscapeBehavior.SELECT_LAST,
+        )
+
+    def _is_view_active_deed_enabled(self, player: Player) -> str | None:
+        """Enable active-deed lookup during an active game for all viewers."""
+        if self.status != "playing":
+            return "action-not-playing"
+        if self._active_deed_space() is None:
+            return "monopoly-no-active-deed"
+        return None
+
+    def _is_view_active_deed_hidden(self, player: Player) -> Visibility:
+        """Show active-deed action in menus."""
+        return self.turn_action_visibility(
+            player,
+            require_current_player=not self._is_auction_active(),
+            extra_condition=self._active_deed_space() is not None,
+        )
+
+    def _is_browse_all_deeds_enabled(self, player: Player) -> str | None:
+        """Enable all-deeds browser for everyone while playing."""
+        if self.status != "playing":
+            return "action-not-playing"
+        return None
+
+    def _is_browse_all_deeds_hidden(self, player: Player) -> Visibility:
+        """Show all-deeds browser in actions menus."""
+        return Visibility.VISIBLE
+
+    def _is_view_my_properties_enabled(self, player: Player) -> str | None:
+        """Enable own-property browser while playing for seated players only."""
+        if self.status != "playing":
+            return "action-not-playing"
+        if player.is_spectator:
+            return "action-spectator"
+        mono_player = player  # type: ignore[assignment]
+        if not self._sorted_owned_space_ids(mono_player.id):
+            return "monopoly-no-owned-properties"
+        return None
+
+    def _is_view_my_properties_hidden(self, player: Player) -> Visibility:
+        """Show own-property browser for non-spectators."""
+        if player.is_spectator:
+            return Visibility.HIDDEN
+        mono_player = player  # type: ignore[assignment]
+        return (
+            Visibility.VISIBLE
+            if self.status == "playing" and bool(self._sorted_owned_space_ids(mono_player.id))
+            else Visibility.HIDDEN
+        )
+
+    def _is_view_player_properties_enabled(self, player: Player) -> str | None:
+        """Enable player-property browser for everyone while playing."""
+        if self.status != "playing":
+            return "action-not-playing"
+        if not [p for p in self.turn_players if isinstance(p, MonopolyPlayer) and not p.bankrupt]:
+            return "monopoly-no-players-with-properties"
+        return None
+
+    def _is_view_player_properties_hidden(self, player: Player) -> Visibility:
+        """Show player-property browser in actions menus."""
+        return Visibility.VISIBLE
+
+    def _is_view_selected_deed_enabled(self, player: Player) -> str | None:
+        """Enable selected-deed follow-up action while playing."""
+        if self.status != "playing":
+            return "action-not-playing"
+        return None
+
+    def _is_view_selected_owner_property_deed_enabled(self, player: Player) -> str | None:
+        """Enable owner-property deed follow-up while playing."""
+        if self.status != "playing":
+            return "action-not-playing"
+        owner_id = self.deed_browse_owner_by_viewer_id.get(player.id, "")
+        if not owner_id:
+            return "monopoly-no-players-with-properties"
+        if not self._sorted_owned_space_ids(owner_id):
+            return "monopoly-no-owned-properties"
+        return None
+
+    def _options_for_deed_browser_selection(self, player: Player) -> list[str]:
+        """Compatibility options for generic action-input flow."""
+        return [space.space_id for space in self._deed_capable_spaces_in_board_order()]
+
+    def _options_for_player_property_owners(self, player: Player) -> list[str]:
+        """Return owner ids that can be browsed for deed lists."""
+        owners: list[str] = []
+        for candidate in self.turn_players:
+            if not isinstance(candidate, MonopolyPlayer) or candidate.bankrupt:
+                continue
+            owners.append(candidate.id)
+        return owners
+
+    def _options_for_selected_owner_property_deeds(self, player: Player) -> list[str]:
+        """Return selected owner's deed ids."""
+        owner_id = self.deed_browse_owner_by_viewer_id.get(player.id, "")
+        if not owner_id:
+            return []
+        return self._sorted_owned_space_ids(owner_id)
+
+    def _action_view_active_deed(self, player: Player, action_id: str) -> None:
+        """Read the deed for the active board item."""
+        _ = action_id
+        space = self._active_deed_space()
+        if not space:
+            user = self.get_user(player)
+            if user:
+                user.speak_l("monopoly-no-active-deed")
+            return
+        self.status_box(player, self._deed_lines(space))
+
+    def _action_browse_all_deeds(self, player: Player, action_id: str) -> None:
+        """Open board-ordered deed list and allow selection."""
+        _ = action_id
+        self._open_deed_selection_menu(
+            player,
+            space_ids=[space.space_id for space in self._deed_capable_spaces_in_board_order()],
+            pending_action_id="view_selected_deed",
+            empty_message_key="monopoly-no-deeds-available",
+        )
+
+    def _action_view_my_properties(self, player: Player, action_id: str) -> None:
+        """Open this player's owned properties and allow deed selection."""
+        _ = action_id
+        mono_player = player  # type: ignore[assignment]
+        self._open_deed_selection_menu(
+            player,
+            space_ids=self._sorted_owned_space_ids(mono_player.id),
+            pending_action_id="view_selected_deed",
+            empty_message_key="monopoly-you-have-no-owned-properties",
+        )
+
+    def _action_view_player_properties(self, player: Player, action_id: str) -> None:
+        """Open player list, then allow browsing that player's properties."""
+        _ = action_id
+        user = self.get_user(player)
+        if not user:
+            return
+        items: list[MenuItem] = []
+        for candidate in self.turn_players:
+            if not isinstance(candidate, MonopolyPlayer) or candidate.bankrupt:
+                continue
+            square_name = ""
+            if self.active_board_size > 0:
+                square_name = self._space_at(candidate.position).name
+            if square_name:
+                label = f"{candidate.name}, on {square_name}, square {candidate.position}"
+            else:
+                label = f"{candidate.name}, square {candidate.position}"
+            items.append(MenuItem(text=label, id=candidate.id))
+        if not items:
+            user.speak_l("monopoly-no-players-with-properties")
+            return
+        items.append(MenuItem(text=Localization.get(user.locale, "back"), id="_cancel"))
+        self._pending_actions[player.id] = "select_player_property_owner"
+        user.show_menu(
+            "action_input_menu",
+            items,
+            multiletter=True,
+            escape_behavior=EscapeBehavior.SELECT_LAST,
+        )
+
+    def _action_select_player_property_owner(
+        self, player: Player, owner_id: str, action_id: str
+    ) -> None:
+        """Store selected owner and open their property list."""
+        _ = action_id
+        owner = self.get_player_by_id(owner_id)
+        if not owner or not isinstance(owner, MonopolyPlayer):
+            return
+        self.deed_browse_owner_by_viewer_id[player.id] = owner.id
+        self._open_deed_selection_menu(
+            player,
+            space_ids=self._sorted_owned_space_ids(owner.id),
+            pending_action_id="view_selected_owner_property_deed",
+            empty_message_key="monopoly-player-has-no-owned-properties",
+            empty_message_kwargs={"player": owner.name},
+        )
+
+    def _get_view_active_deed_label(self, player: Player, action_id: str) -> str:
+        """Show the current deed target by name when one is available."""
+        _ = action_id
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        space = self._active_deed_space()
+        if not space:
+            return Localization.get(locale, "monopoly-view-active-deed")
+        return Localization.get(
+            locale,
+            "monopoly-view-active-deed-space",
+            property=space.name,
+        )
+
+    def _get_buy_property_label(self, player: Player, action_id: str) -> str:
+        """Show contextual buy label with pending property price."""
+        _ = action_id
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        space = self._pending_purchase_space()
+        amount = space.price if space else 0
+        return Localization.get(locale, "monopoly-buy-for", amount=f"${amount}")
+
+    def _action_view_selected_deed(self, player: Player, space_id: str, action_id: str) -> None:
+        """Read one selected deed from board or owned-property menus."""
+        _ = action_id
+        space = self.active_space_by_id.get(space_id)
+        if not space or space.kind not in PURCHASABLE_KINDS:
+            return
+        self.status_box(player, self._deed_lines(space))
+
+    def _action_view_selected_owner_property_deed(
+        self, player: Player, space_id: str, action_id: str
+    ) -> None:
+        """Read one selected deed from player-property browsing flow."""
+        _ = action_id
+        self._action_view_selected_deed(player, space_id, "view_selected_deed")
 
     def _build_space_from_manual_row(self, row: dict[str, object], fallback_index: int) -> MonopolySpace:
         """Build one MonopolySpace from a manual rule artifact row."""
@@ -4133,9 +4628,15 @@ class MonopolyGame(ActionGuardMixin, Game):
     def on_tick(self) -> None:
         """Run per-tick updates (bot actions)."""
         super().on_tick()
+        self.process_scheduled_sounds()
+        self.process_scheduled_events()
         if self._run_auction_bot_tick():
             return
         BotHelper.on_tick(self)
+
+    def on_game_event(self, event_type: str, data: dict) -> None:
+        """Handle Monopoly scheduled animation events."""
+        action_handlers.handle_scheduled_event(self, event_type, data)
 
     def _run_auction_bot_tick(self) -> bool:
         """Handle the dedicated per-tick bot path while an interactive auction is active."""

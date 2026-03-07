@@ -1,5 +1,10 @@
 """Mixin providing sound scheduling, event scheduling, and playback for games."""
 
+import random
+
+
+_SOUND_RANDOM = random.Random()
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -26,6 +31,42 @@ class GameSoundMixin:
     # ==========================================================================
 
     TICKS_PER_SECOND = 20  # 50ms per tick
+    DEFAULT_DICE_ROLL_SOUND_VARIANTS = 3
+    DEFAULT_TOKEN_STEP_SOUND_VARIANTS = 3
+
+    def play_standard_dice_roll_sound(
+        self,
+        *,
+        sound_template: str = "game_squares/diceroll{variant}.ogg",
+        variant_count: int = DEFAULT_DICE_ROLL_SOUND_VARIANTS,
+    ) -> str:
+        """Play one standard board-game dice roll sound and return its asset path."""
+        variant = _SOUND_RANDOM.randint(1, max(1, variant_count))
+        sound = sound_template.format(variant=variant)
+        self.play_sound(sound)
+        return sound
+
+    def schedule_standard_token_movement_sounds(
+        self,
+        spaces: int,
+        *,
+        start_delay_ticks: int = 8,
+        step_interval_ticks: int = 4,
+        sound_template: str = "game_squares/step{variant}.ogg",
+        variant_count: int = DEFAULT_TOKEN_STEP_SOUND_VARIANTS,
+    ) -> int:
+        """Schedule one standard token-movement sound sequence.
+
+        Returns the first tick after the final movement sound, which is useful
+        for scheduling the arrival/landing event in the same pacing style.
+        """
+        next_delay = max(0, start_delay_ticks)
+        for _ in range(max(0, spaces)):
+            variant = _SOUND_RANDOM.randint(1, max(1, variant_count))
+            sound = sound_template.format(variant=variant)
+            self.schedule_sound(sound, delay_ticks=next_delay)
+            next_delay += max(0, step_interval_ticks)
+        return next_delay
 
     def schedule_sound(
         self,

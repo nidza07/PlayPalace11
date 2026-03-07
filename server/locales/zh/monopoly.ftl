@@ -52,6 +52,7 @@ monopoly-buy-disabled = Buying property directly is disabled for this preset.
 # Turn events
 monopoly-pass-go = { $player } passed GO and collected { $amount } (cash: { $cash }).
 monopoly-roll-result = { $player } rolled { $die1 } + { $die2 } = { $total } and landed on { $space }.
+monopoly-roll-only = { $player } rolled { $die1 } + { $die2 } = { $total }.
 monopoly-property-available = { $property } is available for { $price }.
 monopoly-property-bought = { $player } bought { $property } for { $price } (cash: { $cash }).
 monopoly-rent-paid = { $player } paid { $amount } in rent to { $owner } for { $property }.
@@ -240,3 +241,22 @@ monopoly-board-rules-mode-skin-only = Skin only
 monopoly-board-preset-autofixed = Board { $board } is incompatible with { $from_preset }; switched to { $to_preset }.
 monopoly-board-rules-simplified = Board rules for { $board } are partially implemented; base preset behavior is used for missing mechanics.
 monopoly-board-active = Active board: { $board } (mode: { $mode }).
+
+# Deed and ownership browsing
+monopoly-view-active-deed = View active deed
+monopoly-view-active-deed-space = View { $property }
+monopoly-browse-all-deeds = Browse all deeds
+monopoly-view-my-properties = View my properties
+monopoly-view-player-properties = View player properties
+monopoly-view-selected-deed = View selected deed
+monopoly-view-selected-owner-property-deed = View selected player deed
+monopoly-select-property-deed = Select a property deed
+monopoly-select-player-properties = Select a player
+monopoly-select-player-property-deed = Select a player property deed
+monopoly-no-active-deed = There is no active deed to view right now.
+monopoly-no-deeds-available = No deed-capable properties are available on this board.
+monopoly-no-owned-properties = No owned properties are available for this view.
+monopoly-no-players-with-properties = No players are available for property browsing.
+monopoly-buy-for = Buy for { $amount }
+monopoly-you-have-no-owned-properties = You do not own any properties.
+monopoly-player-has-no-owned-properties = { $player } does not own any properties.

@@ -16,6 +16,8 @@ def is_banking_balance_enabled(game: MonopolyGame, player: Player) -> str | None
     error = game.guard_turn_action_enabled(player)
     if error:
         return error
+    if game.turn_has_rolled:
+        return "monopoly-already-rolled"
     mono_player = player  # type: ignore[assignment]
     if mono_player.bankrupt:
         return "monopoly-bankrupt-player"
@@ -28,7 +30,7 @@ def is_banking_balance_hidden(game: MonopolyGame, player: Player) -> Visibility:
     """Show bank balance action only in electronic banking mode."""
     return game.turn_action_visibility(
         player,
-        extra_condition=game._is_electronic_banking_preset(),
+        extra_condition=game._is_electronic_banking_preset() and not game.turn_has_rolled,
     )
 
 
@@ -46,7 +48,8 @@ def is_banking_transfer_hidden(game: MonopolyGame, player: Player) -> Visibility
     """Show transfer action only when electronic transfer options exist."""
     return game.turn_action_visibility(
         player,
-        extra_condition=game._is_electronic_banking_preset()
+        extra_condition=not game.turn_has_rolled
+        and game._is_electronic_banking_preset()
         and bool(game._options_for_banking_transfer(player)),
     )
 
@@ -60,7 +63,7 @@ def is_banking_ledger_hidden(game: MonopolyGame, player: Player) -> Visibility:
     """Show ledger action only in electronic banking mode."""
     return game.turn_action_visibility(
         player,
-        extra_condition=game._is_electronic_banking_preset(),
+        extra_condition=game._is_electronic_banking_preset() and not game.turn_has_rolled,
     )
 
 
@@ -81,7 +84,7 @@ def is_voice_command_hidden(game: MonopolyGame, player: Player) -> Visibility:
     """Show voice command entry only during voice banking games."""
     return game.turn_action_visibility(
         player,
-        extra_condition=game.active_preset_id == "voice_banking",
+        extra_condition=game.active_preset_id == "voice_banking" and not game.turn_has_rolled,
     )
 
 
@@ -178,6 +181,8 @@ def is_mortgage_property_enabled(game: MonopolyGame, player: Player) -> str | No
     error = game.guard_turn_action_enabled(player)
     if error:
         return error
+    if game.turn_has_rolled:
+        return "monopoly-already-rolled"
     if game._is_junior_preset():
         return "monopoly-action-disabled-for-preset"
     mono_player = player  # type: ignore[assignment]
@@ -193,7 +198,7 @@ def is_mortgage_property_hidden(game: MonopolyGame, player: Player) -> Visibilit
     if game._is_junior_preset():
         return Visibility.HIDDEN
     return game.turn_action_visibility(
-        player, extra_condition=bool(game._options_for_mortgage_property(player))
+        player, extra_condition=not game.turn_has_rolled and bool(game._options_for_mortgage_property(player))
     )
 
 
@@ -202,6 +207,8 @@ def is_unmortgage_property_enabled(game: MonopolyGame, player: Player) -> str | 
     error = game.guard_turn_action_enabled(player)
     if error:
         return error
+    if game.turn_has_rolled:
+        return "monopoly-already-rolled"
     if game._is_junior_preset():
         return "monopoly-action-disabled-for-preset"
     mono_player = player  # type: ignore[assignment]
@@ -217,7 +224,7 @@ def is_unmortgage_property_hidden(game: MonopolyGame, player: Player) -> Visibil
     if game._is_junior_preset():
         return Visibility.HIDDEN
     return game.turn_action_visibility(
-        player, extra_condition=bool(game._options_for_unmortgage_property(player))
+        player, extra_condition=not game.turn_has_rolled and bool(game._options_for_unmortgage_property(player))
     )
 
 
@@ -226,6 +233,8 @@ def is_build_house_enabled(game: MonopolyGame, player: Player) -> str | None:
     error = game.guard_turn_action_enabled(player)
     if error:
         return error
+    if game.turn_has_rolled:
+        return "monopoly-already-rolled"
     if game._is_junior_preset():
         return "monopoly-action-disabled-for-preset"
     if game.turn_pending_purchase_space_id:
@@ -243,7 +252,7 @@ def is_build_house_hidden(game: MonopolyGame, player: Player) -> Visibility:
     if game._is_junior_preset():
         return Visibility.HIDDEN
     return game.turn_action_visibility(
-        player, extra_condition=bool(game._options_for_build_house(player))
+        player, extra_condition=not game.turn_has_rolled and bool(game._options_for_build_house(player))
     )
 
 
@@ -252,6 +261,8 @@ def is_sell_house_enabled(game: MonopolyGame, player: Player) -> str | None:
     error = game.guard_turn_action_enabled(player)
     if error:
         return error
+    if game.turn_has_rolled:
+        return "monopoly-already-rolled"
     if game._is_junior_preset():
         return "monopoly-action-disabled-for-preset"
     if game.turn_pending_purchase_space_id:
@@ -269,7 +280,7 @@ def is_sell_house_hidden(game: MonopolyGame, player: Player) -> Visibility:
     if game._is_junior_preset():
         return Visibility.HIDDEN
     return game.turn_action_visibility(
-        player, extra_condition=bool(game._options_for_sell_house(player))
+        player, extra_condition=not game.turn_has_rolled and bool(game._options_for_sell_house(player))
     )
 
 
@@ -278,6 +289,8 @@ def is_offer_trade_enabled(game: MonopolyGame, player: Player) -> str | None:
     error = game.guard_turn_action_enabled(player)
     if error:
         return error
+    if game.turn_has_rolled:
+        return "monopoly-already-rolled"
     if game._is_junior_preset():
         return "monopoly-action-disabled-for-preset"
     mono_player = player  # type: ignore[assignment]
@@ -298,7 +311,9 @@ def is_offer_trade_hidden(game: MonopolyGame, player: Player) -> Visibility:
         return Visibility.HIDDEN
     return game.turn_action_visibility(
         player,
-        extra_condition=game.pending_trade_offer is None and bool(game._options_for_offer_trade(player)),
+        extra_condition=not game.turn_has_rolled
+        and game.pending_trade_offer is None
+        and bool(game._options_for_offer_trade(player)),
     )
 
 
@@ -493,6 +508,8 @@ def is_buy_property_enabled(game: MonopolyGame, player: Player) -> str | None:
     error = game.guard_turn_action_enabled(player)
     if error:
         return error
+    if game._is_auction_active():
+        return "monopoly-auction-active"
     if not game.rule_profile.allow_manual_property_buy:
         return "monopoly-buy-disabled"
     if not game.turn_has_rolled:
@@ -513,6 +530,7 @@ def is_buy_property_hidden(game: MonopolyGame, player: Player) -> Visibility:
     return game.turn_action_visibility(
         player,
         extra_condition=game.rule_profile.allow_manual_property_buy
+        and not game._is_auction_active()
         and game.turn_has_rolled
         and game._pending_purchase_space() is not None,
     )

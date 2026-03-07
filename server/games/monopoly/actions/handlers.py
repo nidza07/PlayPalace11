@@ -19,6 +19,98 @@ def _game_randint(low: int, high: int) -> int:
     return monopoly_game_module.random.randint(low, high)
 
 
+MONOPOLY_MOVE_START_DELAY_TICKS = 8
+MONOPOLY_MOVE_STEP_INTERVAL_TICKS = 4
+
+
+def _schedule_monopoly_roll_resolution(
+    game: MonopolyGame,
+    player: Player,
+    *,
+    die_1: int,
+    die_2: int,
+    total: int,
+    is_doubles: bool,
+    collect_pass_go: bool,
+    roll_message_key: str | None = "monopoly-roll-only",
+    extra_powerup_die: int | None = None,
+    allow_doubles_bonus_roll: bool = False,
+) -> None:
+    """Queue Monopoly movement pacing, then resolve the landing."""
+    game.is_animating = True
+    if roll_message_key:
+        game.broadcast_l(
+            roll_message_key,
+            player=player.name,
+            die1=die_1,
+            die2=die_2,
+            total=total,
+        )
+    delay = game.schedule_standard_token_movement_sounds(
+        total,
+        start_delay_ticks=MONOPOLY_MOVE_START_DELAY_TICKS,
+        step_interval_ticks=MONOPOLY_MOVE_STEP_INTERVAL_TICKS,
+    )
+    game.schedule_event(
+        "monopoly_resolve_roll",
+        {
+            "player_id": player.id,
+            "die_1": die_1,
+            "die_2": die_2,
+            "total": total,
+            "is_doubles": is_doubles,
+            "collect_pass_go": collect_pass_go,
+            "extra_powerup_die": extra_powerup_die,
+            "allow_doubles_bonus_roll": allow_doubles_bonus_roll,
+        },
+        delay_ticks=delay,
+    )
+    game.rebuild_all_menus()
+
+
+def handle_scheduled_event(game: MonopolyGame, event_type: str, data: dict) -> None:
+    """Handle Monopoly-specific scheduled events."""
+    if event_type != "monopoly_resolve_roll":
+        return
+
+    player = game.get_player_by_id(data.get("player_id", ""))
+    if player is None:
+        game.is_animating = False
+        return
+    mono_player = player  # type: ignore[assignment]
+    if mono_player.bankrupt:
+        game.is_animating = False
+        game.rebuild_all_menus()
+        return
+
+    total = int(data["total"])
+    landed_space = game._move_player(
+        mono_player,
+        total,
+        collect_pass_go=bool(data["collect_pass_go"]),
+    )
+    game.broadcast(landed_space.name)
+    resolution = game._resolve_space(mono_player, landed_space, dice_total=total)
+
+    powerup_die = data.get("extra_powerup_die")
+    if powerup_die is not None and not mono_player.bankrupt and resolution == "resolved":
+        resolution = game._apply_junior_super_mario_powerup(mono_player, int(powerup_die))
+
+    if (
+        bool(data.get("allow_doubles_bonus_roll"))
+        and bool(data.get("is_doubles"))
+        and not mono_player.bankrupt
+    ):
+        if resolution == "resolved":
+            game._prepare_next_roll_after_doubles(mono_player)
+        elif resolution == "pending_purchase":
+            game.turn_can_roll_again = True
+
+    game.is_animating = False
+    game._sync_cash_scores()
+    game.rebuild_all_menus()
+
+
 def action_banking_balance(game: MonopolyGame, player: Player, action_id: str) -> None:
     """Announce current electronic bank balance to the requesting player."""
     _ = action_id
@@ -683,6 +775,7 @@ def action_roll_dice(game: MonopolyGame, player: Player, action_id: str) -> None
 
     game.turn_has_rolled = True
     game.turn_pending_purchase_space_id = ""
+    game.play_standard_dice_roll_sound()
     if mono_player.in_jail:
         if game._is_junior_super_mario_manual_core_active():
             if mono_player.get_out_of_jail_cards > 0:
@@ -715,23 +808,17 @@ def action_roll_dice(game: MonopolyGame, player: Player, action_id: str) -> None
                 game.rebuild_all_menus()
                 return
 
-            landed_space = game._move_player(
-                mono_player, total, collect_pass_go=False
-            )
-            game.broadcast_l(
-                "monopoly-roll-result",
-                player=mono_player.name,
-                die1=die_1,
-                die2=die_2,
-                total=total,
-                space=landed_space.name,
-            )
-            resolution = game._resolve_space(mono_player, landed_space, dice_total=total)
-            if not mono_player.bankrupt and resolution == "resolved":
-                game._apply_junior_super_mario_powerup(mono_player, die_2)
             game.turn_doubles_count = 0
-            game._sync_cash_scores()
-            game.rebuild_all_menus()
+            _schedule_monopoly_roll_resolution(
+                game,
+                mono_player,
+                die_1=die_1,
+                die_2=die_2,
+                total=total,
+                is_doubles=False,
+                collect_pass_go=False,
+                extra_powerup_die=die_2,
+            )
             return
         if is_doubles:
             mono_player.in_jail = False
@@ -742,18 +829,16 @@ def action_roll_dice(game: MonopolyGame, player: Player, action_id: str) -> None
                 die1=die_1,
                 die2=die_2,
             )
-            landed_space = game._move_player(
-                mono_player, total, collect_pass_go=False
-            )
-            game.broadcast_l(
-                "monopoly-roll-result",
-                player=mono_player.name,
-                die1=die_1,
-                die2=die_2,
+            _schedule_monopoly_roll_resolution(
+                game,
+                mono_player,
+                die_1=die_1,
+                die_2=die_2,
                 total=total,
-                space=landed_space.name,
+                is_doubles=True,
+                collect_pass_go=False,
+                roll_message_key=None,
             )
-            game._resolve_space(mono_player, landed_space, dice_total=total)
         else:
             mono_player.jail_turns += 1
             game.broadcast_l(
@@ -786,21 +871,20 @@ def action_roll_dice(game: MonopolyGame, player: Player, action_id: str) -> None
                     cash=mono_player.cash,
                 )
                 game._apply_sore_loser_rebate(mono_player, paid)
-                landed_space = game._move_player(
-                    mono_player, total, collect_pass_go=False
-                )
-                game.broadcast_l(
-                    "monopoly-roll-result",
-                    player=mono_player.name,
-                    die1=die_1,
-                    die2=die_2,
+                _schedule_monopoly_roll_resolution(
+                    game,
+                    mono_player,
+                    die_1=die_1,
+                    die_2=die_2,
                     total=total,
-                    space=landed_space.name,
+                    is_doubles=False,
+                    collect_pass_go=False,
+                    roll_message_key=None,
                 )
-                game._resolve_space(mono_player, landed_space, dice_total=total)
         game.turn_doubles_count = 0
-        game._sync_cash_scores()
-        game.rebuild_all_menus()
+        if not game.is_animating:
+            game._sync_cash_scores()
+            game.rebuild_all_menus()
         return
 
     if game.rule_profile.doubles_grant_extra_roll and is_doubles:
@@ -814,33 +898,24 @@ def action_roll_dice(game: MonopolyGame, player: Player, action_id: str) -> None
         game.rebuild_all_menus()
         return
 
-    landed_space = game._move_player(mono_player, total, collect_pass_go=True)
-    game.broadcast_l(
-        "monopoly-roll-result",
-        player=mono_player.name,
-        die1=die_1,
-        die2=die_2,
+    _schedule_monopoly_roll_resolution(
+        game,
+        mono_player,
+        die_1=die_1,
+        die_2=die_2,
         total=total,
-        space=landed_space.name,
+        is_doubles=is_doubles,
+        collect_pass_go=True,
+        extra_powerup_die=die_2 if game._is_junior_super_mario_manual_core_active() else None,
+        allow_doubles_bonus_roll=game.rule_profile.doubles_grant_extra_roll,
     )
-    resolution = game._resolve_space(mono_player, landed_space, dice_total=total)
-    if game._is_junior_super_mario_manual_core_active() and not mono_player.bankrupt:
-        if resolution == "resolved":
-            resolution = game._apply_junior_super_mario_powerup(mono_player, die_2)
-
-    if game.rule_profile.doubles_grant_extra_roll and not mono_player.bankrupt and is_doubles:
-        if resolution == "resolved":
-            game._prepare_next_roll_after_doubles(mono_player)
-        elif resolution == "pending_purchase":
-            game.turn_can_roll_again = True
-
-    game._sync_cash_scores()
-    game.rebuild_all_menus()
 
 
 def action_buy_property(game: MonopolyGame, player: Player, action_id: str) -> None:
     """Buy currently pending property."""
     _ = action_id
+    if game._is_auction_active():
+        return
     if not game.rule_profile.allow_manual_property_buy:
         return
     mono_player = player  # type: ignore[assignment]
