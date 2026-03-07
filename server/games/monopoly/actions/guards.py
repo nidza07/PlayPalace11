@@ -211,7 +211,7 @@ def is_unmortgage_property_enabled(game: MonopolyGame, player: Player) -> str | 
     error = game.guard_turn_action_enabled(player)
     if error:
         return error
-    if game.turn_has_rolled:
+    if game.turn_has_rolled and not game.turn_pending_purchase_space_id:
         return "monopoly-already-rolled"
     if game._is_junior_preset():
         return "monopoly-action-disabled-for-preset"
@@ -228,7 +228,11 @@ def is_unmortgage_property_hidden(game: MonopolyGame, player: Player) -> Visibil
     if game._is_junior_preset():
         return Visibility.HIDDEN
     return game.turn_action_visibility(
-        player, extra_condition=not game.turn_has_rolled and bool(game._options_for_unmortgage_property(player))
+        player,
+        extra_condition=(
+            (not game.turn_has_rolled or bool(game.turn_pending_purchase_space_id))
+            and bool(game._options_for_unmortgage_property(player))
+        ),
     )
 
 

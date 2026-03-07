@@ -914,6 +914,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         self.define_keybind("j", "Pay bail", ["pay_bail"], state=KeybindState.ACTIVE)
 
     def _define_banking_and_voice_keybinds(self) -> None:
+        self.define_keybind("c", "Read cash", ["read_cash"], state=KeybindState.ACTIVE)
         self.define_keybind("ctrl+b", "Bank balance", ["banking_balance"], state=KeybindState.ACTIVE)
         self.define_keybind(
             "shift+b", "Bank transfer", ["banking_transfer"], state=KeybindState.ACTIVE
@@ -1001,6 +1002,13 @@ class MonopolyGame(ActionGuardMixin, Game):
                 is_hidden="_is_always_hidden",
             ),
             Action(
+                id="read_cash",
+                label=Localization.get(locale, "monopoly-read-cash"),
+                handler="_action_read_cash",
+                is_enabled="_is_read_cash_enabled",
+                is_hidden="_is_always_hidden",
+            ),
+            Action(
                 id="announce_preset",
                 label=Localization.get(locale, "monopoly-announce-preset"),
                 handler="_action_announce_preset",
@@ -1083,6 +1091,32 @@ class MonopolyGame(ActionGuardMixin, Game):
         if self.is_animating:
             return "action-game-in-progress"
         return None
+
+    def _preferred_turn_focus_action_id(self, player: Player) -> str | None:
+        """Prefer roll focus whenever the roll action is visible."""
+        for resolved in self.get_all_visible_actions(player):
+            if resolved.action.id == "roll_dice":
+                return "roll_dice"
+        return None
+
+    def rebuild_player_menu(self, player: Player, *, position: int | None = None) -> None:
+        """Rebuild Monopoly turn menus with roll focus when available."""
+        if position is None:
+            preferred_action_id = self._preferred_turn_focus_action_id(player)
+            if preferred_action_id:
+                visible_actions = self.get_all_visible_actions(player)
+                for index, resolved in enumerate(visible_actions, start=1):
+                    if resolved.action.id == preferred_action_id:
+                        position = index
+                        break
+        super().rebuild_player_menu(player, position=position)
+
+    def update_player_menu(self, player: Player, selection_id: str | None = None) -> None:
+        """Update Monopoly turn menus with roll focus when available."""
+        preferred_action_id = self._preferred_turn_focus_action_id(player)
+        if preferred_action_id:
+            selection_id = preferred_action_id
+        super().update_player_menu(player, selection_id=selection_id)
 
     def get_available_preset_ids(self) -> list[str]:
         """Return selectable preset ids from generated catalog artifacts."""
@@ -1541,7 +1575,11 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Enable player-property browser for everyone while playing."""
         if self.status != "playing":
             return "action-not-playing"
-        if not [p for p in self.turn_players if isinstance(p, MonopolyPlayer) and not p.bankrupt]:
+        if not [
+            p
+            for p in self.turn_players
+            if isinstance(p, MonopolyPlayer) and not p.bankrupt and self._sorted_owned_space_ids(p.id)
+        ]:
             return "monopoly-no-players-with-properties"
         return None
 
@@ -1575,6 +1613,8 @@ class MonopolyGame(ActionGuardMixin, Game):
         owners: list[str] = []
         for candidate in self.turn_players:
             if not isinstance(candidate, MonopolyPlayer) or candidate.bankrupt:
+                continue
+            if not self._sorted_owned_space_ids(candidate.id):
                 continue
             owners.append(candidate.id)
         return owners
@@ -1628,6 +1668,8 @@ class MonopolyGame(ActionGuardMixin, Game):
         for candidate in self.turn_players:
             if not isinstance(candidate, MonopolyPlayer) or candidate.bankrupt:
                 continue
+            if not self._sorted_owned_space_ids(candidate.id):
+                continue
             square_name = ""
             if self.active_board_size > 0:
                 square_name = self._space_at(candidate.position).name
@@ -1664,6 +1706,17 @@ class MonopolyGame(ActionGuardMixin, Game):
             empty_message_key="monopoly-player-has-no-owned-properties",
             empty_message_kwargs={"player": owner.name},
         )
+
+    def _is_read_cash_enabled(self, player: Player) -> str | None:
+        """Enable personal cash readout for seated players during play."""
+        if self.status != "playing":
+            return "action-not-playing"
+        if player.is_spectator:
+            return "action-spectator"
+        mono_player = player  # type: ignore[assignment]
+        if mono_player.bankrupt:
+            return "monopoly-bankrupt-player"
+        return None
 
     def _get_view_active_deed_label(self, player: Player, action_id: str) -> str:
         """Show the current deed target by name when one is available."""
@@ -2041,7 +2094,7 @@ class MonopolyGame(ActionGuardMixin, Game):
                 if self._current_liquid_balance(player) > cash_before:
                     continue
 
-            mortgage_choice = self._pick_best_mortgage(self._options_for_mortgage_property(player))
+            mortgage_choice = self._pick_best_mortgage(self._mortgage_space_ids(player))
             if mortgage_choice:
                 cash_before = self._current_liquid_balance(player)
                 self._action_mortgage_property(player, mortgage_choice, "mortgage_property")
@@ -4517,6 +4570,14 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Menu options for mortgaged owned properties."""
         return action_options.options_for_unmortgage_property(self, player)
 
+    def _mortgage_space_ids(self, player: Player) -> list[str]:
+        """Return raw mortgage-eligible property ids."""
+        return action_options.mortgage_space_ids(self, player)
+
+    def _unmortgage_space_ids(self, player: Player) -> list[str]:
+        """Return raw unmortgage-eligible property ids."""
+        return action_options.unmortgage_space_ids(self, player)
+
     def _options_for_build_house(self, player: Player) -> list[str]:
         """Menu options for buildable street properties."""
         return action_options.options_for_build_house(self, player)
@@ -4613,6 +4674,10 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Parse one banking transfer option from menu input."""
         return action_options.parse_banking_transfer_option(self, option)
 
+    def _parse_property_amount_option(self, option: str) -> str | None:
+        """Parse one encoded property/cost option from menu input."""
+        return action_options.parse_property_amount_option(self, option)
+
     def _options_for_banking_transfer(self, player: Player) -> list[str]:
         """Menu options for player-to-player transfers in electronic mode."""
         return action_options.options_for_banking_transfer(self, player)
@@ -4688,6 +4753,18 @@ class MonopolyGame(ActionGuardMixin, Game):
     ) -> None:
         """Unmortgage one owned property."""
         action_handlers.action_unmortgage_property(self, player, space_id, action_id)
+
+    def _action_read_cash(self, player: Player, action_id: str) -> None:
+        """Speak the current player's own cash balance."""
+        _ = action_id
+        user = self.get_user(player)
+        if not user:
+            return
+        mono_player = player  # type: ignore[assignment]
+        user.speak_l(
+            "monopoly-cash-report",
+            cash=f"${self._current_liquid_balance(mono_player):,}",
+        )
 
     def _action_build_house(self, player: Player, space_id: str, action_id: str) -> None:
         """Build one house/hotel on an owned eligible street property."""

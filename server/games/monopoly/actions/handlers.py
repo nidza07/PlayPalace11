@@ -390,9 +390,10 @@ def action_mortgage_property(
     if game._is_junior_preset():
         return
     mono_player = player  # type: ignore[assignment]
-    if space_id not in game._options_for_mortgage_property(player):
+    resolved_space_id = game._parse_property_amount_option(space_id) or space_id
+    if resolved_space_id not in game._mortgage_space_ids(player):
         return
-    space = game.active_space_by_id.get(space_id)
+    space = game.active_space_by_id.get(resolved_space_id)
     if not space:
         return
 
@@ -400,7 +401,7 @@ def action_mortgage_property(
     credited = game._credit_player(mono_player, value, f"mortgage:{space.space_id}")
     if credited <= 0:
         return
-    game.mortgaged_space_ids.append(space_id)
+    game.mortgaged_space_ids.append(resolved_space_id)
     game.broadcast_l(
         "monopoly-property-mortgaged",
         player=mono_player.name,
@@ -421,9 +422,10 @@ def action_unmortgage_property(
     if game._is_junior_preset():
         return
     mono_player = player  # type: ignore[assignment]
-    if space_id not in game._options_for_unmortgage_property(player):
+    resolved_space_id = game._parse_property_amount_option(space_id) or space_id
+    if resolved_space_id not in game._unmortgage_space_ids(player):
         return
-    space = game.active_space_by_id.get(space_id)
+    space = game.active_space_by_id.get(resolved_space_id)
     if not space:
         return
 
@@ -433,7 +435,7 @@ def action_unmortgage_property(
     paid = game._debit_player_to_bank(mono_player, cost, f"unmortgage:{space.space_id}")
     if paid < cost:
         return
-    game.mortgaged_space_ids.remove(space_id)
+    game.mortgaged_space_ids.remove(resolved_space_id)
     game.broadcast_l(
         "monopoly-property-unmortgaged",
         player=mono_player.name,

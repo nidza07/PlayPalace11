@@ -82,8 +82,11 @@ monopoly-sell-house = Sell house or hotel
 monopoly-offer-trade = Offer trade
 monopoly-accept-trade = Accept trade
 monopoly-decline-trade = Decline trade
+monopoly-read-cash = Read cash
 monopoly-pay-bail = Pay bail
 monopoly-use-jail-card = Use get-out-of-jail card
+monopoly-cash-report = { $cash } in cash.
+monopoly-property-amount-option = { $property } for { $amount }
 
 # Additional prompts
 monopoly-select-property-mortgage = Select a property to mortgage
