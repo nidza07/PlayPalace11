@@ -87,6 +87,7 @@ monopoly-pay-bail = Pay bail
 monopoly-use-jail-card = Use get-out-of-jail card
 monopoly-cash-report = { $cash } in cash.
 monopoly-property-amount-option = { $property } for { $amount }
+monopoly-banking-transfer-option = Transfer { $amount } to { $target }
 
 # Additional prompts
 monopoly-select-property-mortgage = Select a property to mortgage
@@ -163,6 +164,7 @@ monopoly-voice-command-error = Voice command error: { $reason }.
 monopoly-voice-command-accepted = Voice command accepted: { $intent }.
 monopoly-voice-command-repeat = Repeating last banking response code: { $response }.
 monopoly-voice-transfer-staged = Voice transfer staged: { $amount } to { $target }. Say voice: confirm transfer.
+monopoly-mortgage-transfer-interest-paid = { $player } paid { $amount } in mortgage transfer interest (cash: { $cash }).
 
 # Card engine
 monopoly-card-drawn = { $player } drew a { $deck } card: { $card }.
@@ -170,16 +172,39 @@ monopoly-card-collect = { $player } collected { $amount } (cash: { $cash }).
 monopoly-card-pay = { $player } paid { $amount } (cash: { $cash }).
 monopoly-card-move = { $player } moved to { $space }.
 monopoly-card-jail-free = { $player } received a get-out-of-jail card ({ $cards } total).
+monopoly-card-utility-roll = { $player } rolled { $die1 } + { $die2 } = { $total } for utility rent.
+monopoly-deck-chance = Chance
+monopoly-deck-community-chest = Community Chest
 
 # Card descriptions
 monopoly-card-advance-to-go = Advance to GO and collect 200
+monopoly-card-advance-to-illinois-avenue = Advance to Illinois Avenue
+monopoly-card-advance-to-st-charles-place = Advance to St. Charles Place
+monopoly-card-advance-to-nearest-utility = Advance to the nearest Utility
+monopoly-card-advance-to-nearest-railroad = Advance to the nearest Railroad and pay double rent if owned
 monopoly-card-bank-dividend-50 = Bank pays you dividend of 50
 monopoly-card-go-back-three = Go back 3 spaces
 monopoly-card-go-to-jail = Go directly to jail
+monopoly-card-general-repairs = Make general repairs on all your property: 25 per house, 100 per hotel
 monopoly-card-poor-tax-15 = Pay poor tax of 15
+monopoly-card-reading-railroad = Take a trip to Reading Railroad
+monopoly-card-boardwalk = Take a walk on Boardwalk
+monopoly-card-chairman-of-the-board = Chairman of the Board, pay 50 to every player
+monopoly-card-building-loan-matures = Your building loan matures, collect 150
+monopoly-card-crossword-competition = You won a crossword competition, collect 100
 monopoly-card-bank-error-200 = Bank error in your favor, collect 200
 monopoly-card-doctor-fee-50 = Doctor's fee, pay 50
+monopoly-card-sale-of-stock-50 = From sale of stock you get 50
+monopoly-card-holiday-fund = Holiday fund matures, receive 100
 monopoly-card-tax-refund-20 = Income tax refund, collect 20
+monopoly-card-birthday = It is your birthday, collect 10 from every player
+monopoly-card-life-insurance = Life insurance matures, collect 100
+monopoly-card-hospital-fees-100 = Pay hospital fees of 100
+monopoly-card-school-fees-50 = Pay school fees of 50
+monopoly-card-consultancy-fee-25 = Receive 25 consultancy fee
+monopoly-card-street-repairs = You are assessed for street repairs: 40 per house, 115 per hotel
+monopoly-card-beauty-contest-10 = You have won second prize in a beauty contest, collect 10
+monopoly-card-inherit-100 = You inherit 100
 monopoly-card-get-out-of-jail = Get out of jail free
 
 # Board profile options
@@ -315,3 +340,56 @@ monopoly-player-properties-label = { $player }, on { $space }, square { $positio
 monopoly-player-properties-label-no-space = { $player }, square { $position }
 monopoly-banking-ledger-entry-success = { $tx_id } { $kind } { $from_id }->{ $to_id } { $amount } ({ $reason })
 monopoly-banking-ledger-entry-failed = { $tx_id } { $kind } failed ({ $reason })
+
+# Trade menu summaries
+monopoly-trade-buy-property-summary = Buy { $property } from { $target } for { $amount }
+monopoly-trade-offer-cash-for-property-summary = Offer { $amount } to { $target } for { $property }
+monopoly-trade-sell-property-summary = Sell { $property } to { $target } for { $amount }
+monopoly-trade-offer-property-for-cash-summary = Offer { $property } to { $target } for { $amount }
+monopoly-trade-swap-summary = Swap { $give_property } with { $target } for { $receive_property }
+monopoly-trade-swap-plus-cash-summary = Swap { $give_property } + { $amount } with { $target } for { $receive_property }
+monopoly-trade-swap-receive-cash-summary = Swap { $give_property } for { $receive_property } + { $amount } from { $target }
+monopoly-trade-buy-jail-card-summary = Buy jail card from { $target } for { $amount }
+monopoly-trade-sell-jail-card-summary = Sell jail card to { $target } for { $amount }
+
+# Board space names
+monopoly-space-go = GO
+monopoly-space-mediterranean_avenue = Mediterranean Avenue
+monopoly-space-community_chest_1 = Community Chest
+monopoly-space-baltic_avenue = Baltic Avenue
+monopoly-space-income_tax = Income Tax
+monopoly-space-reading_railroad = Reading Railroad
+monopoly-space-oriental_avenue = Oriental Avenue
+monopoly-space-chance_1 = Chance
+monopoly-space-vermont_avenue = Vermont Avenue
+monopoly-space-connecticut_avenue = Connecticut Avenue
+monopoly-space-jail = Jail / Just Visiting
+monopoly-space-st_charles_place = St. Charles Place
+monopoly-space-electric_company = Electric Company
+monopoly-space-states_avenue = States Avenue
+monopoly-space-virginia_avenue = Virginia Avenue
+monopoly-space-pennsylvania_railroad = Pennsylvania Railroad
+monopoly-space-st_james_place = St. James Place
+monopoly-space-community_chest_2 = Community Chest
+monopoly-space-tennessee_avenue = Tennessee Avenue
+monopoly-space-new_york_avenue = New York Avenue
+monopoly-space-free_parking = Free Parking
+monopoly-space-kentucky_avenue = Kentucky Avenue
+monopoly-space-chance_2 = Chance
+monopoly-space-indiana_avenue = Indiana Avenue
+monopoly-space-illinois_avenue = Illinois Avenue
+monopoly-space-bo_railroad = B. & O. Railroad
+monopoly-space-atlantic_avenue = Atlantic Avenue
+monopoly-space-ventnor_avenue = Ventnor Avenue
+monopoly-space-water_works = Water Works
+monopoly-space-marvin_gardens = Marvin Gardens
+monopoly-space-go_to_jail = Go to Jail
+monopoly-space-pacific_avenue = Pacific Avenue
+monopoly-space-north_carolina_avenue = North Carolina Avenue
+monopoly-space-community_chest_3 = Community Chest
+monopoly-space-pennsylvania_avenue = Pennsylvania Avenue
+monopoly-space-short_line = Short Line
+monopoly-space-chance_3 = Chance
+monopoly-space-park_place = Park Place
+monopoly-space-luxury_tax = Luxury Tax
+monopoly-space-boardwalk = Boardwalk

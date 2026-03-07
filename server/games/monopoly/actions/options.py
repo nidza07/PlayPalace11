@@ -11,10 +11,21 @@ if TYPE_CHECKING:
     from ..game import MonopolyGame
 
 
-def encode_banking_transfer_option(game: MonopolyGame, target: Player, amount: int) -> str:
+def encode_banking_transfer_option(
+    game: MonopolyGame,
+    target: Player,
+    amount: int,
+    *,
+    locale: str = "en",
+) -> str:
     """Encode one banking transfer option for menu selection."""
-    _ = game
-    return f"Transfer {amount} to {target.name} ## target={target.id};amount={amount}"
+    label = Localization.get(
+        locale,
+        "monopoly-banking-transfer-option",
+        amount=f"${amount}",
+        target=target.name,
+    )
+    return f"{label} ## target={target.id};amount={amount}"
 
 
 def parse_banking_transfer_option(game: MonopolyGame, option: str) -> tuple[str, int] | None:
@@ -52,7 +63,7 @@ def encode_property_amount_option(
     label = Localization.get(
         locale,
         "monopoly-property-amount-option",
-        property=space.name,
+        property=game._space_label(space_id, locale),
         amount=f"${amount}",
     )
     return f"{label} ## space={space_id}"
@@ -89,6 +100,8 @@ def options_for_banking_transfer(game: MonopolyGame, player: Player) -> list[str
     if balance <= 0:
         return []
 
+    user = game.get_user(player)
+    locale = user.locale if user else "en"
     base_amounts = [10, 20, 50, 100, 200, 500]
     options: list[str] = []
     for target in game.turn_players:
@@ -102,7 +115,9 @@ def options_for_banking_transfer(game: MonopolyGame, player: Player) -> list[str
             }
         )
         for amount in target_amounts:
-            options.append(encode_banking_transfer_option(game, target, amount))
+            options.append(
+                encode_banking_transfer_option(game, target, amount, locale=locale)
+            )
     return options
 
 

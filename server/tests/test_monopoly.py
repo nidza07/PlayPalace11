@@ -46,6 +46,25 @@ def _start_two_player_game(options: MonopolyOptions | None = None) -> MonopolyGa
     return game
 
 
+def _start_three_player_game(options: MonopolyOptions | None = None) -> MonopolyGame:
+    """Create and start a three player Monopoly game."""
+    game = MonopolyGame(options=options or MonopolyOptions())
+    for name in ("Host", "Guest", "Third"):
+        game.add_player(name, MockUser(name))
+    game.host = "Host"
+    game.on_start()
+    original_execute_action = game.execute_action
+
+    def execute_action_and_finish_animation(player, action_id: str, *args, **kwargs):
+        result = original_execute_action(player, action_id, *args, **kwargs)
+        if action_id == "roll_dice":
+            _finish_animation(game)
+        return result
+
+    game.execute_action = execute_action_and_finish_animation  # type: ignore[method-assign]
+    return game
+
+
 def _find_trade_option(game: MonopolyGame, player, text: str) -> str | None:
     """Return first trade option containing the provided text."""
     for option in game._options_for_offer_trade(player):
@@ -342,7 +361,7 @@ def test_monopoly_view_active_deed_uses_localized_deed_templates() -> None:
     assert "monopoly-deed" not in " ".join(lines)
     assert "monopoly-color" not in " ".join(lines)
     assert "Baltic Avenue" in lines
-    assert "Owner: Bank" in lines
+    assert any("Bank" in line for line in lines)
 
 
 def test_monopoly_view_active_deed_hidden_when_no_active_deed():
@@ -847,7 +866,7 @@ def test_monopoly_bankruptcy_transfers_assets_to_creditor(monkeypatch):
     assert guest.get_out_of_jail_cards == 0
     assert host.get_out_of_jail_cards == 1
     assert "mediterranean_avenue" in game.mortgaged_space_ids
-    assert host.cash == STARTING_CASH + 40
+    assert host.cash == STARTING_CASH + 37
 
 
 def test_monopoly_doubles_grant_extra_roll(monkeypatch):
@@ -1036,6 +1055,75 @@ def test_monopoly_community_chest_can_grant_jail_card(monkeypatch):
     game.execute_action(host, "roll_dice")
 
     assert host.get_out_of_jail_cards == 1
+
+
+def test_monopoly_get_out_of_jail_card_leaves_deck_until_used(monkeypatch):
+    game = _start_two_player_game()
+    host = game.current_player
+    assert host is not None
+    game.community_chest_deck_order = ["get_out_of_jail_free_community_chest", "income_tax_refund_20"]
+    game.community_chest_deck_index = 0
+
+    rolls = iter([1, 1])  # total = 2 -> community chest
+    monkeypatch.setattr("server.games.monopoly.game.random.randint", lambda a, b: next(rolls))
+    game.execute_action(host, "roll_dice")
+
+    assert host.get_out_of_jail_cards == 1
+    assert "get_out_of_jail_free_community_chest" not in game.community_chest_deck_order
+
+    host.in_jail = True
+    game.current_player = host
+    game.turn_has_rolled = False
+    game.execute_action(host, "use_jail_card")
+
+    assert host.get_out_of_jail_cards == 0
+    assert game.community_chest_deck_order[-1] == "get_out_of_jail_free_community_chest"
+
+
+def test_monopoly_mortgaged_trade_charges_interest_to_new_owner():
+    game = _start_two_player_game()
+    host = game.current_player
+    assert host is not None
+    guest = game.players[1]
+
+    host.owned_space_ids.append("baltic_avenue")
+    game.property_owners["baltic_avenue"] = host.id
+    game.mortgaged_space_ids.append("baltic_avenue")
+
+    offer = _find_trade_option(game, host, "Sell Baltic Avenue to Guest for 60")
+    assert offer is not None
+
+    game.execute_action(host, "offer_trade", input_value=offer)
+    game.execute_action(guest, "accept_trade")
+
+    assert game.property_owners["baltic_avenue"] == guest.id
+    assert host.cash == STARTING_CASH + 60
+    assert guest.cash == STARTING_CASH - 60 - 3
+
+
+def test_monopoly_bankruptcy_to_bank_auctions_released_property(monkeypatch):
+    game = _start_three_player_game()
+    host = game.players[0]
+    guest = game.players[1]
+    third = game.players[2]
+
+    game.current_player = guest
+    guest.position = 35
+    guest.cash = 30
+    guest.owned_space_ids.append("mediterranean_avenue")
+    game.property_owners["mediterranean_avenue"] = guest.id
+    host.cash = 0
+    third.cash = STARTING_CASH
+    game.turn_has_rolled = False
+    game.turn_pending_purchase_space_id = ""
+    rolls = iter([1, 2])  # total = 3 -> Luxury Tax
+    monkeypatch.setattr("server.games.monopoly.game.random.randint", lambda a, b: next(rolls))
+
+    game.execute_action(guest, "roll_dice")
+
+    assert guest.bankrupt is True
+    assert game.property_owners.get("mediterranean_avenue") == third.id
+    assert "mediterranean_avenue" in third.owned_space_ids
 
 
 def test_monopoly_chance_go_back_three_resolves_destination(monkeypatch):

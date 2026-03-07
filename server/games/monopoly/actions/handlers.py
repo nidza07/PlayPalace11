@@ -691,6 +691,10 @@ def action_use_jail_card(game: MonopolyGame, player: Player, action_id: str) -> 
         return
 
     mono_player.get_out_of_jail_cards -= 1
+    held_card = game._pop_held_get_out_of_jail_card(mono_player)
+    if held_card is not None:
+        deck_type, card_id = held_card
+        game._return_get_out_of_jail_card_to_deck(deck_type, card_id)
     mono_player.in_jail = False
     mono_player.jail_turns = 0
     game.broadcast_l(
@@ -780,6 +784,10 @@ def action_roll_dice(game: MonopolyGame, player: Player, action_id: str) -> None
         if game._is_junior_super_mario_manual_core_active():
             if mono_player.get_out_of_jail_cards > 0:
                 mono_player.get_out_of_jail_cards -= 1
+                held_card = game._pop_held_get_out_of_jail_card(mono_player)
+                if held_card is not None:
+                    deck_type, card_id = held_card
+                    game._return_get_out_of_jail_card_to_deck(deck_type, card_id)
                 mono_player.in_jail = False
                 mono_player.jail_turns = 0
                 game.broadcast_l(
