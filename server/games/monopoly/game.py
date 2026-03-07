@@ -5211,7 +5211,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             "crossword_competition_100": 100,
             "bank_error_collect_200": 200,
             "doctor_fee_pay_50": 50,
-            "sale_of_stock_collect_50": 50,
+            "from_sale_of_stock_50": 50,
             "holiday_fund_matures_100": 100,
             "income_tax_refund_20": 20,
             "its_your_birthday_collect_10_each": 10,

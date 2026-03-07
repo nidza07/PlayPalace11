@@ -751,6 +751,9 @@ def test_monopoly_star_wars_board_preserves_credits_currency_format() -> None:
     assert game._resolve_card_draw_text(None, "bank_dividend_50", locale="en") == (
         "Bank pays you dividend of 50 Credits"
     )
+    assert game._resolve_card_draw_text(None, "from_sale_of_stock_50", locale="en") == (
+        "From sale of stock you get 50 Credits"
+    )
 
 
 def test_monopoly_income_tax_space_deducts_cash(monkeypatch):
