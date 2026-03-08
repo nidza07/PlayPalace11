@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import random
 import re
 
@@ -279,7 +279,7 @@ CLASSIC_STANDARD_BOARD = [
         house_cost=150,
         rents=(20, 100, 300, 750, 925, 1100),
     ),
-    MonopolySpace(25, "bo_railroad", "B&O Railroad", "railroad", 200, 25),
+    MonopolySpace(25, "bo_railroad", "B. & O. Railroad", "railroad", 200, 25),
     MonopolySpace(
         26,
         "atlantic_avenue",
@@ -1793,6 +1793,19 @@ class MonopolyGame(ActionGuardMixin, Game):
         if self.active_manual_rule_set is None:
             return ""
         return self._detect_manual_currency_name(self.active_manual_rule_set.cards)
+
+    def _sync_active_space_names_from_locale(self) -> None:
+        """Normalize runtime space names from locale keys instead of board literals."""
+        normalized_spaces: list[MonopolySpace] = []
+        for space in self.active_board_spaces:
+            key = f"monopoly-space-{space.space_id}"
+            resolved = Localization.get("en", key)
+            if resolved and resolved != key:
+                normalized_spaces.append(replace(space, name=resolved))
+            else:
+                normalized_spaces.append(space)
+        self.active_board_spaces = normalized_spaces
+        self.active_space_by_id = {space.space_id: space for space in normalized_spaces}
 
     def _space_display_name(self, space: MonopolySpace, locale: str) -> str:
         """Return localized display text for one board space."""
@@ -7073,6 +7086,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             self.active_space_by_id,
             self.active_color_group_to_space_ids,
         ) = self._resolve_active_board_structures()
+        self._sync_active_space_names_from_locale()
         self.active_board_size = len(self.active_board_spaces)
         self.active_sound_mode = "none"
         self.last_hardware_event_id = ""
