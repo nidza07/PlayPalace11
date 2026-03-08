@@ -988,6 +988,85 @@ def test_monopoly_roll_messages_use_you_and_call_out_doubles(monkeypatch):
     assert "Host rolled doubles and gets another roll." in guest_spoken
 
 
+def test_monopoly_transcript_messages_use_you_for_active_actor(monkeypatch) -> None:
+    game = _start_two_player_game()
+    host = game.players[0]
+    guest = game.players[1]
+    host_user = game.get_user(host)
+    guest_user = game.get_user(guest)
+    assert host_user is not None
+    assert guest_user is not None
+
+    host.owned_space_ids.append("north_carolina_avenue")
+    game.property_owners["north_carolina_avenue"] = host.id
+    host_user.clear_messages()
+    guest_user.clear_messages()
+
+    guest.position = game.active_space_by_id["north_carolina_avenue"].index - 2
+    game.current_player = guest
+    rolls = iter([1, 1])  # total = 2 -> North Carolina Avenue
+    monkeypatch.setattr("server.games.monopoly.game.random.randint", lambda a, b: next(rolls))
+    game.execute_action(guest, "roll_dice")
+
+    host_spoken = " ".join(host_user.get_spoken_messages())
+    guest_spoken = " ".join(guest_user.get_spoken_messages())
+    assert "You paid $26 in rent to Host for North Carolina Avenue." in guest_spoken
+    assert "Guest paid $26 in rent to you for North Carolina Avenue." in host_spoken
+
+
+def test_monopoly_buy_pass_go_tax_and_auction_bid_use_personalized_messages() -> None:
+    game = _start_two_player_game()
+    host = game.players[0]
+    guest = game.players[1]
+    host_user = game.get_user(host)
+    guest_user = game.get_user(guest)
+    assert host_user is not None
+    assert guest_user is not None
+
+    host_user.clear_messages()
+    guest_user.clear_messages()
+    bought = game._buy_property_for_player(host, game.active_space_by_id["boardwalk"])
+    assert bought is True
+    host_spoken = " ".join(host_user.get_spoken_messages())
+    guest_spoken = " ".join(guest_user.get_spoken_messages())
+    assert "You bought Boardwalk for $400." in host_spoken
+    assert "Host bought Boardwalk for $400." in guest_spoken
+
+    host_user.clear_messages()
+    guest_user.clear_messages()
+    host.position = 39
+    game._move_player(host, 2, collect_pass_go=True)
+    host_spoken = " ".join(host_user.get_spoken_messages())
+    guest_spoken = " ".join(guest_user.get_spoken_messages())
+    assert "You passed GO and collected $200." in host_spoken
+    assert "Host passed GO and collected $200." in guest_spoken
+
+    host_user.clear_messages()
+    guest_user.clear_messages()
+    assert game._apply_bank_payment(host, 200, tax_name="Income Tax") is True
+    host_spoken = " ".join(host_user.get_spoken_messages())
+    guest_spoken = " ".join(guest_user.get_spoken_messages())
+    assert "You paid $200 for Income Tax." in host_spoken
+    assert "Host paid $200 for Income Tax." in guest_spoken
+
+    host_user.clear_messages()
+    guest_user.clear_messages()
+    game._broadcast_monopoly_personal(
+        guest,
+        personal_message_id="monopoly-you-auction-bid-placed",
+        others_message_id="monopoly-player-auction-bid-placed",
+        personal_fallback="You bid $80 for Connecticut Avenue.",
+        others_fallback="Guest bid $80 for Connecticut Avenue.",
+        player=guest.name,
+        property="Connecticut Avenue",
+        amount="$80",
+    )
+    host_spoken = " ".join(host_user.get_spoken_messages())
+    guest_spoken = " ".join(guest_user.get_spoken_messages())
+    assert "You bid $80 for Connecticut Avenue." in guest_spoken
+    assert "Guest bid $80 for Connecticut Avenue." in host_spoken
+
+
 def test_monopoly_roll_focus_returns_to_roll_option_after_doubles(monkeypatch):
     game = _start_two_player_game()
     host = game.current_player
@@ -1277,6 +1356,36 @@ def test_monopoly_auction_rebuilds_turn_menu_for_next_bidder(monkeypatch):
     assert "auction_pass" in guest_ids
 
 
+def test_monopoly_auction_label_and_turn_message_use_property_and_you(monkeypatch) -> None:
+    game = _start_two_player_game()
+    host = game.current_player
+    assert host is not None
+    host_user = game.get_user(host)
+    guest = game.players[1]
+    guest_user = game.get_user(guest)
+    assert host_user is not None
+    assert guest_user is not None
+
+    rolls = iter([2, 2])  # total = 4 -> Connecticut Avenue? no; set explicitly below
+    monkeypatch.setattr("server.games.monopoly.game.random.randint", lambda a, b: next(rolls))
+    game.turn_has_rolled = True
+    game.turn_pending_purchase_space_id = "connecticut_avenue"
+    game.rebuild_all_menus()
+
+    host_actions = game.get_all_visible_actions(host)
+    auction_label = next(
+        resolved.label for resolved in host_actions if resolved.action.id == "auction_property"
+    )
+    assert auction_label == "Auction Connecticut Avenue"
+
+    game.execute_action(host, "auction_property")
+
+    guest_spoken = " ".join(guest_user.get_spoken_messages())
+    host_spoken = " ".join(host_user.get_spoken_messages())
+    assert "Your turn to act." in guest_spoken
+    assert "Guest's turn to act." in host_spoken
+
+
 def test_monopoly_mortgage_allowed_for_current_auction_bidder() -> None:
     game = _start_two_player_game()
     host = game.players[0]
@@ -1500,9 +1609,10 @@ def test_monopoly_birthday_card_announces_player_payments() -> None:
     assert result == "resolved"
     host_spoken = " ".join(host_user.get_spoken_messages())
     guest_spoken = " ".join(guest_user.get_spoken_messages())
-    assert "Guest paid $10 to Host." in host_spoken
-    assert "Guest paid $10 to Host." in guest_spoken
-    assert "Host collected $10." in host_spoken
+    assert "Guest paid $10 to you." in host_spoken
+    assert "You paid $10 to Host." in guest_spoken
+    assert "You collected $10." in host_spoken
+    assert "Host collected $10." in guest_spoken
 
 
 def test_monopoly_view_my_properties_focuses_first_item() -> None:

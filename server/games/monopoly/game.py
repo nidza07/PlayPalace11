@@ -734,6 +734,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             Action(
                 id="auction_property",
                 label=Localization.get(locale, "monopoly-auction-property"),
+                get_label="_get_auction_property_label",
                 handler="_action_auction_property",
                 is_enabled="_is_auction_property_enabled",
                 is_hidden="_is_auction_property_hidden",
@@ -1386,12 +1387,26 @@ class MonopolyGame(ActionGuardMixin, Game):
         )
         owner_name = owner.name if owner else self.pending_rent_payment_owner_name or "Bank"
         self._clear_pending_rent_payment()
-        self.broadcast_l(
-            "monopoly-rent-paid",
+        property_name = space.name if space else self.pending_rent_payment_space_id
+        self._broadcast_monopoly_transaction(
+            player,
+            owner,
+            actor_message_id="monopoly-you-rent-paid",
+            recipient_message_id="monopoly-player-paid-you-rent",
+            others_message_id="monopoly-player-rent-paid",
+            actor_fallback=(
+                f"You paid {self._format_money(paid)} in rent to {owner_name} for {property_name}."
+            ),
+            recipient_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to you for {property_name}."
+            ),
+            others_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to {owner_name} for {property_name}."
+            ),
             player=player.name,
             owner=owner_name,
             amount=paid,
-            property=space.name if space else self.pending_rent_payment_space_id,
+            property=property_name,
         )
         self._apply_sore_loser_rebate(player, paid)
         if paid < amount_due:
@@ -1603,6 +1618,82 @@ class MonopolyGame(ActionGuardMixin, Game):
             buffer=buffer,
             **kwargs,
         )
+
+    def _broadcast_monopoly_personal(
+        self,
+        actor: Player,
+        *,
+        personal_message_id: str,
+        others_message_id: str,
+        personal_fallback: str,
+        others_fallback: str,
+        buffer: str = "table",
+        **kwargs,
+    ) -> None:
+        """Broadcast a Monopoly message with localized you/player variants."""
+        for listener in self.players:
+            user = self.get_user(listener)
+            if not user:
+                continue
+            if listener.id == actor.id:
+                text = self._monopoly_text(
+                    user.locale,
+                    personal_message_id,
+                    fallback=personal_fallback,
+                    **kwargs,
+                )
+            else:
+                text = self._monopoly_text(
+                    user.locale,
+                    others_message_id,
+                    fallback=others_fallback,
+                    **kwargs,
+                )
+            user.speak(text, buffer=buffer)
+
+    def _broadcast_monopoly_transaction(
+        self,
+        actor: Player,
+        recipient: Player | None,
+        *,
+        actor_message_id: str,
+        others_message_id: str,
+        actor_fallback: str,
+        others_fallback: str,
+        recipient_message_id: str | None = None,
+        recipient_fallback: str | None = None,
+        buffer: str = "table",
+        **kwargs,
+    ) -> None:
+        """Broadcast a Monopoly transaction with actor/recipient-aware variants."""
+        for listener in self.players:
+            user = self.get_user(listener)
+            if not user:
+                continue
+            if listener.id == actor.id:
+                text = self._monopoly_text(
+                    user.locale,
+                    actor_message_id,
+                    fallback=actor_fallback,
+                    **kwargs,
+                )
+            elif recipient is not None and listener.id == recipient.id:
+                message_id = recipient_message_id or others_message_id
+                fallback = recipient_fallback or others_fallback
+                text = self._monopoly_text(
+                    user.locale,
+                    message_id,
+                    fallback=fallback,
+                    **kwargs,
+                )
+            else:
+                text = self._monopoly_text(
+                    user.locale,
+                    others_message_id,
+                    fallback=others_fallback,
+                    **kwargs,
+                )
+            user.speak(text, buffer=buffer)
 
     def _speak_monopoly_l(
         self,
@@ -2347,6 +2438,21 @@ class MonopolyGame(ActionGuardMixin, Game):
             amount=amount,
         )
 
+    def _get_auction_property_label(self, player: Player, action_id: str) -> str:
+        """Show the pending property name on the auction action when available."""
+        _ = action_id
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        space = self._pending_purchase_space()
+        if not space:
+            return Localization.get(locale, "monopoly-auction-property")
+        return self._monopoly_text(
+            locale,
+            "monopoly-auction-property-space",
+            fallback=f"Auction {self._space_display_name(space, locale)}",
+            property=self._space_display_name(space, locale),
+        )
+
     def _action_view_selected_deed(self, player: Player, space_id: str, action_id: str) -> None:
         """Read one selected deed from board or owned-property menus."""
         _ = action_id
@@ -2483,8 +2589,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         if effect_type == "credit":
             amount = max(0, int(effect_spec.get("amount", 0)))
             credited = self._credit_player(player, amount, "manual_card_credit")
-            self.broadcast_l(
-                "monopoly-card-collect",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-collect",
+                others_message_id="monopoly-player-card-collect",
+                personal_fallback=f"You collected {self._format_money(credited)}.",
+                others_fallback=f"{player.name} collected {self._format_money(credited)}.",
                 player=player.name,
                 amount=credited,
                 cash=player.cash,
@@ -2515,10 +2625,14 @@ class MonopolyGame(ActionGuardMixin, Game):
             if collect_pass_go and player.position < old_position:
                 pass_go_cash = max(0, self.rule_profile.pass_go_cash)
                 credited = self._credit_player(player, pass_go_cash, "manual_card_move_absolute_pass_go")
-                self.broadcast_l(
-                    "monopoly-pass-go",
-                    player=player.name,
+                self._broadcast_monopoly_personal(
+                    player,
+                    personal_message_id="monopoly-you-pass-go",
+                    others_message_id="monopoly-player-pass-go",
+                    personal_fallback=f"You passed GO and collected {self._format_money(credited)}.",
+                    others_fallback=f"{player.name} passed GO and collected {self._format_money(credited)}.",
                     amount=credited,
+                    player=player.name,
                     cash=player.cash,
                 )
             landed_space = self._space_at(player.position)
@@ -2547,8 +2661,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Grant one get-out-of-jail card using classic Monopoly behavior."""
         if self._is_junior_preset():
             credited = self._credit_player(player, 1, "community_chest_junior_bonus")
-            self.broadcast_l(
-                "monopoly-card-collect",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-collect",
+                others_message_id="monopoly-player-card-collect",
+                personal_fallback=f"You collected {self._format_money(credited)}.",
+                others_fallback=f"{player.name} collected {self._format_money(credited)}.",
                 player=player.name,
                 amount=credited,
                 cash=player.cash,
@@ -2644,10 +2762,24 @@ class MonopolyGame(ActionGuardMixin, Game):
             self.rebuild_all_menus()
             return "resolved"
         paid = self._pay_rent_to_owner_or_bank(player, owner, rent_due, reason)
-        self.broadcast_l(
-            "monopoly-rent-paid",
+        owner_name = owner.name if owner else "Bank"
+        self._broadcast_monopoly_transaction(
+            player,
+            owner,
+            actor_message_id="monopoly-you-rent-paid",
+            recipient_message_id="monopoly-player-paid-you-rent",
+            others_message_id="monopoly-player-rent-paid",
+            actor_fallback=(
+                f"You paid {self._format_money(paid)} in rent to {owner_name} for {landed_space.name}."
+            ),
+            recipient_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to you for {landed_space.name}."
+            ),
+            others_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to {owner_name} for {landed_space.name}."
+            ),
             player=player.name,
-            owner=owner.name if owner else "Bank",
+            owner=owner_name,
             amount=paid,
             property=landed_space.name,
         )
@@ -2763,8 +2895,15 @@ class MonopolyGame(ActionGuardMixin, Game):
                 allow_partial=True,
             )
             if paid > 0:
-                self.broadcast_l(
-                    "monopoly-player-paid-player",
+                self._broadcast_monopoly_transaction(
+                    other,
+                    player,
+                    actor_message_id="monopoly-you-paid-player",
+                    recipient_message_id="monopoly-player-paid-you",
+                    others_message_id="monopoly-player-paid-player",
+                    actor_fallback=f"You paid {self._format_money(paid)} to {player.name}.",
+                    recipient_fallback=f"{other.name} paid {self._format_money(paid)} to you.",
+                    others_fallback=f"{other.name} paid {self._format_money(paid)} to {player.name}.",
                     player=other.name,
                     target=player.name,
                     amount=paid,
@@ -2776,8 +2915,12 @@ class MonopolyGame(ActionGuardMixin, Game):
                     creditor_name=player.name,
                     creditor_id=player.id,
                 )
-        self.broadcast_l(
-            "monopoly-card-collect",
+        self._broadcast_monopoly_personal(
+            player,
+            personal_message_id="monopoly-you-card-collect",
+            others_message_id="monopoly-player-card-collect",
+            personal_fallback=f"You collected {self._format_money(total_collected)}.",
+            others_fallback=f"{player.name} collected {self._format_money(total_collected)}.",
             player=player.name,
             amount=total_collected,
             cash=player.cash,
@@ -2807,8 +2950,15 @@ class MonopolyGame(ActionGuardMixin, Game):
                 allow_partial=True,
             )
             if paid > 0:
-                self.broadcast_l(
-                    "monopoly-player-paid-player",
+                self._broadcast_monopoly_transaction(
+                    player,
+                    other,
+                    actor_message_id="monopoly-you-paid-player",
+                    recipient_message_id="monopoly-player-paid-you",
+                    others_message_id="monopoly-player-paid-player",
+                    actor_fallback=f"You paid {self._format_money(paid)} to {other.name}.",
+                    recipient_fallback=f"{player.name} paid {self._format_money(paid)} to you.",
+                    others_fallback=f"{player.name} paid {self._format_money(paid)} to {other.name}.",
                     player=player.name,
                     target=other.name,
                     amount=paid,
@@ -4022,8 +4172,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         bidder = self._current_auction_bidder()
         space = self._pending_auction_space()
         if bidder and space:
-            self.broadcast_l(
-                "monopoly-auction-turn",
+            self._broadcast_monopoly_personal(
+                bidder,
+                personal_message_id="monopoly-you-auction-turn",
+                others_message_id="monopoly-player-auction-turn",
+                personal_fallback="Your turn to act.",
+                others_fallback=f"{bidder.name}'s turn to act.",
                 player=bidder.name,
                 property=space.name,
                 amount=self.pending_auction_current_bid,
@@ -4226,8 +4380,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         if space.space_id in self.mortgaged_space_ids:
             self.mortgaged_space_ids.remove(space.space_id)
 
-        self.broadcast_l(
-            "monopoly-property-bought",
+        self._broadcast_monopoly_personal(
+            player,
+            personal_message_id="monopoly-you-property-bought",
+            others_message_id="monopoly-player-property-bought",
+            personal_fallback=f"You bought {space.name} for {self._format_money(paid)}.",
+            others_fallback=f"{player.name} bought {space.name} for {self._format_money(paid)}.",
             player=player.name,
             property=space.name,
             price=paid,
@@ -4683,7 +4841,16 @@ class MonopolyGame(ActionGuardMixin, Game):
 
         if outcome_type == "coin_ping":
             self._credit_player(player, amount, "question_block_coin_ping")
-            self.broadcast_l("monopoly-card-collect", player=player.name, amount=amount, cash=player.cash)
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-collect",
+                others_message_id="monopoly-player-card-collect",
+                personal_fallback=f"You collected {self._format_money(amount)}.",
+                others_fallback=f"{player.name} collected {self._format_money(amount)}.",
+                player=player.name,
+                amount=amount,
+                cash=player.cash,
+            )
             return "resolved"
 
         if outcome_type in ("bowser", "game_over"):
@@ -4780,8 +4947,12 @@ class MonopolyGame(ActionGuardMixin, Game):
             except (TypeError, ValueError):
                 return "resolved"
             credited = self._credit_player(player, amount, "junior_super_mario_powerup_collect")
-            self.broadcast_l(
-                "monopoly-card-collect",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-collect",
+                others_message_id="monopoly-player-card-collect",
+                personal_fallback=f"You collected {self._format_money(credited)}.",
+                others_fallback=f"{player.name} collected {self._format_money(credited)}.",
                 player=player.name,
                 amount=credited,
                 cash=player.cash,
@@ -4819,8 +4990,12 @@ class MonopolyGame(ActionGuardMixin, Game):
                     pride_rock_event,
                     payload={"pass_go_cash": pass_go_cash},
                 )
-            self.broadcast_l(
-                "monopoly-pass-go",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-pass-go",
+                others_message_id="monopoly-player-pass-go",
+                personal_fallback=f"You passed GO and collected {self._format_money(credited)}.",
+                others_fallback=f"{player.name} passed GO and collected {self._format_money(credited)}.",
                 player=player.name,
                 amount=credited,
                 cash=player.cash,
@@ -4949,16 +5124,24 @@ class MonopolyGame(ActionGuardMixin, Game):
     ) -> None:
         """Broadcast canonical bank-payment messages for taxes/cards."""
         if tax_name:
-            self.broadcast_l(
-                "monopoly-tax-paid",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-tax-paid",
+                others_message_id="monopoly-player-tax-paid",
+                personal_fallback=f"You paid {self._format_money(paid)} for {tax_name}.",
+                others_fallback=f"{player.name} paid {self._format_money(paid)} for {tax_name}.",
                 player=player.name,
                 amount=paid,
                 tax=tax_name,
                 cash=player.cash,
             )
         elif card_reason_key:
-            self.broadcast_l(
-                card_reason_key,
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-pay",
+                others_message_id="monopoly-player-card-pay",
+                personal_fallback=f"You paid {self._format_money(paid)}.",
+                others_fallback=f"{player.name} paid {self._format_money(paid)}.",
                 player=player.name,
                 amount=paid,
                 cash=player.cash,
@@ -5464,8 +5647,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         reason: str,
     ) -> str:
         credited = self._credit_player(player, amount, reason)
-        self.broadcast_l(
-            "monopoly-card-collect",
+        self._broadcast_monopoly_personal(
+            player,
+            personal_message_id="monopoly-you-card-collect",
+            others_message_id="monopoly-player-card-collect",
+            personal_fallback=f"You collected {self._format_money(credited)}.",
+            others_fallback=f"{player.name} collected {self._format_money(credited)}.",
             player=player.name,
             amount=credited,
             cash=player.cash,
@@ -5487,8 +5674,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         if self._is_electronic_banking_preset() and self.banking_profile:
             pass_go_cash = max(0, self.banking_profile.pass_go_credit)
         credited = self._credit_player(player, pass_go_cash, "chance_advance_to_go")
-        self.broadcast_l(
-            "monopoly-pass-go",
+        self._broadcast_monopoly_personal(
+            player,
+            personal_message_id="monopoly-you-pass-go",
+            others_message_id="monopoly-player-pass-go",
+            personal_fallback=f"You passed GO and collected {self._format_money(credited)}.",
+            others_fallback=f"{player.name} passed GO and collected {self._format_money(credited)}.",
             player=player.name,
             amount=credited,
             cash=player.cash,
@@ -5917,10 +6108,24 @@ class MonopolyGame(ActionGuardMixin, Game):
             return "resolved"
         paid = self._pay_rent_to_owner_or_bank(player, owner, rent_due, rent_reason)
 
-        self.broadcast_l(
-            "monopoly-rent-paid",
+        owner_name = owner.name if owner else "Bank"
+        self._broadcast_monopoly_transaction(
+            player,
+            owner,
+            actor_message_id="monopoly-you-rent-paid",
+            recipient_message_id="monopoly-player-paid-you-rent",
+            others_message_id="monopoly-player-rent-paid",
+            actor_fallback=(
+                f"You paid {self._format_money(paid)} in rent to {owner_name} for {landed_space.name}."
+            ),
+            recipient_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to you for {landed_space.name}."
+            ),
+            others_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to {owner_name} for {landed_space.name}."
+            ),
             player=player.name,
-            owner=owner.name if owner else "Bank",
+            owner=owner_name,
             amount=paid,
             property=landed_space.name,
         )

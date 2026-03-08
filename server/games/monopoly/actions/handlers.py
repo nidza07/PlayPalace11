@@ -394,8 +394,12 @@ def action_auction_bid(game: MonopolyGame, player: Player, option: str, action_i
 
     game.pending_auction_current_bid = bid
     game.pending_auction_high_bidder_id = current_bidder.id
-    game.broadcast_l(
-        "monopoly-auction-bid-placed",
+    game._broadcast_monopoly_personal(
+        current_bidder,
+        personal_message_id="monopoly-you-auction-bid-placed",
+        others_message_id="monopoly-player-auction-bid-placed",
+        personal_fallback=f"You bid {game._format_money(bid)} for {space.name}.",
+        others_fallback=f"{current_bidder.name} bid {game._format_money(bid)} for {space.name}.",
         player=current_bidder.name,
         property=space.name,
         amount=bid,
