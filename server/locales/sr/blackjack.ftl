@@ -199,3 +199,4 @@ blackjack-status-line-hands = { $player }: { $chips } žetona, ulog ruke 1 { $be
 blackjack-status-dealer = Delitelj: { $cards } ({ $total })
 blackjack-status-dealer-up = Delitelj: pokazuje { $card }
 blackjack-no-active-players = Nema aktivnih igrača.
+blackjack-waiting-for-bets = Čeka se uplata od { $players }.

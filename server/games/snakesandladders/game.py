@@ -266,9 +266,7 @@ class SnakesAndLaddersGame(Game):
         # Roll dice (1-6)
         roll = random.randint(1, 6)
 
-        # Play random dice roll sound (1-3)
-        roll_variant = random.randint(1, 3)
-        self.play_sound(f"game_squares/diceroll{roll_variant}.ogg")
+        self.play_standard_dice_roll_sound()
 
         self.broadcast_l("snakes-roll-result", player=player.name, roll=roll)
 
@@ -277,20 +275,17 @@ class SnakesAndLaddersGame(Game):
         step_interval = 4    # Fast steps
 
         # --- PHASE 1: Movement Steps ---
-        # Schedule sounds
-        for i in range(roll):
-             step_variant = random.randint(1, self.NUM_STEP_SOUNDS)
-             self.schedule_sound(
-                 f"game_squares/step{step_variant}.ogg",
-                 delay_ticks=step_delay_start + (i * step_interval)
-             )
-
         # Calculate logical new position
         old_pos = snakes_player.position
         intermediate_pos = old_pos + roll
 
         # Event: Update position AFTER steps
-        next_delay = step_delay_start + (roll * step_interval)
+        next_delay = self.schedule_standard_token_movement_sounds(
+            roll,
+            start_delay_ticks=step_delay_start,
+            step_interval_ticks=step_interval,
+            variant_count=self.NUM_STEP_SOUNDS,
+        )
         self.schedule_event(
             "move",
             {"player_id": player.id, "pos": intermediate_pos},

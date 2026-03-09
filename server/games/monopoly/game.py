@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import random
+import re
 
 from ..base import Game, Player, GameOptions
 from ..registry import register_game
@@ -13,6 +14,7 @@ from ...game_utils.actions import Action, ActionSet, EditboxInput, Visibility, M
 from ...game_utils.options import MenuOption, option_field
 from ...messages.localization import Localization
 from ...core.ui.keybinds import KeybindState
+from ...core.users.base import EscapeBehavior, MenuItem
 from .banking_sim import (
     BANK_ACCOUNT_ID,
     BankingState,
@@ -391,28 +393,72 @@ JAIL_CARD_TRADE_CASH = 50
 
 CHANCE_CARD_IDS = [
     "advance_to_go",
+    "advance_to_illinois_avenue",
+    "advance_to_st_charles_place",
+    "advance_to_nearest_utility",
+    "advance_to_nearest_railroad",
     "bank_dividend_50",
+    "get_out_of_jail_free_chance",
     "go_back_three",
     "go_to_jail",
+    "general_repairs",
     "poor_tax_15",
+    "take_trip_to_reading_railroad",
+    "take_walk_on_boardwalk",
+    "chairman_of_the_board_pay_50_each",
+    "building_loan_matures_150",
+    "crossword_competition_100",
 ]
 COMMUNITY_CHEST_CARD_IDS = [
+    "advance_to_go",
     "bank_error_collect_200",
     "doctor_fee_pay_50",
-    "income_tax_refund_20",
+    "from_sale_of_stock_50",
+    "get_out_of_jail_free_community_chest",
     "go_to_jail",
-    "get_out_of_jail_free",
+    "holiday_fund_matures_100",
+    "income_tax_refund_20",
+    "its_your_birthday_collect_10_each",
+    "life_insurance_matures_100",
+    "hospital_fees_pay_100",
+    "school_fees_pay_50",
+    "consultancy_fee_collect_25",
+    "street_repairs",
+    "beauty_contest_second_prize_10",
+    "inherit_100",
 ]
 CARD_DESCRIPTION_KEYS = {
     "advance_to_go": "monopoly-card-advance-to-go",
+    "advance_to_illinois_avenue": "monopoly-card-advance-to-illinois-avenue",
+    "advance_to_st_charles_place": "monopoly-card-advance-to-st-charles-place",
+    "advance_to_nearest_utility": "monopoly-card-advance-to-nearest-utility",
+    "advance_to_nearest_railroad": "monopoly-card-advance-to-nearest-railroad",
     "bank_dividend_50": "monopoly-card-bank-dividend-50",
+    "get_out_of_jail_free_chance": "monopoly-card-get-out-of-jail",
     "go_back_three": "monopoly-card-go-back-three",
     "go_to_jail": "monopoly-card-go-to-jail",
+    "general_repairs": "monopoly-card-general-repairs",
     "poor_tax_15": "monopoly-card-poor-tax-15",
+    "take_trip_to_reading_railroad": "monopoly-card-reading-railroad",
+    "take_walk_on_boardwalk": "monopoly-card-boardwalk",
+    "chairman_of_the_board_pay_50_each": "monopoly-card-chairman-of-the-board",
+    "building_loan_matures_150": "monopoly-card-building-loan-matures",
+    "crossword_competition_100": "monopoly-card-crossword-competition",
     "bank_error_collect_200": "monopoly-card-bank-error-200",
     "doctor_fee_pay_50": "monopoly-card-doctor-fee-50",
-    "income_tax_refund_20": "monopoly-card-tax-refund-20",
+    "from_sale_of_stock_50": "monopoly-card-sale-of-stock-50",
     "get_out_of_jail_free": "monopoly-card-get-out-of-jail",
+    "get_out_of_jail_free_community_chest": "monopoly-card-get-out-of-jail",
+    "holiday_fund_matures_100": "monopoly-card-holiday-fund",
+    "income_tax_refund_20": "monopoly-card-tax-refund-20",
+    "its_your_birthday_collect_10_each": "monopoly-card-birthday",
+    "life_insurance_matures_100": "monopoly-card-life-insurance",
+    "hospital_fees_pay_100": "monopoly-card-hospital-fees-100",
+    "school_fees_pay_50": "monopoly-card-school-fees-50",
+    "consultancy_fee_collect_25": "monopoly-card-consultancy-fee-25",
+    "street_repairs": "monopoly-card-street-repairs",
+    "beauty_contest_second_prize_10": "monopoly-card-beauty-contest-10",
+    "inherit_100": "monopoly-card-inherit-100",
 }
 
 
@@ -583,6 +629,7 @@ class MonopolyGame(ActionGuardMixin, Game):
     )
     active_board_size: int = BOARD_SIZE
     active_sound_mode: str = "none"
+    active_currency_name: str = ""
     last_hardware_event_id: str = ""
     last_hardware_event_status: str = "none"
     last_hardware_event_details: str = ""
@@ -603,12 +650,23 @@ class MonopolyGame(ActionGuardMixin, Game):
     mortgaged_space_ids: list[str] = field(default_factory=list)
     building_levels: dict[str, int] = field(default_factory=dict)
     pending_trade_offer: MonopolyTradeOffer | None = None
+    deed_browse_owner_by_viewer_id: dict[str, str] = field(default_factory=dict)
+    deed_browse_return_by_viewer_id: dict[str, str] = field(default_factory=dict)
+    turn_menu_roll_focus_player_ids: set[str] = field(default_factory=set)
+    held_get_out_of_jail_cards_by_player_id: dict[str, list[tuple[str, str]]] = field(
+        default_factory=dict
+    )
     free_parking_pool: int = 0
     pending_auction_space_id: str = ""
     pending_auction_bidder_ids: list[str] = field(default_factory=list)
     pending_auction_turn_index: int = 0
     pending_auction_high_bidder_id: str = ""
     pending_auction_current_bid: int = 0
+    pending_rent_payment_amount: int = 0
+    pending_rent_payment_owner_id: str = ""
+    pending_rent_payment_owner_name: str = ""
+    pending_rent_payment_space_id: str = ""
+    pending_rent_payment_reason: str = ""
 
     turn_has_rolled: bool = False
     turn_last_roll: list[int] = field(default_factory=list)
@@ -668,6 +726,7 @@ class MonopolyGame(ActionGuardMixin, Game):
                 handler="_action_buy_property",
                 is_enabled="_is_buy_property_enabled",
                 is_hidden="_is_buy_property_hidden",
+                get_label="_get_buy_property_label",
             )
         )
 
@@ -676,6 +735,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             Action(
                 id="auction_property",
                 label=Localization.get(locale, "monopoly-auction-property"),
+                get_label="_get_auction_property_label",
                 handler="_action_auction_property",
                 is_enabled="_is_auction_property_enabled",
                 is_hidden="_is_auction_property_hidden",
@@ -872,15 +932,6 @@ class MonopolyGame(ActionGuardMixin, Game):
                 is_hidden="_is_claim_cheat_reward_hidden",
             )
         )
-        action_set.add(
-            Action(
-                id="end_turn",
-                label=Localization.get(locale, "monopoly-end-turn"),
-                handler="_action_end_turn",
-                is_enabled="_is_end_turn_enabled",
-                is_hidden="_is_end_turn_hidden",
-            )
-        )
 
     def create_turn_action_set(self, player: MonopolyPlayer) -> ActionSet:
         """Create the turn action set for Monopoly."""
@@ -914,25 +965,55 @@ class MonopolyGame(ActionGuardMixin, Game):
         )
         self.define_keybind("h", "Build house", ["build_house"], state=KeybindState.ACTIVE)
         self.define_keybind("shift+h", "Sell house", ["sell_house"], state=KeybindState.ACTIVE)
-        self.define_keybind("t", "Offer trade", ["offer_trade"], state=KeybindState.ACTIVE)
-        self.define_keybind("shift+t", "Accept trade", ["accept_trade"], state=KeybindState.ACTIVE)
+        self.define_keybind("e", "Offer trade", ["offer_trade"], state=KeybindState.ACTIVE)
+        self.define_keybind("shift+e", "Accept trade", ["accept_trade"], state=KeybindState.ACTIVE)
         self.define_keybind("ctrl+t", "Decline trade", ["decline_trade"], state=KeybindState.ACTIVE)
         self.define_keybind("j", "Pay bail", ["pay_bail"], state=KeybindState.ACTIVE)
 
     def _define_banking_and_voice_keybinds(self) -> None:
+        self.define_keybind("c", "Read cash", ["read_cash"], state=KeybindState.ACTIVE)
         self.define_keybind("ctrl+b", "Bank balance", ["banking_balance"], state=KeybindState.ACTIVE)
         self.define_keybind(
             "shift+b", "Bank transfer", ["banking_transfer"], state=KeybindState.ACTIVE
         )
         self.define_keybind("alt+b", "Bank ledger", ["banking_ledger"], state=KeybindState.ACTIVE)
-        self.define_keybind("v", "Voice command", ["voice_command"], state=KeybindState.ACTIVE)
-        self.define_keybind("e", "End turn", ["end_turn"], state=KeybindState.ACTIVE)
+        self.define_keybind("alt+v", "Voice command", ["voice_command"], state=KeybindState.ACTIVE)
 
     def _define_preset_announcement_keybind(self) -> None:
         self.define_keybind(
-            "p",
+            "o",
             "Announce current preset",
             ["announce_preset"],
+            state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+
+    def _define_deed_and_property_keybinds(self) -> None:
+        self.define_keybind(
+            "d",
+            "View active deed",
+            ["view_active_deed"],
+            state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+        self.define_keybind(
+            "shift+d",
+            "Browse all deeds",
+            ["browse_all_deeds"],
+            state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+        self.define_keybind(
+            "p",
+            "View my properties",
+            ["view_my_properties"],
+            state=KeybindState.ACTIVE,
+            include_spectators=True,
+        )
+        self.define_keybind(
+            "shift+p",
+            "Browse player properties",
+            ["view_player_properties"],
             state=KeybindState.ACTIVE,
             include_spectators=True,
         )
@@ -944,15 +1025,100 @@ class MonopolyGame(ActionGuardMixin, Game):
         self._define_property_trade_jail_keybinds()
         self._define_banking_and_voice_keybinds()
         self._define_preset_announcement_keybind()
+        self._define_deed_and_property_keybinds()
 
     def _add_standard_monopoly_actions(self, action_set: ActionSet, locale: str) -> None:
-        action_set.add(
+        local_actions = [
+            Action(
+                id="view_active_deed",
+                label=Localization.get(locale, "monopoly-view-active-deed"),
+                handler="_action_view_active_deed",
+                is_enabled="_is_view_active_deed_enabled",
+                is_hidden="_is_view_active_deed_hidden",
+                get_label="_get_view_active_deed_label",
+            ),
+            Action(
+                id="browse_all_deeds",
+                label=Localization.get(locale, "monopoly-browse-all-deeds"),
+                handler="_action_browse_all_deeds",
+                is_enabled="_is_browse_all_deeds_enabled",
+                is_hidden="_is_always_hidden",
+            ),
+            Action(
+                id="view_my_properties",
+                label=Localization.get(locale, "monopoly-view-my-properties"),
+                handler="_action_view_my_properties",
+                is_enabled="_is_view_my_properties_enabled",
+                is_hidden="_is_always_hidden",
+            ),
+            Action(
+                id="view_player_properties",
+                label=Localization.get(locale, "monopoly-view-player-properties"),
+                handler="_action_view_player_properties",
+                is_enabled="_is_view_player_properties_enabled",
+                is_hidden="_is_always_hidden",
+            ),
+            Action(
+                id="read_cash",
+                label=Localization.get(locale, "monopoly-read-cash"),
+                handler="_action_read_cash",
+                is_enabled="_is_read_cash_enabled",
+                is_hidden="_is_always_hidden",
+            ),
             Action(
                 id="announce_preset",
                 label=Localization.get(locale, "monopoly-announce-preset"),
                 handler="_action_announce_preset",
                 is_enabled="_is_announce_preset_enabled",
                 is_hidden="_is_announce_preset_hidden",
+            ),
+        ]
+        for action in local_actions:
+            action_set.add(action)
+        for action in reversed(local_actions):
+            if action.id in action_set._order:
+                action_set._order.remove(action.id)
+            action_set._order.insert(0, action.id)
+        action_set.add(
+            Action(
+                id="view_selected_deed",
+                label=Localization.get(locale, "monopoly-view-selected-deed"),
+                handler="_action_view_selected_deed",
+                is_enabled="_is_view_selected_deed_enabled",
+                is_hidden="_is_always_hidden",
+                show_in_actions_menu=False,
+                input_request=MenuInput(
+                    prompt="monopoly-select-property-deed",
+                    options="_options_for_deed_browser_selection",
+                ),
+            )
+        )
+        action_set.add(
+            Action(
+                id="select_player_property_owner",
+                label=Localization.get(locale, "monopoly-select-player-properties"),
+                handler="_action_select_player_property_owner",
+                is_enabled="_is_view_player_properties_enabled",
+                is_hidden="_is_always_hidden",
+                show_in_actions_menu=False,
+                input_request=MenuInput(
+                    prompt="monopoly-select-player-properties",
+                    options="_options_for_player_property_owners",
+                ),
+            )
+        )
+        action_set.add(
+            Action(
+                id="view_selected_owner_property_deed",
+                label=Localization.get(locale, "monopoly-view-selected-owner-property-deed"),
+                handler="_action_view_selected_owner_property_deed",
+                is_enabled="_is_view_selected_owner_property_deed_enabled",
+                is_hidden="_is_always_hidden",
+                show_in_actions_menu=False,
+                input_request=MenuInput(
+                    prompt="monopoly-select-player-property-deed",
+                    options="_options_for_selected_owner_property_deeds",
+                ),
             )
         )
 
@@ -963,6 +1129,51 @@ class MonopolyGame(ActionGuardMixin, Game):
         locale = user.locale if user else "en"
         self._add_standard_monopoly_actions(action_set, locale)
         return action_set
+
+    def guard_turn_action_enabled(
+        self,
+        player: Player,
+        *,
+        allow_spectators: bool = False,
+        require_current_player: bool = True,
+    ) -> str | None:
+        """Block Monopoly turn actions while movement animation is in progress."""
+        error = super().guard_turn_action_enabled(
+            player,
+            allow_spectators=allow_spectators,
+            require_current_player=require_current_player,
+        )
+        if error:
+            return error
+        if self.is_animating:
+            return "action-game-in-progress"
+        return None
+
+    def _preferred_turn_focus_action_id(self, player: Player) -> str | None:
+        """Return the preferred one-shot turn-menu focus action."""
+        for resolved in self.get_all_visible_actions(player):
+            if resolved.action.id == "roll_dice":
+                return "roll_dice"
+        return None
+
+    def _queue_roll_focus(self, player: Player | None) -> None:
+        """Focus roll on the next rebuild when roll is available."""
+        if player is None:
+            return
+        self.turn_menu_roll_focus_player_ids.add(player.id)
+
+    def rebuild_player_menu(self, player: Player, *, position: int | None = None) -> None:
+        """Rebuild Monopoly turn menus with queued one-shot roll focus."""
+        if position is None and player.id in self.turn_menu_roll_focus_player_ids:
+            preferred_action_id = self._preferred_turn_focus_action_id(player)
+            if preferred_action_id:
+                visible_actions = self.get_all_visible_actions(player)
+                for index, resolved in enumerate(visible_actions, start=1):
+                    if resolved.action.id == preferred_action_id:
+                        position = index
+                        break
+            self.turn_menu_roll_focus_player_ids.discard(player.id)
+        super().rebuild_player_menu(player, position=position)
 
     def get_available_preset_ids(self) -> list[str]:
         """Return selectable preset ids from generated catalog artifacts."""
@@ -1077,6 +1288,215 @@ class MonopolyGame(ActionGuardMixin, Game):
     def _current_liquid_balance(self, player: MonopolyPlayer) -> int:
         """Return current spendable balance for decision and validation logic."""
         return self._bank_balance(player)
+
+    def _has_pending_rent_payment(self, player: MonopolyPlayer | None = None) -> bool:
+        """Return True when the current turn is paused for unresolved rent."""
+        if self.pending_rent_payment_amount <= 0:
+            return False
+        if player is None:
+            return isinstance(self.current_player, MonopolyPlayer)
+        current = self.current_player
+        return isinstance(current, MonopolyPlayer) and current.id == player.id
+
+    def _pending_rent_shortfall(self, player: MonopolyPlayer) -> int:
+        """Return the remaining shortfall on the active pending rent payment."""
+        if not self._has_pending_rent_payment(player):
+            return 0
+        return max(0, self.pending_rent_payment_amount - self._current_liquid_balance(player))
+
+    def _clear_pending_rent_payment(self) -> None:
+        """Clear the active unresolved rent payment state."""
+        self.pending_rent_payment_amount = 0
+        self.pending_rent_payment_owner_id = ""
+        self.pending_rent_payment_owner_name = ""
+        self.pending_rent_payment_space_id = ""
+        self.pending_rent_payment_reason = ""
+
+    def _announce_pending_rent_shortfall(self, player: MonopolyPlayer) -> None:
+        """Tell the player how much rent they still need to raise."""
+        shortfall = self._pending_rent_shortfall(player)
+        if shortfall <= 0:
+            return
+        user = self.get_user(player)
+        if not user:
+            return
+        user.speak(
+            (
+                f"You are short by {self._format_money(shortfall)}. "
+                "Use mortgage, sell house, or trade actions to raise cash."
+            ),
+            buffer="table",
+        )
+
+    def _can_raise_cash_for_pending_rent(self, player: MonopolyPlayer) -> bool:
+        """Return True when the player still has plausible ways to raise cash."""
+        actionable_pending_trade = self._pending_trade_for_target(player) is not None
+        return bool(
+            self._mortgage_space_ids(player)
+            or self._options_for_sell_house(player)
+            or self._options_for_offer_trade(player)
+            or actionable_pending_trade
+        )
+
+    def _start_pending_rent_payment(
+        self,
+        player: MonopolyPlayer,
+        *,
+        owner: Player | None,
+        amount_due: int,
+        landed_space: MonopolySpace | None,
+        reason: str,
+        payment_label: str | None = None,
+    ) -> None:
+        """Pause the turn so the player can manually raise rent money."""
+        self.pending_rent_payment_amount = amount_due
+        self.pending_rent_payment_owner_id = owner.id if owner else ""
+        self.pending_rent_payment_owner_name = owner.name if owner else "Bank"
+        if landed_space is not None:
+            self.pending_rent_payment_space_id = landed_space.space_id
+        else:
+            self.pending_rent_payment_space_id = payment_label or ""
+        self.pending_rent_payment_reason = reason
+        self._announce_pending_rent_shortfall(player)
+
+    def _is_pending_bank_payment(self) -> bool:
+        """Return True when the current pending payment is owed to the bank."""
+        if self.pending_rent_payment_amount <= 0:
+            return False
+        return bool(
+            self.pending_rent_payment_reason
+            and not self.pending_rent_payment_reason.startswith("rent:")
+            and not self.pending_rent_payment_reason.startswith("card_rent:")
+        )
+
+    def _utility_rent_detail(self, dice_total: int, multiplier: int) -> str:
+        """Describe utility rent as multiplier times the triggering roll."""
+        return self._monopoly_text(
+            "en",
+            "monopoly-utility-rent-detail",
+            fallback=f"{multiplier} times roll of {dice_total}.",
+            multiplier=multiplier,
+            roll=dice_total,
+        )
+
+    def _rent_detail_text(
+        self,
+        space: MonopolySpace | None,
+        *,
+        owner_id: str,
+        dice_total: int | None,
+        utility_multiplier: int | None = None,
+    ) -> str:
+        """Return optional trailing rent detail for utility spaces."""
+        if space is None or space.kind != "utility":
+            return ""
+        owned = max(1, self._count_owned_kind(owner_id, "utility"))
+        multiplier = utility_multiplier if utility_multiplier is not None else (10 if owned >= 2 else 4)
+        roll_value = dice_total if dice_total is not None else sum(self.turn_last_roll)
+        return self._utility_rent_detail(roll_value, multiplier)
+
+    def _try_resolve_pending_rent_payment(self, player: MonopolyPlayer) -> bool:
+        """Settle the current pending rent payment when enough cash has been raised."""
+        if not self._has_pending_rent_payment(player):
+            return False
+        amount_due = self.pending_rent_payment_amount
+        if amount_due <= 0:
+            self._clear_pending_rent_payment()
+            return False
+        if self._current_liquid_balance(player) < amount_due:
+            if not self._can_raise_cash_for_pending_rent(player):
+                owner = self.get_player_by_id(self.pending_rent_payment_owner_id)
+                creditor_name = owner.name if owner else self.pending_rent_payment_owner_name or "Bank"
+                creditor_id = owner.id if owner and isinstance(owner, MonopolyPlayer) else None
+                self._clear_pending_rent_payment()
+                self._declare_bankrupt(
+                    player,
+                    creditor_name=creditor_name,
+                    creditor_id=creditor_id,
+                )
+                return True
+            self._announce_pending_rent_shortfall(player)
+            self.rebuild_all_menus()
+            return False
+
+        owner = self.get_player_by_id(self.pending_rent_payment_owner_id)
+        space = self._space_by_id_or_none(self.pending_rent_payment_space_id)
+        pending_reason = self.pending_rent_payment_reason or "rent"
+        pending_bank_payment = self._is_pending_bank_payment()
+        if pending_bank_payment:
+            paid = self._debit_player_to_bank(
+                player,
+                amount_due,
+                pending_reason,
+                allow_partial=True,
+            )
+            if self._is_free_parking_jackpot_enabled():
+                self.free_parking_pool += paid
+        else:
+            paid = self._pay_rent_to_owner_or_bank(
+                player,
+                owner,
+                amount_due,
+                pending_reason,
+            )
+        owner_name = owner.name if owner else self.pending_rent_payment_owner_name or "Bank"
+        self._clear_pending_rent_payment()
+        property_name = space.name if space else self.pending_rent_payment_space_id
+        if pending_bank_payment:
+            self._broadcast_bank_payment(player, paid, property_name or owner_name, None)
+        else:
+            self._broadcast_monopoly_transaction(
+                player,
+                owner,
+                actor_message_id="monopoly-you-rent-paid",
+                recipient_message_id="monopoly-player-paid-you-rent",
+                others_message_id="monopoly-player-rent-paid",
+                actor_fallback=(
+                    f"You paid {self._format_money(paid)} in rent to {owner_name} for {property_name}."
+                ),
+                recipient_fallback=(
+                    f"{player.name} paid {self._format_money(paid)} in rent to you for {property_name}."
+                ),
+                others_fallback=(
+                    f"{player.name} paid {self._format_money(paid)} in rent to {owner_name} for {property_name}."
+                ),
+                player=player.name,
+                owner=owner_name,
+                amount=paid,
+                property=property_name,
+                detail=self._rent_detail_text(
+                    space,
+                    owner_id=owner.id if owner and isinstance(owner, MonopolyPlayer) else "",
+                    dice_total=None,
+                ),
+            )
+        self._apply_sore_loser_rebate(player, paid)
+        if paid < amount_due:
+            creditor_id = owner.id if owner and isinstance(owner, MonopolyPlayer) else None
+            self._declare_bankrupt(
+                player,
+                creditor_name=owner_name,
+                creditor_id=creditor_id,
+            )
+            return True
+        self._sync_cash_scores()
+        self._advance_after_roll_resolution(player)
+        return True
+
+    def _asset_management_actor(self) -> MonopolyPlayer | None:
+        """Return the player who may currently use cash-raising actions."""
+        if self._is_auction_active():
+            return self._current_auction_bidder()
+        current = self.current_player
+        if isinstance(current, MonopolyPlayer):
+            return current
+        return None
+
+    def _can_manage_assets_now(self, player: Player) -> bool:
+        """Return True when this player may raise cash via asset actions."""
+        mono_player = player  # type: ignore[assignment]
+        actor = self._asset_management_actor()
+        return actor is not None and actor.id == mono_player.id and not mono_player.bankrupt
 
     def _credit_player(self, player: MonopolyPlayer, amount: int, reason: str) -> int:
         """Credit player funds and return actual amount credited."""
@@ -1196,6 +1616,250 @@ class MonopolyGame(ActionGuardMixin, Game):
             return fallback
         return text
 
+    def _monopoly_text(
+        self,
+        locale: str,
+        key: str,
+        *,
+        fallback: str | None = None,
+        **kwargs,
+    ) -> str:
+        """Return one Monopoly locale string with optional fallback text."""
+        kwargs = self._format_monopoly_message_kwargs(kwargs)
+        text = Localization.get(locale, key, **kwargs)
+        if fallback is not None and text == key:
+            return fallback
+        return text
+
+    def _format_money(self, amount: int) -> str:
+        """Format one Monopoly money value using the active board currency style."""
+        sign = "-" if amount < 0 else ""
+        digits = f"{abs(amount):,}"
+        if self.active_currency_name:
+            return f"{sign}{digits} {self.active_currency_name}"
+        return f"{sign}${digits}"
+
+    def _format_monopoly_message_kwargs(self, kwargs: dict[str, object]) -> dict[str, object]:
+        """Format Monopoly money placeholders before localization."""
+        if not kwargs:
+            return kwargs
+        formatted = dict(kwargs)
+        for key in ("amount", "cash", "price", "per_house", "per_hotel"):
+            value = formatted.get(key)
+            if isinstance(value, int):
+                formatted[key] = self._format_money(value)
+        return formatted
+
+    def broadcast_l(
+        self,
+        message_id: str,
+        buffer: str = "table",
+        exclude: Player | None = None,
+        **kwargs,
+    ) -> None:
+        """Send localized messages, formatting Monopoly money placeholders centrally."""
+        if message_id.startswith("monopoly-"):
+            kwargs = self._format_monopoly_message_kwargs(kwargs)
+        super().broadcast_l(message_id, buffer=buffer, exclude=exclude, **kwargs)
+
+    def broadcast_personal_l(
+        self,
+        player: Player,
+        personal_message_id: str,
+        others_message_id: str,
+        buffer: str = "table",
+        **kwargs,
+    ) -> None:
+        """Send personalized localized messages with Monopoly money formatting."""
+        if personal_message_id.startswith("monopoly-") or others_message_id.startswith("monopoly-"):
+            kwargs = self._format_monopoly_message_kwargs(kwargs)
+        super().broadcast_personal_l(
+            player,
+            personal_message_id,
+            others_message_id,
+            buffer=buffer,
+            **kwargs,
+        )
+
+    def _broadcast_monopoly_personal(
+        self,
+        actor: Player,
+        *,
+        personal_message_id: str,
+        others_message_id: str,
+        personal_fallback: str,
+        others_fallback: str,
+        buffer: str = "table",
+        **kwargs,
+    ) -> None:
+        """Broadcast a Monopoly message with localized you/player variants."""
+        for listener in self.players:
+            user = self.get_user(listener)
+            if not user:
+                continue
+            if listener.id == actor.id:
+                text = self._monopoly_text(
+                    user.locale,
+                    personal_message_id,
+                    fallback=personal_fallback,
+                    **kwargs,
+                )
+            else:
+                text = self._monopoly_text(
+                    user.locale,
+                    others_message_id,
+                    fallback=others_fallback,
+                    **kwargs,
+                )
+            user.speak(text, buffer=buffer)
+
+    def _broadcast_monopoly_transaction(
+        self,
+        actor: Player,
+        recipient: Player | None,
+        *,
+        actor_message_id: str,
+        others_message_id: str,
+        actor_fallback: str,
+        others_fallback: str,
+        recipient_message_id: str | None = None,
+        recipient_fallback: str | None = None,
+        buffer: str = "table",
+        **kwargs,
+    ) -> None:
+        """Broadcast a Monopoly transaction with actor/recipient-aware variants."""
+        for listener in self.players:
+            user = self.get_user(listener)
+            if not user:
+                continue
+            if listener.id == actor.id:
+                text = self._monopoly_text(
+                    user.locale,
+                    actor_message_id,
+                    fallback=actor_fallback,
+                    **kwargs,
+                )
+            elif recipient is not None and listener.id == recipient.id:
+                message_id = recipient_message_id or others_message_id
+                fallback = recipient_fallback or others_fallback
+                text = self._monopoly_text(
+                    user.locale,
+                    message_id,
+                    fallback=fallback,
+                    **kwargs,
+                )
+            else:
+                text = self._monopoly_text(
+                    user.locale,
+                    others_message_id,
+                    fallback=others_fallback,
+                    **kwargs,
+                )
+            user.speak(text, buffer=buffer)
+
+    def _speak_monopoly_l(
+        self,
+        user,
+        message_id: str,
+        buffer: str = "misc",
+        **kwargs,
+    ) -> None:
+        """Speak one localized Monopoly message with formatted money placeholders."""
+        user.speak_l(
+            message_id,
+            buffer,
+            **self._format_monopoly_message_kwargs(kwargs),
+        )
+
+    def _detect_manual_currency_name(self, payload: object) -> str:
+        """Extract a themed currency name from manual-rule payload text notes."""
+        if isinstance(payload, str):
+            match = re.search(r"Themed currency:\s*([A-Za-z][A-Za-z ]*[A-Za-z])\.", payload)
+            return match.group(1).strip() if match else ""
+        if isinstance(payload, dict):
+            for value in payload.values():
+                currency_name = self._detect_manual_currency_name(value)
+                if currency_name:
+                    return currency_name
+            return ""
+        if isinstance(payload, list):
+            for value in payload:
+                currency_name = self._detect_manual_currency_name(value)
+                if currency_name:
+                    return currency_name
+        return ""
+
+    def _resolve_active_currency_name(self) -> str:
+        """Resolve the active board currency name, defaulting to dollars."""
+        if self.active_manual_rule_set is None:
+            return ""
+        return self._detect_manual_currency_name(self.active_manual_rule_set.cards)
+
+    def _sync_active_space_names_from_locale(self) -> None:
+        """Normalize runtime space names from locale keys instead of board literals."""
+        normalized_spaces: list[MonopolySpace] = []
+        for space in self.active_board_spaces:
+            key = f"monopoly-space-{space.space_id}"
+            resolved = Localization.get("en", key)
+            if resolved and resolved != key:
+                normalized_spaces.append(replace(space, name=resolved))
+            else:
+                normalized_spaces.append(space)
+        self.active_board_spaces = normalized_spaces
+        self.active_space_by_id = {space.space_id: space for space in normalized_spaces}
+
+    def _space_display_name(self, space: MonopolySpace, locale: str) -> str:
+        """Return localized display text for one board space."""
+        return self._monopoly_text(
+            locale,
+            f"monopoly-space-{space.space_id}",
+            fallback=space.name,
+        )
+
+    def _handle_keybind_event(self, player: Player, event: dict) -> None:
+        """Handle keybinds with Monopoly-specific no-rebuild status keys."""
+        key = self._normalize_keybind(event)
+        menu_item_id = event.get("menu_item_id")
+        menu_index = event.get("menu_index")
+
+        if key == "space" and getattr(self, "status", "playing") != "playing" and menu_item_id:
+            handler = getattr(self, "_speak_option_description", None)
+            if handler and handler(player, menu_item_id):
+                return
+
+        keybinds = self._keybinds.get(key)
+        if keybinds is None:
+            return
+
+        is_spectator = self._is_player_spectator(player)
+
+        from ..base import ActionContext
+
+        context = ActionContext(
+            menu_item_id=menu_item_id,
+            menu_index=menu_index,
+            from_keybind=True,
+        )
+
+        executed_any = self._execute_keybinds(
+            player, keybinds, is_spectator, menu_item_id, context
+        )
+
+        no_rebuild_keys = {
+            "c",
+            "ctrl+b",
+            "ctrl+w",
+            "alt+b",
+            "o",
+            "s",
+            "t",
+        }
+        if key in no_rebuild_keys:
+            return
+
+        if self._should_rebuild_after_keybind(player, executed_any):
+            self.rebuild_all_menus()
+
     def _is_announce_preset_enabled(self, player: Player) -> str | None:
         """Enable preset announcements during active play."""
         return self.guard_game_active()
@@ -1217,6 +1881,717 @@ class MonopolyGame(ActionGuardMixin, Game):
             preset=preset_name,
             count=len(self.active_edition_ids),
         )
+
+    def _deed_capable_spaces_in_board_order(self) -> list[MonopolySpace]:
+        """Return all purchasable spaces that can render deed text."""
+        return [space for space in self.active_board_spaces if space.kind in PURCHASABLE_KINDS]
+
+    def _active_deed_space(self) -> MonopolySpace | None:
+        """Return active deed target for quick deed lookup."""
+        pending = self._pending_purchase_space()
+        if pending and pending.kind in PURCHASABLE_KINDS:
+            return pending
+        auction = self._pending_auction_space()
+        if auction and auction.kind in PURCHASABLE_KINDS:
+            return auction
+        current = self.current_player
+        if not current or not isinstance(current, MonopolyPlayer) or self.active_board_size <= 0:
+            return None
+        landed = self._space_at(current.position)
+        if landed.kind not in PURCHASABLE_KINDS:
+            return None
+        return landed
+
+    def _owner_name_for_space(self, space_id: str, locale: str) -> str:
+        """Return owner name for one space id."""
+        owner_id = self.property_owners.get(space_id, "")
+        if not owner_id:
+            return self._monopoly_text(locale, "monopoly-owner-bank", fallback="Bank")
+        owner = self.get_player_by_id(owner_id)
+        if owner:
+            return owner.name
+        return self._monopoly_text(locale, "monopoly-owner-unknown", fallback="Unknown")
+
+    def _building_status_text(self, space: MonopolySpace, locale: str) -> str:
+        """Return compact building status text for property summaries."""
+        if not self._is_street_property(space):
+            return ""
+        level = self._building_level(space.space_id)
+        if level <= 0:
+            return ""
+        if level >= 5:
+            return self._monopoly_text(
+                locale,
+                "monopoly-building-status-hotel",
+                fallback="with hotel",
+            )
+        if level == 1:
+            return self._monopoly_text(
+                locale,
+                "monopoly-building-status-one-house",
+                fallback="with 1 house",
+            )
+        return self._monopoly_text(
+            locale,
+            "monopoly-building-status-houses",
+            fallback=f"with {level} houses",
+            count=level,
+        )
+
+    def _deed_menu_label(self, space: MonopolySpace, locale: str) -> str:
+        """Build one concise menu label for deed browsing."""
+        owner = self._owner_name_for_space(space.space_id, locale)
+        building = self._building_status_text(space, locale)
+        mortgaged = ""
+        if self._is_space_mortgaged(space.space_id):
+            mortgaged = self._monopoly_text(
+                locale,
+                "monopoly-mortgaged-short",
+                fallback="mortgaged",
+            )
+        extras = ", ".join([part for part in (building, mortgaged) if part])
+        property_name = self._space_display_name(space, locale)
+        if extras:
+            return self._monopoly_text(
+                locale,
+                "monopoly-deed-menu-label-extra",
+                fallback=f"{property_name} ({owner}; {extras})",
+                property=property_name,
+                owner=owner,
+                extras=extras,
+            )
+        return self._monopoly_text(
+            locale,
+            "monopoly-deed-menu-label",
+            fallback=f"{property_name} ({owner})",
+            property=property_name,
+            owner=owner,
+        )
+
+    def _sorted_owned_space_ids(self, owner_id: str) -> list[str]:
+        """Return owner's deed-capable spaces sorted by board index."""
+        spaces: list[MonopolySpace] = []
+        for space_id, mapped_owner_id in self.property_owners.items():
+            if mapped_owner_id != owner_id:
+                continue
+            space = self.active_space_by_id.get(space_id)
+            if not space or space.kind not in PURCHASABLE_KINDS:
+                continue
+            spaces.append(space)
+        spaces.sort(key=lambda space: space.index)
+        return [space.space_id for space in spaces]
+
+    def _deed_lines(self, space: MonopolySpace, locale: str) -> list[str]:
+        """Render one title deed as multiline status text."""
+        lines = [self._space_display_name(space, locale)]
+        if self._is_street_property(space):
+            color = self._monopoly_text(
+                locale,
+                f"monopoly-color-{space.color_group}",
+                fallback=space.color_group.replace("_", " ").title(),
+            )
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-type-color-group",
+                    fallback=f"Type: {color} color group",
+                    color=color,
+                )
+            )
+        elif space.kind == "railroad":
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-type-railroad",
+                    fallback="Type: Railroad",
+                )
+            )
+        elif space.kind == "utility":
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-type-utility",
+                    fallback="Type: Utility",
+                )
+            )
+        else:
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-type-generic",
+                    fallback=f"Type: {space.kind.title()}",
+                    kind=space.kind.title(),
+                )
+            )
+        if space.price > 0:
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-purchase-price",
+                    fallback=f"Purchase price: {self._format_money(space.price)}",
+                    amount=space.price,
+                )
+            )
+
+        if self._is_street_property(space):
+            base_rent = space.rents[0] if space.rents else space.rent
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-rent",
+                    fallback=f"Rent: {self._format_money(base_rent)}",
+                    amount=base_rent,
+                )
+            )
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-full-set-rent",
+                    fallback=f"If owner has full color set: {self._format_money(base_rent * 2)}",
+                    amount=base_rent * 2,
+                )
+            )
+            if space.rents:
+                if len(space.rents) > 1:
+                    lines.append(
+                        self._monopoly_text(
+                            locale,
+                            "monopoly-deed-rent-one-house",
+                            fallback=f"With 1 house: {self._format_money(space.rents[1])}",
+                            amount=space.rents[1],
+                        )
+                    )
+                if len(space.rents) > 2:
+                    lines.append(
+                        self._monopoly_text(
+                            locale,
+                            "monopoly-deed-rent-houses",
+                            fallback=f"With 2 houses: {self._format_money(space.rents[2])}",
+                            count=2,
+                            amount=space.rents[2],
+                        )
+                    )
+                if len(space.rents) > 3:
+                    lines.append(
+                        self._monopoly_text(
+                            locale,
+                            "monopoly-deed-rent-houses",
+                            fallback=f"With 3 houses: {self._format_money(space.rents[3])}",
+                            count=3,
+                            amount=space.rents[3],
+                        )
+                    )
+                if len(space.rents) > 4:
+                    lines.append(
+                        self._monopoly_text(
+                            locale,
+                            "monopoly-deed-rent-houses",
+                            fallback=f"With 4 houses: {self._format_money(space.rents[4])}",
+                            count=4,
+                            amount=space.rents[4],
+                        )
+                    )
+                if len(space.rents) > 5:
+                    lines.append(
+                        self._monopoly_text(
+                            locale,
+                            "monopoly-deed-rent-hotel",
+                            fallback=f"With hotel: {self._format_money(space.rents[5])}",
+                            amount=space.rents[5],
+                        )
+                    )
+            if space.house_cost > 0:
+                lines.append(
+                    self._monopoly_text(
+                        locale,
+                        "monopoly-deed-house-cost",
+                        fallback=f"House cost: {self._format_money(space.house_cost)}",
+                        amount=space.house_cost,
+                    )
+                )
+        elif space.kind == "railroad":
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-railroad-rent",
+                    fallback=f"Rent with 1 railroad: {self._format_money(25)}",
+                    count=1,
+                    amount=25,
+                )
+            )
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-railroad-rent",
+                    fallback=f"Rent with 2 railroads: {self._format_money(50)}",
+                    count=2,
+                    amount=50,
+                )
+            )
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-railroad-rent",
+                    fallback=f"Rent with 3 railroads: {self._format_money(100)}",
+                    count=3,
+                    amount=100,
+                )
+            )
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-railroad-rent",
+                    fallback=f"Rent with 4 railroads: {self._format_money(200)}",
+                    count=4,
+                    amount=200,
+                )
+            )
+        elif space.kind == "utility":
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-utility-one-owned",
+                    fallback="If one utility is owned: 4x dice roll",
+                )
+            )
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-utility-both-owned",
+                    fallback="If both utilities are owned: 10x dice roll",
+                )
+            )
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-utility-base-rent",
+                    fallback=f"Utility base rent (legacy fallback): {self._format_money(20)}",
+                    amount=20,
+                )
+            )
+        else:
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-rent",
+                    fallback=f"Rent: {self._format_money(space.rent)}",
+                    amount=space.rent,
+                )
+            )
+
+        lines.append(
+            self._monopoly_text(
+                locale,
+                "monopoly-deed-mortgage-value",
+                fallback=f"Mortgage value: {self._format_money(self._mortgage_value(space))}",
+                amount=self._mortgage_value(space),
+            )
+        )
+        lines.append(
+            self._monopoly_text(
+                locale,
+                "monopoly-deed-unmortgage-cost",
+                fallback=f"Unmortgage cost: {self._format_money(self._unmortgage_cost(space))}",
+                amount=self._unmortgage_cost(space),
+            )
+        )
+        owner = self._owner_name_for_space(space.space_id, locale)
+        lines.append(
+            self._monopoly_text(
+                locale,
+                "monopoly-deed-owner",
+                fallback=f"Owner: {owner}",
+                owner=owner,
+            )
+        )
+
+        building = self._building_status_text(space, locale)
+        if building:
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-current-buildings",
+                    fallback=f"Current buildings: {building}",
+                    buildings=building,
+                )
+            )
+        if self._is_space_mortgaged(space.space_id):
+            lines.append(
+                self._monopoly_text(
+                    locale,
+                    "monopoly-deed-status-mortgaged",
+                    fallback="Status: Mortgaged",
+                )
+            )
+        return lines
+
+    def _open_deed_selection_menu(
+        self,
+        player: Player,
+        *,
+        space_ids: list[str],
+        pending_action_id: str,
+        empty_message_key: str,
+        empty_message_kwargs: dict[str, object] | None = None,
+    ) -> None:
+        """Open a custom property-selection menu tied to a pending action."""
+        user = self.get_user(player)
+        if not user:
+            return
+        locale = user.locale
+        items: list[MenuItem] = []
+        for space_id in space_ids:
+            space = self.active_space_by_id.get(space_id)
+            if not space or space.kind not in PURCHASABLE_KINDS:
+                continue
+            items.append(MenuItem(text=self._deed_menu_label(space, locale), id=space.space_id))
+        if not items:
+            kwargs = empty_message_kwargs or {}
+            user.speak_l(empty_message_key, **kwargs)
+            return
+        items.append(MenuItem(text=Localization.get(user.locale, "back"), id="_cancel"))
+        self._pending_actions[player.id] = pending_action_id
+        user.show_menu(
+            "action_input_menu",
+            items,
+            multiletter=True,
+            escape_behavior=EscapeBehavior.SELECT_LAST,
+            position=1,
+        )
+
+    def _reopen_action_options_menu(
+        self,
+        player: Player,
+        *,
+        pending_action_id: str,
+        options: list[str],
+    ) -> None:
+        """Reopen a standard action-input menu and keep focus at the first option."""
+        user = self.get_user(player)
+        if not user or not options:
+            return
+        items = [MenuItem(text=option, id=option) for option in options]
+        items.append(MenuItem(text=Localization.get(user.locale, "back"), id="_cancel"))
+        self._pending_actions[player.id] = pending_action_id
+        user.show_menu(
+            "action_input_menu",
+            items,
+            multiletter=True,
+            escape_behavior=EscapeBehavior.SELECT_LAST,
+            position=1,
+        )
+
+    def _is_view_active_deed_enabled(self, player: Player) -> str | None:
+        """Enable active-deed lookup during an active game for all viewers."""
+        if self.status != "playing":
+            return "action-not-playing"
+        if self._active_deed_space() is None:
+            return "monopoly-no-active-deed"
+        return None
+
+    def _is_view_active_deed_hidden(self, player: Player) -> Visibility:
+        """Show active-deed action in menus."""
+        return self.turn_action_visibility(
+            player,
+            require_current_player=not self._is_auction_active(),
+            extra_condition=self._active_deed_space() is not None,
+        )
+
+    def _is_browse_all_deeds_enabled(self, player: Player) -> str | None:
+        """Enable all-deeds browser for everyone while playing."""
+        if self.status != "playing":
+            return "action-not-playing"
+        return None
+
+    def _is_browse_all_deeds_hidden(self, player: Player) -> Visibility:
+        """Show all-deeds browser in actions menus."""
+        return Visibility.VISIBLE
+
+    def _is_view_my_properties_enabled(self, player: Player) -> str | None:
+        """Enable own-property browser while playing for seated players only."""
+        if self.status != "playing":
+            return "action-not-playing"
+        if player.is_spectator:
+            return "action-spectator"
+        mono_player = player  # type: ignore[assignment]
+        if not self._sorted_owned_space_ids(mono_player.id):
+            return "monopoly-no-owned-properties"
+        return None
+
+    def _is_view_my_properties_hidden(self, player: Player) -> Visibility:
+        """Show own-property browser for non-spectators."""
+        if player.is_spectator:
+            return Visibility.HIDDEN
+        mono_player = player  # type: ignore[assignment]
+        return (
+            Visibility.VISIBLE
+            if self.status == "playing" and bool(self._sorted_owned_space_ids(mono_player.id))
+            else Visibility.HIDDEN
+        )
+
+    def _is_view_player_properties_enabled(self, player: Player) -> str | None:
+        """Enable player-info browser for everyone while playing."""
+        if self.status != "playing":
+            return "action-not-playing"
+        if not [
+            p for p in self.turn_players if isinstance(p, MonopolyPlayer) and not p.bankrupt
+        ]:
+            return "monopoly-no-players-with-properties"
+        return None
+
+    def _is_view_player_properties_hidden(self, player: Player) -> Visibility:
+        """Show player-property browser in actions menus."""
+        return Visibility.VISIBLE
+
+    def _is_view_selected_deed_enabled(self, player: Player) -> str | None:
+        """Enable selected-deed follow-up action while playing."""
+        if self.status != "playing":
+            return "action-not-playing"
+        return None
+
+    def _is_view_selected_owner_property_deed_enabled(self, player: Player) -> str | None:
+        """Enable owner-property deed follow-up while playing."""
+        if self.status != "playing":
+            return "action-not-playing"
+        owner_id = self.deed_browse_owner_by_viewer_id.get(player.id, "")
+        if not owner_id:
+            return "monopoly-no-players-with-properties"
+        if not self._sorted_owned_space_ids(owner_id):
+            return "monopoly-no-owned-properties"
+        return None
+
+    def _options_for_deed_browser_selection(self, player: Player) -> list[str]:
+        """Compatibility options for generic action-input flow."""
+        return [space.space_id for space in self._deed_capable_spaces_in_board_order()]
+
+    def _options_for_player_property_owners(self, player: Player) -> list[str]:
+        """Return player ids that can be browsed for deed lists."""
+        owners: list[str] = []
+        for candidate in self.turn_players:
+            if not isinstance(candidate, MonopolyPlayer) or candidate.bankrupt:
+                continue
+            owners.append(candidate.id)
+        return owners
+
+    def _options_for_selected_owner_property_deeds(self, player: Player) -> list[str]:
+        """Return selected owner's deed ids."""
+        owner_id = self.deed_browse_owner_by_viewer_id.get(player.id, "")
+        if not owner_id:
+            return []
+        return self._sorted_owned_space_ids(owner_id)
+
+    def _action_view_active_deed(self, player: Player, action_id: str) -> None:
+        """Read the deed for the active board item."""
+        _ = action_id
+        user = self.get_user(player)
+        space = self._active_deed_space()
+        if not space:
+            if user:
+                user.speak_l("monopoly-no-active-deed")
+            return
+        locale = user.locale if user else "en"
+        self.status_box(player, self._deed_lines(space, locale))
+
+    def _action_browse_all_deeds(self, player: Player, action_id: str) -> None:
+        """Open board-ordered deed list and allow selection."""
+        _ = action_id
+        self.deed_browse_return_by_viewer_id[player.id] = "all"
+        self._open_deed_selection_menu(
+            player,
+            space_ids=[space.space_id for space in self._deed_capable_spaces_in_board_order()],
+            pending_action_id="view_selected_deed",
+            empty_message_key="monopoly-no-deeds-available",
+        )
+
+    def _action_view_my_properties(self, player: Player, action_id: str) -> None:
+        """Open this player's owned properties and allow deed selection."""
+        _ = action_id
+        mono_player = player  # type: ignore[assignment]
+        self.deed_browse_return_by_viewer_id[player.id] = "mine"
+        self._open_deed_selection_menu(
+            player,
+            space_ids=self._sorted_owned_space_ids(mono_player.id),
+            pending_action_id="view_selected_deed",
+            empty_message_key="monopoly-you-have-no-owned-properties",
+        )
+
+    def _action_view_player_properties(self, player: Player, action_id: str) -> None:
+        """Open player list, then allow browsing that player's info."""
+        _ = action_id
+        user = self.get_user(player)
+        if not user:
+            return
+        items: list[MenuItem] = []
+        for candidate in self.turn_players:
+            if not isinstance(candidate, MonopolyPlayer) or candidate.bankrupt:
+                continue
+            square_name = ""
+            if self.active_board_size > 0:
+                square_name = self._space_display_name(self._space_at(candidate.position), user.locale)
+            if square_name:
+                label = self._monopoly_text(
+                    user.locale,
+                    "monopoly-player-properties-label",
+                    fallback=f"{candidate.name}, on {square_name}, square {candidate.position}",
+                    player=candidate.name,
+                    space=square_name,
+                    position=candidate.position,
+                )
+            else:
+                label = self._monopoly_text(
+                    user.locale,
+                    "monopoly-player-properties-label-no-space",
+                    fallback=f"{candidate.name}, square {candidate.position}",
+                    player=candidate.name,
+                    position=candidate.position,
+                )
+            items.append(MenuItem(text=label, id=candidate.id))
+        if not items:
+            user.speak_l("monopoly-no-players-with-properties")
+            return
+        items.append(MenuItem(text=Localization.get(user.locale, "back"), id="_cancel"))
+        self._pending_actions[player.id] = "select_player_property_owner"
+        user.show_menu(
+            "action_input_menu",
+            items,
+            multiletter=True,
+            escape_behavior=EscapeBehavior.SELECT_LAST,
+            position=1,
+        )
+
+    def _action_select_player_property_owner(
+        self, player: Player, owner_id: str, action_id: str
+    ) -> None:
+        """Store selected owner and open their property list."""
+        _ = action_id
+        owner = self.get_player_by_id(owner_id)
+        if not owner or not isinstance(owner, MonopolyPlayer):
+            return
+        self.deed_browse_owner_by_viewer_id[player.id] = owner.id
+        self.deed_browse_return_by_viewer_id[player.id] = "owner"
+        self._open_deed_selection_menu(
+            player,
+            space_ids=self._sorted_owned_space_ids(owner.id),
+            pending_action_id="view_selected_owner_property_deed",
+            empty_message_key="monopoly-player-has-no-owned-properties",
+            empty_message_kwargs={"player": owner.name},
+        )
+
+    def _is_read_cash_enabled(self, player: Player) -> str | None:
+        """Enable personal cash readout for seated players during play."""
+        if self.status != "playing":
+            return "action-not-playing"
+        if player.is_spectator:
+            return "action-spectator"
+        mono_player = player  # type: ignore[assignment]
+        if mono_player.bankrupt:
+            return "monopoly-bankrupt-player"
+        return None
+
+    def _get_view_active_deed_label(self, player: Player, action_id: str) -> str:
+        """Show the current deed target by name when one is available."""
+        _ = action_id
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        space = self._active_deed_space()
+        if not space:
+            return Localization.get(locale, "monopoly-view-active-deed")
+        return Localization.get(
+            locale,
+            "monopoly-view-active-deed-space",
+            property=self._space_display_name(space, locale),
+        )
+
+    def _get_buy_property_label(self, player: Player, action_id: str) -> str:
+        """Show contextual buy label with pending property price."""
+        _ = action_id
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        space = self._pending_purchase_space()
+        amount = space.price if space else 0
+        return self._monopoly_text(
+            locale,
+            "monopoly-buy-for",
+            fallback=f"Buy for {self._format_money(amount)}",
+            amount=amount,
+        )
+
+    def _get_auction_property_label(self, player: Player, action_id: str) -> str:
+        """Show the pending property name on the auction action when available."""
+        _ = action_id
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        space = self._pending_purchase_space()
+        if not space:
+            return Localization.get(locale, "monopoly-auction-property")
+        return self._monopoly_text(
+            locale,
+            "monopoly-auction-property-space",
+            fallback=f"Auction {self._space_display_name(space, locale)}",
+            property=self._space_display_name(space, locale),
+        )
+
+    def _action_view_selected_deed(self, player: Player, space_id: str, action_id: str) -> None:
+        """Read one selected deed from board or owned-property menus."""
+        _ = action_id
+        space = self.active_space_by_id.get(space_id)
+        if not space or space.kind not in PURCHASABLE_KINDS:
+            return
+        if player.id not in self.deed_browse_return_by_viewer_id:
+            self.deed_browse_return_by_viewer_id[player.id] = "all"
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
+        self.status_box(player, self._deed_lines(space, locale))
+
+    def _action_view_selected_owner_property_deed(
+        self, player: Player, space_id: str, action_id: str
+    ) -> None:
+        """Read one selected deed from player-property browsing flow."""
+        _ = action_id
+        self.deed_browse_return_by_viewer_id[player.id] = "owner"
+        self._action_view_selected_deed(player, space_id, "view_selected_deed")
+
+    def _reopen_deed_return_menu(self, player: Player) -> bool:
+        """Reopen the appropriate deed browser after closing a deed detail."""
+        mode = self.deed_browse_return_by_viewer_id.get(player.id, "")
+        if mode == "mine":
+            self._action_view_my_properties(player, "view_my_properties")
+            return True
+        if mode == "owner":
+            owner_id = self.deed_browse_owner_by_viewer_id.get(player.id, "")
+            owner = self.get_player_by_id(owner_id)
+            if owner and isinstance(owner, MonopolyPlayer):
+                self._action_select_player_property_owner(
+                    player,
+                    owner.id,
+                    "select_player_property_owner",
+                )
+                return True
+        if mode == "all":
+            self._action_browse_all_deeds(player, "browse_all_deeds")
+            return True
+        return False
+
+    def _handle_menu_event(self, player: Player, event: dict) -> None:
+        """Handle deed-browser return paths before generic menu behavior."""
+        menu_id = event.get("menu_id")
+        selection_id = event.get("selection_id", "")
+        user = self.get_user(player)
+        if menu_id == "status_box" and player.id in self.deed_browse_return_by_viewer_id:
+            if user:
+                user.remove_menu("status_box")
+                self._status_box_open.discard(player.id)
+            if self._reopen_deed_return_menu(player):
+                return
+        if (
+            menu_id == "action_input_menu"
+            and selection_id == "_cancel"
+            and self._pending_actions.get(player.id) == "view_selected_owner_property_deed"
+        ):
+            self._pending_actions.pop(player.id, None)
+            self._action_view_player_properties(player, "view_player_properties")
+            return
+        super()._handle_menu_event(player, event)
 
     def _build_space_from_manual_row(self, row: dict[str, object], fallback_index: int) -> MonopolySpace:
         """Build one MonopolySpace from a manual rule artifact row."""
@@ -1323,6 +2698,7 @@ class MonopolyGame(ActionGuardMixin, Game):
     def _apply_manual_card_effect(
         self,
         player: MonopolyPlayer,
+        deck_type: str,
         effect_spec: dict[str, object],
         *,
         depth: int,
@@ -1336,8 +2712,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         if effect_type == "credit":
             amount = max(0, int(effect_spec.get("amount", 0)))
             credited = self._credit_player(player, amount, "manual_card_credit")
-            self.broadcast_l(
-                "monopoly-card-collect",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-collect",
+                others_message_id="monopoly-player-card-collect",
+                personal_fallback=f"You collected {self._format_money(credited)}.",
+                others_fallback=f"{player.name} collected {self._format_money(credited)}.",
                 player=player.name,
                 amount=credited,
                 cash=player.cash,
@@ -1368,47 +2748,554 @@ class MonopolyGame(ActionGuardMixin, Game):
             if collect_pass_go and player.position < old_position:
                 pass_go_cash = max(0, self.rule_profile.pass_go_cash)
                 credited = self._credit_player(player, pass_go_cash, "manual_card_move_absolute_pass_go")
-                self.broadcast_l(
-                    "monopoly-pass-go",
-                    player=player.name,
+                self._broadcast_monopoly_personal(
+                    player,
+                    personal_message_id="monopoly-you-pass-go",
+                    others_message_id="monopoly-player-pass-go",
+                    personal_fallback=f"You passed GO and collected {self._format_money(credited)}.",
+                    others_fallback=f"{player.name} passed GO and collected {self._format_money(credited)}.",
                     amount=credited,
+                    player=player.name,
                     cash=player.cash,
                 )
             landed_space = self._space_at(player.position)
             return self._resolve_space(player, landed_space, depth=depth + 1, dice_total=dice_total)
 
         if effect_type in {"grant_jail_free", "get_out_of_jail_free"}:
-            return self._grant_get_out_of_jail_card(player)
+            return self._grant_get_out_of_jail_card(
+                player,
+                deck_type="community_chest" if deck_type == "community_chest" else "chance",
+                card_id=(
+                    "get_out_of_jail_free_community_chest"
+                    if deck_type == "community_chest"
+                    else "get_out_of_jail_free_chance"
+                ),
+            )
 
         return None
 
-    def _grant_get_out_of_jail_card(self, player: MonopolyPlayer) -> str:
+    def _grant_get_out_of_jail_card(
+        self,
+        player: MonopolyPlayer,
+        *,
+        deck_type: str,
+        card_id: str,
+    ) -> str:
         """Grant one get-out-of-jail card using classic Monopoly behavior."""
         if self._is_junior_preset():
             credited = self._credit_player(player, 1, "community_chest_junior_bonus")
-            self.broadcast_l(
-                "monopoly-card-collect",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-collect",
+                others_message_id="monopoly-player-card-collect",
+                personal_fallback=f"You collected {self._format_money(credited)}.",
+                others_fallback=f"{player.name} collected {self._format_money(credited)}.",
                 player=player.name,
                 amount=credited,
                 cash=player.cash,
             )
             return "resolved"
-        player.get_out_of_jail_cards += 1
+        self._hold_get_out_of_jail_card(player, deck_type=deck_type, card_id=card_id)
         self.broadcast_l(
             "monopoly-card-jail-free",
             player=player.name,
-            cards=player.get_out_of_jail_cards,
         )
         return "resolved"
+
+    def _next_space_of_kind(self, start_position: int, kind: str) -> MonopolySpace:
+        """Return the next space of one kind ahead of a position."""
+        for step in range(1, self.active_board_size + 1):
+            candidate = self._space_at(start_position + step)
+            if candidate.kind == kind:
+                return candidate
+        return self._space_at(start_position)
+
+    def _move_player_to_space(
+        self,
+        player: MonopolyPlayer,
+        space_id: str,
+        *,
+        collect_pass_go: bool,
+    ) -> MonopolySpace | None:
+        """Move a player to a named destination space."""
+        destination = self._space_by_id_or_none(space_id)
+        if destination is None:
+            return None
+        steps = (destination.index - player.position) % self.active_board_size
+        if steps == 0 and destination.index == 0:
+            steps = self.active_board_size
+        return self._move_player(player, steps, collect_pass_go=collect_pass_go)
+
+    def _other_active_players(self, player: MonopolyPlayer) -> list[MonopolyPlayer]:
+        """Return all other active non-bankrupt players."""
+        return [
+            other
+            for other in self.turn_players
+            if isinstance(other, MonopolyPlayer) and not other.bankrupt and other.id != player.id
+        ]
+
+    def _building_repair_cost(self, player: MonopolyPlayer, *, per_house: int, per_hotel: int) -> int:
+        """Compute building repair costs for one player's holdings."""
+        houses = 0
+        hotels = 0
+        for space_id in player.owned_space_ids:
+            level = self._building_level(space_id)
+            if level >= 5:
+                hotels += 1
+            else:
+                houses += max(0, level)
+        return (houses * per_house) + (hotels * per_hotel)
+
+    def _resolve_custom_rent_payment(
+        self,
+        player: MonopolyPlayer,
+        landed_space: MonopolySpace,
+        owner_id: str,
+        rent_due: int,
+        *,
+        reason: str,
+    ) -> str:
+        """Resolve one forced rent payment with a card-specific rent amount."""
+        no_rent_result = self._resolve_owned_space_no_rent_case(player, landed_space, owner_id)
+        if no_rent_result is not None:
+            return no_rent_result
+
+        owner = self.get_player_by_id(owner_id)
+        payment_context = self._payment_context(
+            "rent",
+            space_id=landed_space.space_id,
+            owner_id=owner_id,
+        )
+        manual_core = self._is_junior_super_mario_manual_core_active()
+        if not self._apply_cheaters_payment_required(
+            player,
+            reason,
+            rent_due,
+            payment_context,
+        ):
+            return "bankrupt" if player.bankrupt else "resolved"
+        if not manual_core and self._current_liquid_balance(player) < rent_due:
+            if player.is_bot:
+                self._liquidate_assets_for_debt(player, rent_due)
+            if self._current_liquid_balance(player) < rent_due and not player.is_bot:
+                self._start_pending_rent_payment(
+                    player,
+                    owner=owner,
+                    amount_due=rent_due,
+                    landed_space=landed_space,
+                    reason=reason,
+                )
+                self.rebuild_all_menus()
+                return "resolved"
+        if not manual_core and self._current_liquid_balance(player) < rent_due:
+            if player.is_bot:
+                self._liquidate_assets_for_debt(player, rent_due)
+            if self._current_liquid_balance(player) < rent_due and not player.is_bot:
+                self._start_pending_rent_payment(
+                    player,
+                    owner=owner,
+                    amount_due=rent_due,
+                    landed_space=landed_space,
+                    reason=reason,
+                )
+                self.rebuild_all_menus()
+                return "resolved"
+        if not manual_core and self._current_liquid_balance(player) < rent_due and not player.is_bot:
+            self._start_pending_rent_payment(
+                player,
+                owner=owner,
+                amount_due=rent_due,
+                landed_space=landed_space,
+                reason=reason,
+            )
+            self.rebuild_all_menus()
+            return "resolved"
+        paid = self._pay_rent_to_owner_or_bank(player, owner, rent_due, reason)
+        owner_name = owner.name if owner else "Bank"
+        self._broadcast_monopoly_transaction(
+            player,
+            owner,
+            actor_message_id="monopoly-you-rent-paid",
+            recipient_message_id="monopoly-player-paid-you-rent",
+            others_message_id="monopoly-player-rent-paid",
+            actor_fallback=(
+                f"You paid {self._format_money(paid)} in rent to {owner_name} for {landed_space.name}."
+            ),
+            recipient_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to you for {landed_space.name}."
+            ),
+            others_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to {owner_name} for {landed_space.name}."
+            ),
+            player=player.name,
+            owner=owner_name,
+            amount=paid,
+            property=landed_space.name,
+            detail=self._rent_detail_text(
+                landed_space,
+                owner_id=owner_id,
+                dice_total=None,
+                utility_multiplier=10 if landed_space.kind == "utility" else None,
+            ),
+        )
+        self._apply_sore_loser_rebate(player, paid)
+        if not self._apply_cheaters_payment_result(
+            player,
+            paid,
+            rent_due,
+            payment_context,
+        ):
+            return "bankrupt" if player.bankrupt else "resolved"
+        return self._finalize_rent_payment(player, owner, paid, rent_due, manual_core)
+
+    def _resolve_card_arrival_at_railroad(
+        self,
+        player: MonopolyPlayer,
+        landed_space: MonopolySpace,
+    ) -> str:
+        """Resolve Chance arrival at a railroad with double-rent rules."""
+        owner_id = self.property_owners.get(landed_space.space_id)
+        if owner_id is None:
+            return self._resolve_unowned_purchasable_space(player, landed_space)
+        rent_due = self._calculate_rent_due(landed_space, owner_id, None) * 2
+        return self._resolve_custom_rent_payment(
+            player,
+            landed_space,
+            owner_id,
+            rent_due,
+            reason=f"card_rent:{landed_space.space_id}",
+        )
+
+    def _resolve_card_arrival_at_utility(
+        self,
+        player: MonopolyPlayer,
+        landed_space: MonopolySpace,
+    ) -> str:
+        """Resolve Chance arrival at a utility with 10x rerolled utility rent."""
+        owner_id = self.property_owners.get(landed_space.space_id)
+        if owner_id is None:
+            return self._resolve_unowned_purchasable_space(player, landed_space)
+        no_rent_result = self._resolve_owned_space_no_rent_case(player, landed_space, owner_id)
+        if no_rent_result is not None:
+            return no_rent_result
+        utility_die_1 = random.randint(1, 6)
+        utility_die_2 = random.randint(1, 6)
+        utility_total = utility_die_1 + utility_die_2
+        self.broadcast_l(
+            "monopoly-card-utility-roll",
+            player=player.name,
+            die1=utility_die_1,
+            die2=utility_die_2,
+            total=utility_total,
+        )
+        return self._resolve_custom_rent_payment(
+            player,
+            landed_space,
+            owner_id,
+            utility_total * 10,
+            reason=f"card_rent:{landed_space.space_id}",
+        )
+
+    def _resolve_card_move_to_space_effect(
+        self,
+        player: MonopolyPlayer,
+        *,
+        destination_space_id: str,
+        depth: int,
+        dice_total: int | None,
+        arrival_mode: str = "normal",
+    ) -> str:
+        """Move a player to a named destination and resolve the new landing."""
+        old_position = player.position
+        landed_space = self._move_player_to_space(
+            player,
+            destination_space_id,
+            collect_pass_go=(
+                self._space_by_id_or_none(destination_space_id) is not None
+                and self._space_by_id_or_none(destination_space_id).index < old_position
+            ),
+        )
+        if landed_space is None:
+            return "resolved"
+        self.broadcast_l(
+            "monopoly-card-move",
+            player=player.name,
+            space=landed_space.name,
+        )
+        if arrival_mode == "nearest_railroad":
+            return self._resolve_card_arrival_at_railroad(player, landed_space)
+        if arrival_mode == "nearest_utility":
+            return self._resolve_card_arrival_at_utility(player, landed_space)
+        return self._resolve_space(
+            player,
+            landed_space,
+            depth=depth + 1,
+            dice_total=dice_total,
+        )
+
+    def _collect_from_each_other_player(
+        self,
+        player: MonopolyPlayer,
+        amount_each: int,
+        *,
+        reason: str,
+    ) -> str:
+        """Collect a fixed amount from every other active player."""
+        total_collected = 0
+        for other in self._other_active_players(player):
+            if self._current_liquid_balance(other) < amount_each:
+                self._liquidate_assets_for_debt(other, amount_each)
+            paid = self._transfer_between_players(
+                other,
+                player,
+                amount_each,
+                reason,
+                allow_partial=True,
+            )
+            if paid > 0:
+                self._broadcast_monopoly_transaction(
+                    other,
+                    player,
+                    actor_message_id="monopoly-you-paid-player",
+                    recipient_message_id="monopoly-player-paid-you",
+                    others_message_id="monopoly-player-paid-player",
+                    actor_fallback=f"You paid {self._format_money(paid)} to {player.name}.",
+                    recipient_fallback=f"{other.name} paid {self._format_money(paid)} to you.",
+                    others_fallback=f"{other.name} paid {self._format_money(paid)} to {player.name}.",
+                    player=other.name,
+                    target=player.name,
+                    amount=paid,
+                )
+            total_collected += paid
+            if paid < amount_each:
+                self._declare_bankrupt(
+                    other,
+                    creditor_name=player.name,
+                    creditor_id=player.id,
+                )
+        self._broadcast_monopoly_personal(
+            player,
+            personal_message_id="monopoly-you-card-collect",
+            others_message_id="monopoly-player-card-collect",
+            personal_fallback=f"You collected {self._format_money(total_collected)}.",
+            others_fallback=f"{player.name} collected {self._format_money(total_collected)}.",
+            player=player.name,
+            amount=total_collected,
+            cash=player.cash,
+        )
+        return "resolved"
+
+    def _pay_each_other_player(
+        self,
+        player: MonopolyPlayer,
+        amount_each: int,
+        *,
+        reason: str,
+    ) -> str:
+        """Pay a fixed amount to every other active player."""
+        others = self._other_active_players(player)
+        total_due = amount_each * len(others)
+        if total_due <= 0:
+            return "resolved"
+        if self._current_liquid_balance(player) < total_due:
+            self._liquidate_assets_for_debt(player, total_due)
+        for other in others:
+            paid = self._transfer_between_players(
+                player,
+                other,
+                amount_each,
+                reason,
+                allow_partial=True,
+            )
+            if paid > 0:
+                self._broadcast_monopoly_transaction(
+                    player,
+                    other,
+                    actor_message_id="monopoly-you-paid-player",
+                    recipient_message_id="monopoly-player-paid-you",
+                    others_message_id="monopoly-player-paid-player",
+                    actor_fallback=f"You paid {self._format_money(paid)} to {other.name}.",
+                    recipient_fallback=f"{player.name} paid {self._format_money(paid)} to you.",
+                    others_fallback=f"{player.name} paid {self._format_money(paid)} to {other.name}.",
+                    player=player.name,
+                    target=other.name,
+                    amount=paid,
+                )
+            if paid < amount_each:
+                self._declare_bankrupt(
+                    player,
+                    creditor_name=other.name,
+                    creditor_id=other.id,
+                )
+                return "bankrupt"
+        return "resolved"
+
+    def _auction_released_bankrupt_properties(
+        self,
+        released_space_ids: list[str],
+        *,
+        bankrupt_player: MonopolyPlayer,
+    ) -> None:
+        """Immediately auction bank-released properties after bankruptcy."""
+        if self.status != "playing" or not self.game_active:
+            return
+        for space_id in released_space_ids:
+            space = self._space_by_id_or_none(space_id)
+            if not space or space.space_id in self.property_owners:
+                continue
+            self._run_property_auction(space, bankrupt_player)
+
+    def _settle_transferred_mortgage_interest(
+        self,
+        player: MonopolyPlayer,
+        space_ids: list[str],
+        *,
+        allow_bankruptcy: bool,
+    ) -> bool:
+        """Collect immediate mortgage-transfer interest from the new owner."""
+        if not space_ids or player.bankrupt:
+            return True
+        total_due = 0
+        for space_id in space_ids:
+            space = self._space_by_id_or_none(space_id)
+            if not space or not self._is_space_mortgaged(space_id):
+                continue
+            total_due += self._mortgage_transfer_interest(space)
+        if total_due <= 0:
+            return True
+        if self._current_liquid_balance(player) < total_due:
+            self._liquidate_assets_for_debt(player, total_due)
+        paid = self._debit_player_to_bank(
+            player,
+            total_due,
+            "mortgage_transfer_interest",
+            allow_partial=allow_bankruptcy,
+        )
+        self.broadcast_l(
+            "monopoly-mortgage-transfer-interest-paid",
+            player=player.name,
+            amount=paid,
+        )
+        if paid < total_due and allow_bankruptcy:
+            self._declare_bankrupt(player, creditor_name="Bank")
+            return False
+        return paid >= total_due
 
     def _space_at(self, position: int) -> MonopolySpace:
         """Get board space by board index."""
         return self.active_board_spaces[position % self.active_board_size]
 
-    def _space_label(self, space_id: str) -> str:
+    def _space_by_id_or_none(self, space_id: str) -> MonopolySpace | None:
+        """Return one active board space by id."""
+        return self.active_space_by_id.get(space_id)
+
+    def _space_label(self, space_id: str, locale: str = "en") -> str:
         """Return display label for a space id."""
         space = self.active_space_by_id.get(space_id)
-        return space.name if space else space_id
+        if not space:
+            return space_id
+        return self._space_display_name(space, locale)
+
+    def _is_get_out_of_jail_card_id(self, card_id: str) -> bool:
+        """Return True for classic get-out-of-jail card ids."""
+        return card_id in {
+            "get_out_of_jail_free",
+            "get_out_of_jail_free_chance",
+            "get_out_of_jail_free_community_chest",
+        }
+
+    def _mortgage_transfer_interest(self, space: MonopolySpace) -> int:
+        """Return the immediate 10% mortgage interest due on transfer."""
+        return max(0, self._unmortgage_cost(space) - self._mortgage_value(space))
+
+    def _held_jail_free_cards(self, player_id: str) -> list[tuple[str, str]]:
+        """Return held get-out-of-jail cards for one player."""
+        return self.held_get_out_of_jail_cards_by_player_id.setdefault(player_id, [])
+
+    def _hold_get_out_of_jail_card(
+        self,
+        player: MonopolyPlayer,
+        *,
+        deck_type: str,
+        card_id: str,
+    ) -> None:
+        """Assign one held get-out-of-jail card to a player."""
+        self._held_jail_free_cards(player.id).append((deck_type, card_id))
+        player.get_out_of_jail_cards += 1
+
+    def _pop_held_get_out_of_jail_card(
+        self,
+        player: MonopolyPlayer,
+    ) -> tuple[str, str] | None:
+        """Pop one held get-out-of-jail card, preserving deck provenance when available."""
+        held = self._held_jail_free_cards(player.id)
+        if held:
+            card = held.pop(0)
+            if not held:
+                self.held_get_out_of_jail_cards_by_player_id.pop(player.id, None)
+            return card
+        return None
+
+    def _return_get_out_of_jail_card_to_deck(self, deck_type: str, card_id: str) -> None:
+        """Return one held get-out-of-jail card to the bottom of its deck."""
+        if not self._is_get_out_of_jail_card_id(card_id):
+            return
+        if deck_type == "chance":
+            if card_id not in self.chance_deck_order:
+                self.chance_deck_order.append(card_id)
+            return
+        if deck_type == "community_chest" and card_id not in self.community_chest_deck_order:
+            self.community_chest_deck_order.append(card_id)
+
+    def _transfer_held_get_out_of_jail_cards(
+        self,
+        from_player: MonopolyPlayer,
+        to_player: MonopolyPlayer,
+        count: int,
+    ) -> None:
+        """Transfer held get-out-of-jail cards between players."""
+        for _ in range(max(0, count)):
+            card = self._pop_held_get_out_of_jail_card(from_player)
+            if card is None:
+                break
+            deck_type, card_id = card
+            self._held_jail_free_cards(to_player.id).append((deck_type, card_id))
+
+    def _return_player_get_out_of_jail_cards_to_decks(self, player: MonopolyPlayer) -> None:
+        """Return all held get-out-of-jail cards for one player to their decks."""
+        while True:
+            card = self._pop_held_get_out_of_jail_card(player)
+            if card is None:
+                return
+            deck_type, card_id = card
+            self._return_get_out_of_jail_card_to_deck(deck_type, card_id)
+
+    def _broadcast_space_name(self, space: MonopolySpace) -> None:
+        """Speak one board-space name with per-user localization."""
+        for player in self.players:
+            user = self.get_user(player)
+            if not user:
+                continue
+            user.speak(self._space_display_name(space, user.locale))
+            if self._is_street_property(space):
+                level = self._building_level(space.space_id)
+                if level >= 5:
+                    user.speak(
+                        self._monopoly_text(
+                            user.locale,
+                            "monopoly-space-with-hotel",
+                            fallback="With a hotel.",
+                        )
+                    )
+                elif level > 0:
+                    user.speak(
+                        self._monopoly_text(
+                            user.locale,
+                            "monopoly-space-with-houses",
+                            fallback=f"With {level} houses.",
+                            count=level,
+                        )
+                    )
 
     def _mortgage_value(self, space: MonopolySpace) -> int:
         """Get mortgage value for a space."""
@@ -1444,6 +3331,110 @@ class MonopolyGame(ActionGuardMixin, Game):
         if not group_ids:
             return False
         return all(self.property_owners.get(space_id) == owner_id for space_id in group_ids)
+
+    def _owns_all_of_kind(self, owner_id: str, kind: str) -> bool:
+        """Return True when one owner controls every active space of one kind."""
+        total = sum(1 for space in self.active_board_spaces if space.kind == kind)
+        if total <= 0:
+            return False
+        return self._count_owned_kind(owner_id, kind) >= total
+
+    def _color_group_label(self, color_group: str, locale: str) -> str:
+        """Return one localized color-group label."""
+        return self._monopoly_text(
+            locale,
+            f"monopoly-color-{color_group}",
+            fallback=color_group.replace("_", " ").title(),
+        )
+
+    def _broadcast_completed_collection(
+        self,
+        player: MonopolyPlayer,
+        *,
+        color_group: str | None = None,
+        kind: str | None = None,
+    ) -> None:
+        """Announce when a player completes a full set."""
+        for listener in self.players:
+            user = self.get_user(listener)
+            if not user:
+                continue
+            locale = user.locale
+            if color_group:
+                message_id = (
+                    "monopoly-you-completed-color-set"
+                    if listener.id == player.id
+                    else "monopoly-player-completed-color-set"
+                )
+                text = self._monopoly_text(
+                    locale,
+                    message_id,
+                    fallback=(
+                        f"You now own all of the {self._color_group_label(color_group, locale)} properties."
+                        if listener.id == player.id
+                        else (
+                            f"{player.name} now owns all of the "
+                            f"{self._color_group_label(color_group, locale)} properties."
+                        )
+                    ),
+                    player=player.name,
+                    group=self._color_group_label(color_group, locale),
+                )
+            elif kind == "railroad":
+                message_id = (
+                    "monopoly-you-completed-railroads"
+                    if listener.id == player.id
+                    else "monopoly-player-completed-railroads"
+                )
+                text = self._monopoly_text(
+                    locale,
+                    message_id,
+                    fallback=(
+                        "You now own all of the railroads."
+                        if listener.id == player.id
+                        else f"{player.name} now owns all of the railroads."
+                    ),
+                    player=player.name,
+                )
+            elif kind == "utility":
+                message_id = (
+                    "monopoly-you-completed-utilities"
+                    if listener.id == player.id
+                    else "monopoly-player-completed-utilities"
+                )
+                text = self._monopoly_text(
+                    locale,
+                    message_id,
+                    fallback=(
+                        "You now own all of the utilities."
+                        if listener.id == player.id
+                        else f"{player.name} now owns all of the utilities."
+                    ),
+                    player=player.name,
+                )
+            else:
+                continue
+            user.speak(text, buffer="table")
+
+    def _announce_completed_collection_if_needed(
+        self,
+        player: MonopolyPlayer,
+        space: MonopolySpace,
+        *,
+        owned_before: bool,
+    ) -> None:
+        """Announce one newly completed color set, railroad set, or utility set."""
+        if owned_before:
+            return
+        if self._is_street_property(space) and space.color_group:
+            if self._owner_has_full_color_set(player.id, space.color_group):
+                self._broadcast_completed_collection(player, color_group=space.color_group)
+            return
+        if space.kind == "railroad" and self._owns_all_of_kind(player.id, "railroad"):
+            self._broadcast_completed_collection(player, kind="railroad")
+            return
+        if space.kind == "utility" and self._owns_all_of_kind(player.id, "utility"):
+            self._broadcast_completed_collection(player, kind="utility")
 
     def _group_space_ids(self, color_group: str) -> list[str]:
         """Get all board space ids in one color group."""
@@ -1543,20 +3534,22 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Auto-liquidate: sell buildings first, then mortgage, until debt is covered."""
         if amount_due <= 0 or self._current_liquid_balance(player) >= amount_due:
             return
+        if self._maximum_raiseable_cash(player) < amount_due:
+            return
 
         attempts = 0
         max_attempts = max(8, len(player.owned_space_ids) * 8)
         while self._current_liquid_balance(player) < amount_due and attempts < max_attempts:
             attempts += 1
 
-            sell_choice = self._pick_best_building_sale(self._options_for_sell_house(player))
+            sell_choice = self._pick_best_building_sale(self._sell_house_space_ids(player))
             if sell_choice:
                 cash_before = self._current_liquid_balance(player)
                 self._action_sell_house(player, sell_choice, "sell_house")
                 if self._current_liquid_balance(player) > cash_before:
                     continue
 
-            mortgage_choice = self._pick_best_mortgage(self._options_for_mortgage_property(player))
+            mortgage_choice = self._pick_best_mortgage(self._mortgage_space_ids(player))
             if mortgage_choice:
                 cash_before = self._current_liquid_balance(player)
                 self._action_mortgage_property(player, mortgage_choice, "mortgage_property")
@@ -1564,6 +3557,20 @@ class MonopolyGame(ActionGuardMixin, Game):
                     continue
 
             break
+
+    def _maximum_raiseable_cash(self, player: MonopolyPlayer) -> int:
+        """Estimate the most cash a player could raise immediately."""
+        total = max(0, self._current_liquid_balance(player))
+        for space_id in player.owned_space_ids:
+            space = self._space_by_id_or_none(space_id)
+            if not space:
+                continue
+            level = self._building_level(space_id)
+            if self._is_street_property(space) and level > 0:
+                total += max(0, space.house_cost // 2) * level
+            if space_id not in self.mortgaged_space_ids:
+                total += self._mortgage_value(space)
+        return total
 
     def _property_trade_value(self, space_id: str) -> int:
         """Estimate trade value for a property."""
@@ -1592,12 +3599,44 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Transfer one property between players."""
         if not self._is_property_tradable_for_trade(space_id, from_player.id):
             return False
+        space = self.active_space_by_id.get(space_id)
+        if not space:
+            return False
+        owned_before = False
+        if self._is_street_property(space) and space.color_group:
+            owned_before = self._owner_has_full_color_set(to_player.id, space.color_group)
+        elif space.kind in {"railroad", "utility"}:
+            owned_before = self._owns_all_of_kind(to_player.id, space.kind)
         self.property_owners[space_id] = to_player.id
         if space_id in from_player.owned_space_ids:
             from_player.owned_space_ids.remove(space_id)
         if space_id not in to_player.owned_space_ids:
             to_player.owned_space_ids.append(space_id)
+        self._announce_completed_collection_if_needed(
+            to_player,
+            space,
+            owned_before=owned_before,
+        )
         return True
+
+    def _transferred_mortgage_interest_due_for_offer(
+        self,
+        proposer: MonopolyPlayer,
+        target: MonopolyPlayer,
+        offer: MonopolyTradeOffer,
+    ) -> tuple[int, int]:
+        """Return immediate mortgage-interest totals owed after one trade."""
+        proposer_due = 0
+        target_due = 0
+        if offer.give_property_id and self._is_space_mortgaged(offer.give_property_id):
+            space = self._space_by_id_or_none(offer.give_property_id)
+            if space is not None:
+                target_due += self._mortgage_transfer_interest(space)
+        if offer.receive_property_id and self._is_space_mortgaged(offer.receive_property_id):
+            space = self._space_by_id_or_none(offer.receive_property_id)
+            if space is not None:
+                proposer_due += self._mortgage_transfer_interest(space)
+        return proposer_due, target_due
 
     def _encode_trade_option(self, summary: str, offer: MonopolyTradeOffer) -> str:
         """Encode trade metadata into one menu option string."""
@@ -1691,6 +3730,15 @@ class MonopolyGame(ActionGuardMixin, Game):
             offer.receive_property_id, target.id
         ):
             return False
+        proposer_interest_due, target_interest_due = self._transferred_mortgage_interest_due_for_offer(
+            proposer,
+            target,
+            offer,
+        )
+        if self._current_liquid_balance(proposer) < (offer.give_cash + proposer_interest_due):
+            return False
+        if self._current_liquid_balance(target) < (offer.receive_cash + target_interest_due):
+            return False
         return True
 
     def _apply_trade_offer(
@@ -1733,9 +3781,29 @@ class MonopolyGame(ActionGuardMixin, Game):
 
         proposer.get_out_of_jail_cards -= offer.give_jail_cards
         target.get_out_of_jail_cards += offer.give_jail_cards
+        self._transfer_held_get_out_of_jail_cards(proposer, target, offer.give_jail_cards)
 
         target.get_out_of_jail_cards -= offer.receive_jail_cards
         proposer.get_out_of_jail_cards += offer.receive_jail_cards
+        self._transfer_held_get_out_of_jail_cards(target, proposer, offer.receive_jail_cards)
+        transferred_to_proposer: list[str] = []
+        transferred_to_target: list[str] = []
+        if offer.receive_property_id and self._is_space_mortgaged(offer.receive_property_id):
+            transferred_to_proposer.append(offer.receive_property_id)
+        if offer.give_property_id and self._is_space_mortgaged(offer.give_property_id):
+            transferred_to_target.append(offer.give_property_id)
+        if transferred_to_proposer and not self._settle_transferred_mortgage_interest(
+            proposer,
+            transferred_to_proposer,
+            allow_bankruptcy=False,
+        ):
+            return False
+        if transferred_to_target and not self._settle_transferred_mortgage_interest(
+            target,
+            transferred_to_target,
+            allow_bankruptcy=False,
+        ):
+            return False
         return True
 
     def _bot_accepts_trade_offer(
@@ -1803,13 +3871,22 @@ class MonopolyGame(ActionGuardMixin, Game):
         target: MonopolyPlayer,
         proposer_cash: int,
         target_props: list[str],
+        *,
+        locale: str,
     ) -> None:
         """Add cash-for-property purchase offers where proposer buys from target."""
         for space_id in target_props:
             price = self._property_trade_value(space_id)
             if proposer_cash < price:
                 continue
-            summary = f"Buy {self._space_label(space_id)} from {target.name} for {price}"
+            summary = self._monopoly_text(
+                locale,
+                "monopoly-trade-buy-property-summary",
+                fallback=f"Buy {self._space_label(space_id)} from {target.name} for {price}",
+                property=self._space_label(space_id, locale),
+                target=target.name,
+                amount=price,
+            )
             offer = MonopolyTradeOffer(
                 target_id=target.id,
                 give_cash=price,
@@ -1821,7 +3898,14 @@ class MonopolyGame(ActionGuardMixin, Game):
             for bid in self._trade_price_points(price):
                 if bid <= 0 or bid > proposer_cash:
                     continue
-                custom_summary = f"Offer {bid} to {target.name} for {self._space_label(space_id)}"
+                custom_summary = self._monopoly_text(
+                    locale,
+                    "monopoly-trade-offer-cash-for-property-summary",
+                    fallback=f"Offer {bid} to {target.name} for {self._space_label(space_id)}",
+                    amount=bid,
+                    target=target.name,
+                    property=self._space_label(space_id, locale),
+                )
                 custom_offer = MonopolyTradeOffer(
                     target_id=target.id,
                     give_cash=bid,
@@ -1836,13 +3920,22 @@ class MonopolyGame(ActionGuardMixin, Game):
         target: MonopolyPlayer,
         target_cash: int,
         proposer_props: list[str],
+        *,
+        locale: str,
     ) -> None:
         """Add property-for-cash sale offers where proposer sells to target."""
         for space_id in proposer_props:
             price = self._property_trade_value(space_id)
             if target_cash < price:
                 continue
-            summary = f"Sell {self._space_label(space_id)} to {target.name} for {price}"
+            summary = self._monopoly_text(
+                locale,
+                "monopoly-trade-sell-property-summary",
+                fallback=f"Sell {self._space_label(space_id)} to {target.name} for {price}",
+                property=self._space_label(space_id, locale),
+                target=target.name,
+                amount=price,
+            )
             offer = MonopolyTradeOffer(
                 target_id=target.id,
                 give_property_id=space_id,
@@ -1854,7 +3947,14 @@ class MonopolyGame(ActionGuardMixin, Game):
             for ask in self._trade_price_points(price):
                 if ask <= 0 or ask > target_cash:
                     continue
-                custom_summary = f"Offer {self._space_label(space_id)} to {target.name} for {ask}"
+                custom_summary = self._monopoly_text(
+                    locale,
+                    "monopoly-trade-offer-property-for-cash-summary",
+                    fallback=f"Offer {self._space_label(space_id)} to {target.name} for {ask}",
+                    property=self._space_label(space_id, locale),
+                    target=target.name,
+                    amount=ask,
+                )
                 custom_offer = MonopolyTradeOffer(
                     target_id=target.id,
                     give_property_id=space_id,
@@ -1871,16 +3971,25 @@ class MonopolyGame(ActionGuardMixin, Game):
         target_cash: int,
         proposer_props: list[str],
         target_props: list[str],
+        *,
+        locale: str,
     ) -> None:
         """Add property swap offers with optional balancing cash."""
         for give_space_id in proposer_props:
             give_value = self._property_trade_value(give_space_id)
-            give_label = self._space_label(give_space_id)
+            give_label = self._space_label(give_space_id, locale)
             for receive_space_id in target_props:
                 receive_value = self._property_trade_value(receive_space_id)
-                receive_label = self._space_label(receive_space_id)
+                receive_label = self._space_label(receive_space_id, locale)
 
-                swap_summary = f"Swap {give_label} with {target.name} for {receive_label}"
+                swap_summary = self._monopoly_text(
+                    locale,
+                    "monopoly-trade-swap-summary",
+                    fallback=f"Swap {give_label} with {target.name} for {receive_label}",
+                    give_property=give_label,
+                    target=target.name,
+                    receive_property=receive_label,
+                )
                 swap_offer = MonopolyTradeOffer(
                     target_id=target.id,
                     give_property_id=give_space_id,
@@ -1891,8 +4000,14 @@ class MonopolyGame(ActionGuardMixin, Game):
 
                 diff = receive_value - give_value
                 if diff > 0 and proposer_cash >= diff:
-                    plus_cash_summary = (
-                        f"Swap {give_label} + {diff} with {target.name} for {receive_label}"
+                    plus_cash_summary = self._monopoly_text(
+                        locale,
+                        "monopoly-trade-swap-plus-cash-summary",
+                        fallback=f"Swap {give_label} + {diff} with {target.name} for {receive_label}",
+                        give_property=give_label,
+                        amount=diff,
+                        target=target.name,
+                        receive_property=receive_label,
                     )
                     plus_cash_offer = MonopolyTradeOffer(
                         target_id=target.id,
@@ -1903,8 +4018,14 @@ class MonopolyGame(ActionGuardMixin, Game):
                     )
                     self._append_trade_offer_option(options, plus_cash_summary, plus_cash_offer)
                 elif diff < 0 and target_cash >= abs(diff):
-                    plus_cash_summary = (
-                        f"Swap {give_label} for {receive_label} + {abs(diff)} from {target.name}"
+                    plus_cash_summary = self._monopoly_text(
+                        locale,
+                        "monopoly-trade-swap-receive-cash-summary",
+                        fallback=f"Swap {give_label} for {receive_label} + {abs(diff)} from {target.name}",
+                        give_property=give_label,
+                        receive_property=receive_label,
+                        amount=abs(diff),
+                        target=target.name,
                     )
                     plus_cash_offer = MonopolyTradeOffer(
                         target_id=target.id,
@@ -1922,13 +4043,21 @@ class MonopolyGame(ActionGuardMixin, Game):
         target: MonopolyPlayer,
         proposer_cash: int,
         target_cash: int,
+        *,
+        locale: str,
     ) -> None:
         """Add cash-for-jail-card buy/sell offers."""
         if target.get_out_of_jail_cards > 0 and proposer_cash >= JAIL_CARD_TRADE_CASH:
             for price in sorted({JAIL_CARD_TRADE_CASH, JAIL_CARD_TRADE_CASH * 2}):
                 if price > proposer_cash:
                     continue
-                summary = f"Buy jail card from {target.name} for {price}"
+                summary = self._monopoly_text(
+                    locale,
+                    "monopoly-trade-buy-jail-card-summary",
+                    fallback=f"Buy jail card from {target.name} for {price}",
+                    target=target.name,
+                    amount=price,
+                )
                 offer = MonopolyTradeOffer(
                     target_id=target.id,
                     give_cash=price,
@@ -1940,7 +4069,13 @@ class MonopolyGame(ActionGuardMixin, Game):
             for price in sorted({JAIL_CARD_TRADE_CASH, JAIL_CARD_TRADE_CASH * 2}):
                 if price > target_cash:
                     continue
-                summary = f"Sell jail card to {target.name} for {price}"
+                summary = self._monopoly_text(
+                    locale,
+                    "monopoly-trade-sell-jail-card-summary",
+                    fallback=f"Sell jail card to {target.name} for {price}",
+                    target=target.name,
+                    amount=price,
+                )
                 offer = MonopolyTradeOffer(
                     target_id=target.id,
                     give_jail_cards=1,
@@ -1955,6 +4090,8 @@ class MonopolyGame(ActionGuardMixin, Game):
         proposer: MonopolyPlayer,
         target: MonopolyPlayer,
         proposer_props: list[str],
+        *,
+        locale: str,
     ) -> None:
         """Add all canonical trade offer variants against one target player."""
         proposer_cash = self._current_liquid_balance(proposer)
@@ -1965,12 +4102,14 @@ class MonopolyGame(ActionGuardMixin, Game):
             target,
             proposer_cash,
             target_props,
+            locale=locale,
         )
         self._append_sell_property_trade_offers(
             options,
             target,
             target_cash,
             proposer_props,
+            locale=locale,
         )
         self._append_swap_trade_offers(
             options,
@@ -1979,6 +4118,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             target_cash,
             proposer_props,
             target_props,
+            locale=locale,
         )
         self._append_jail_card_trade_offers(
             options,
@@ -1986,6 +4126,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             target,
             proposer_cash,
             target_cash,
+            locale=locale,
         )
 
     def _options_for_offer_trade(self, player: Player) -> list[str]:
@@ -1994,6 +4135,8 @@ class MonopolyGame(ActionGuardMixin, Game):
         if self._is_junior_preset():
             return []
         options: list[str] = []
+        user = self.get_user(player)
+        locale = user.locale if user else "en"
 
         other_players = [
             p
@@ -2007,6 +4150,7 @@ class MonopolyGame(ActionGuardMixin, Game):
                 mono_player,
                 other,
                 proposer_props,
+                locale=locale,
             )
 
         # Keep list stable and reasonably sized for menu navigation.
@@ -2165,10 +4309,22 @@ class MonopolyGame(ActionGuardMixin, Game):
         for bidder in rotated:
             if bidder.bankrupt:
                 continue
-            if self._current_liquid_balance(bidder) < MIN_AUCTION_INCREMENT:
+            if not self._can_raise_cash_for_auction_bid(bidder, MIN_AUCTION_INCREMENT):
                 continue
             bidders.append(bidder)
         return bidders
+
+    def _can_raise_cash_for_auction_bid(
+        self,
+        player: MonopolyPlayer,
+        minimum_bid: int,
+    ) -> bool:
+        """Return True when the player can legally reach the minimum auction bid."""
+        if player.bankrupt:
+            return False
+        if self._current_liquid_balance(player) >= minimum_bid:
+            return True
+        return bool(self._mortgage_space_ids(player) or self._options_for_sell_house(player))
 
     def _auction_min_bid(self) -> int:
         """Return minimum legal next bid for the active interactive auction."""
@@ -2221,8 +4377,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         bidder = self._current_auction_bidder()
         space = self._pending_auction_space()
         if bidder and space:
-            self.broadcast_l(
-                "monopoly-auction-turn",
+            self._broadcast_monopoly_personal(
+                bidder,
+                personal_message_id="monopoly-you-auction-turn",
+                others_message_id="monopoly-player-auction-turn",
+                personal_fallback="Your turn to act.",
+                others_fallback=f"{bidder.name}'s turn to act.",
                 player=bidder.name,
                 property=space.name,
                 amount=self.pending_auction_current_bid,
@@ -2238,18 +4398,31 @@ class MonopolyGame(ActionGuardMixin, Game):
         paid = self._debit_player_to_bank(winner, bid, f"auction:{space.space_id}")
         if paid <= 0:
             return
+        owned_before = False
+        if self._is_street_property(space) and space.color_group:
+            owned_before = self._owner_has_full_color_set(winner.id, space.color_group)
+        elif space.kind in {"railroad", "utility"}:
+            owned_before = self._owns_all_of_kind(winner.id, space.kind)
         if space.space_id not in winner.owned_space_ids:
             winner.owned_space_ids.append(space.space_id)
         self.property_owners[space.space_id] = winner.id
         if space.space_id in self.mortgaged_space_ids:
             self.mortgaged_space_ids.remove(space.space_id)
 
-        self.broadcast_l(
-            "monopoly-auction-won",
+        self._broadcast_monopoly_personal(
+            winner,
+            personal_message_id="monopoly-you-auction-won",
+            others_message_id="monopoly-player-auction-won",
+            personal_fallback=f"You won the auction for {space.name} at {self._format_money(paid)}.",
+            others_fallback=f"{winner.name} won the auction for {space.name} at {self._format_money(paid)}.",
             player=winner.name,
             property=space.name,
             amount=paid,
-            cash=winner.cash,
+        )
+        self._announce_completed_collection_if_needed(
+            winner,
+            space,
+            owned_before=owned_before,
         )
         self._award_builder_blocks(winner)
 
@@ -2288,8 +4461,14 @@ class MonopolyGame(ActionGuardMixin, Game):
             and not current.bankrupt
         ):
             self._prepare_next_roll_after_doubles(current)
+            self._sync_cash_scores()
+            self.rebuild_all_menus()
+            return
 
         self._sync_cash_scores()
+        if current and isinstance(current, MonopolyPlayer):
+            self._advance_after_roll_resolution(current)
+            return
         self.rebuild_all_menus()
 
     def _start_property_auction(self, space: MonopolySpace, declined_by: MonopolyPlayer) -> None:
@@ -2300,21 +4479,28 @@ class MonopolyGame(ActionGuardMixin, Game):
             self.turn_pending_purchase_space_id = ""
             if self.turn_can_roll_again and not declined_by.bankrupt:
                 self._prepare_next_roll_after_doubles(declined_by)
+                self._sync_cash_scores()
+                self.rebuild_all_menus()
+                return
             self._sync_cash_scores()
-            self.rebuild_all_menus()
+            self._advance_after_roll_resolution(declined_by)
             return
 
         if len(bidders) == 1:
             winner = bidders[0]
             reserve = max(1, space.price // 2)
             winning_bid = min(self._current_liquid_balance(winner), reserve)
-            self.turn_pending_purchase_space_id = ""
-            self._complete_auction_sale(space, winner, winning_bid)
-            if self.turn_can_roll_again and not declined_by.bankrupt:
-                self._prepare_next_roll_after_doubles(declined_by)
-            self._sync_cash_scores()
-            self.rebuild_all_menus()
-            return
+            if winning_bid > 0:
+                self.turn_pending_purchase_space_id = ""
+                self._complete_auction_sale(space, winner, winning_bid)
+                if self.turn_can_roll_again and not declined_by.bankrupt:
+                    self._prepare_next_roll_after_doubles(declined_by)
+                    self._sync_cash_scores()
+                    self.rebuild_all_menus()
+                    return
+                self._sync_cash_scores()
+                self._advance_after_roll_resolution(declined_by)
+                return
 
         self.pending_auction_space_id = space.space_id
         self.pending_auction_bidder_ids = [bidder.id for bidder in bidders]
@@ -2328,6 +4514,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             amount=MIN_AUCTION_INCREMENT,
         )
         self._advance_pending_auction_turn(-1)
+        self.rebuild_all_menus()
 
     def _is_free_parking_jackpot_enabled(self) -> bool:
         """Return True when current preset enables jackpot on Free Parking."""
@@ -2387,6 +4574,11 @@ class MonopolyGame(ActionGuardMixin, Game):
             return False
         if self._current_liquid_balance(player) < space.price:
             return False
+        owned_before = False
+        if self._is_street_property(space) and space.color_group:
+            owned_before = self._owner_has_full_color_set(player.id, space.color_group)
+        elif space.kind in {"railroad", "utility"}:
+            owned_before = self._owns_all_of_kind(player.id, space.kind)
 
         paid = self._debit_player_to_bank(player, space.price, f"buy_property:{space.space_id}")
         if paid < space.price:
@@ -2398,12 +4590,20 @@ class MonopolyGame(ActionGuardMixin, Game):
         if space.space_id in self.mortgaged_space_ids:
             self.mortgaged_space_ids.remove(space.space_id)
 
-        self.broadcast_l(
-            "monopoly-property-bought",
+        self._broadcast_monopoly_personal(
+            player,
+            personal_message_id="monopoly-you-property-bought",
+            others_message_id="monopoly-player-property-bought",
+            personal_fallback=f"You bought {space.name} for {self._format_money(paid)}.",
+            others_fallback=f"{player.name} bought {space.name} for {self._format_money(paid)}.",
             player=player.name,
             property=space.name,
             price=paid,
-            cash=player.cash,
+        )
+        self._announce_completed_collection_if_needed(
+            player,
+            space,
+            owned_before=owned_before,
         )
         self._award_builder_blocks(player)
         return True
@@ -2500,7 +4700,124 @@ class MonopolyGame(ActionGuardMixin, Game):
         self.turn_last_roll.clear()
         self.turn_pending_purchase_space_id = ""
         self.turn_can_roll_again = False
-        self.broadcast_l("monopoly-roll-again", player=player.name)
+        self._queue_roll_focus(player)
+        self.broadcast_personal_l(
+            player,
+            "monopoly-you-roll-again",
+            "monopoly-player-roll-again",
+        )
+
+    def _broadcast_roll_only(
+        self,
+        player: MonopolyPlayer,
+        *,
+        die_1: int,
+        die_2: int,
+        total: int,
+        is_doubles: bool = False,
+    ) -> None:
+        """Broadcast one localized roll announcement with personal wording."""
+        if is_doubles:
+            self.broadcast_personal_l(
+                player,
+                "monopoly-you-roll-only-doubles",
+                "monopoly-player-roll-only-doubles",
+                die1=die_1,
+                die2=die_2,
+                total=total,
+            )
+            return
+        self.broadcast_personal_l(
+            player,
+            "monopoly-you-roll-only",
+            "monopoly-player-roll-only",
+            die1=die_1,
+            die2=die_2,
+            total=total,
+        )
+
+    def _broadcast_roll_result(
+        self,
+        player: MonopolyPlayer,
+        *,
+        die_1: int,
+        die_2: int,
+        total: int,
+        space: str,
+    ) -> None:
+        """Broadcast one localized roll-and-land announcement with personal wording."""
+        self.broadcast_personal_l(
+            player,
+            "monopoly-you-roll-result",
+            "monopoly-player-roll-result",
+            die1=die_1,
+            die2=die_2,
+            total=total,
+            space=space,
+        )
+
+    def _broadcast_jail_roll_doubles(
+        self,
+        player: MonopolyPlayer,
+        *,
+        die_1: int,
+        die_2: int,
+    ) -> None:
+        """Broadcast doubles release from jail with personal wording."""
+        self.broadcast_personal_l(
+            player,
+            "monopoly-you-jail-roll-doubles",
+            "monopoly-player-jail-roll-doubles",
+            die1=die_1,
+            die2=die_2,
+        )
+
+    def _finish_turn(self, player: MonopolyPlayer | None = None) -> None:
+        """Advance from the current turn to the next player."""
+        finisher = player if isinstance(player, MonopolyPlayer) else self.current_player
+        if isinstance(finisher, MonopolyPlayer):
+            self.voice_pending_transfer_by_player_id.pop(finisher.id, None)
+        if self._is_city_preset() and self._check_city_endgame():
+            self.rebuild_all_menus()
+            return
+        if self._is_junior_preset() and self._check_junior_endgame():
+            self.rebuild_all_menus()
+            return
+        self._reset_turn_state()
+        next_player = self.advance_turn(announce=True)
+        self._start_cheaters_turn(next_player)
+        self._start_city_turn(next_player)
+        self._queue_roll_focus(next_player)
+        if self._is_city_preset() and self._check_city_endgame():
+            self.rebuild_all_menus()
+            return
+        if self._is_junior_preset() and self._check_junior_endgame():
+            self.rebuild_all_menus()
+            return
+        if next_player:
+            self.rebuild_player_menu(next_player)
+        if next_player and next_player.is_bot:
+            BotHelper.jolt_bot(next_player, ticks=random.randint(8, 14))
+
+    def _advance_after_roll_resolution(self, player: MonopolyPlayer) -> bool:
+        """Advance automatically once a roll is fully resolved."""
+        current = self.current_player
+        if (
+            self.status != "playing"
+            or not self.game_active
+            or current is None
+            or current.id != player.id
+            or player.bankrupt
+            or not self.turn_has_rolled
+            or self.turn_pending_purchase_space_id
+            or self.turn_can_roll_again
+            or self._is_auction_active()
+            or self._has_pending_rent_payment(player)
+        ):
+            self.rebuild_all_menus()
+            return False
+        self._finish_turn(player)
+        return True
 
     def _resolve_board_pass_go_credit(self, base_credit: int) -> int:
         """Resolve pass-GO credit with board rule-pack override when active."""
@@ -2733,7 +5050,16 @@ class MonopolyGame(ActionGuardMixin, Game):
 
         if outcome_type == "coin_ping":
             self._credit_player(player, amount, "question_block_coin_ping")
-            self.broadcast_l("monopoly-card-collect", player=player.name, amount=amount, cash=player.cash)
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-collect",
+                others_message_id="monopoly-player-card-collect",
+                personal_fallback=f"You collected {self._format_money(amount)}.",
+                others_fallback=f"{player.name} collected {self._format_money(amount)}.",
+                player=player.name,
+                amount=amount,
+                cash=player.cash,
+            )
             return "resolved"
 
         if outcome_type in ("bowser", "game_over"):
@@ -2744,11 +5070,10 @@ class MonopolyGame(ActionGuardMixin, Game):
         if outcome_type == "power_up":
             extra_steps = random.randint(1, 6)
             landed_space = self._move_player(player, extra_steps, collect_pass_go=True)
-            self.broadcast_l(
-                "monopoly-roll-result",
-                player=player.name,
-                die1=extra_steps,
-                die2=0,
+            self._broadcast_roll_result(
+                player,
+                die_1=extra_steps,
+                die_2=0,
                 total=extra_steps,
                 space=landed_space.name,
             )
@@ -2816,11 +5141,10 @@ class MonopolyGame(ActionGuardMixin, Game):
         if outcome == "roll_numbered_die_again":
             extra_steps = random.randint(1, 6)
             landed_space = self._move_player(player, extra_steps, collect_pass_go=True)
-            self.broadcast_l(
-                "monopoly-roll-result",
-                player=player.name,
-                die1=extra_steps,
-                die2=0,
+            self._broadcast_roll_result(
+                player,
+                die_1=extra_steps,
+                die_2=0,
                 total=extra_steps,
                 space=landed_space.name,
             )
@@ -2832,8 +5156,12 @@ class MonopolyGame(ActionGuardMixin, Game):
             except (TypeError, ValueError):
                 return "resolved"
             credited = self._credit_player(player, amount, "junior_super_mario_powerup_collect")
-            self.broadcast_l(
-                "monopoly-card-collect",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-collect",
+                others_message_id="monopoly-player-card-collect",
+                personal_fallback=f"You collected {self._format_money(credited)}.",
+                others_fallback=f"{player.name} collected {self._format_money(credited)}.",
                 player=player.name,
                 amount=credited,
                 cash=player.cash,
@@ -2871,8 +5199,12 @@ class MonopolyGame(ActionGuardMixin, Game):
                     pride_rock_event,
                     payload={"pass_go_cash": pass_go_cash},
                 )
-            self.broadcast_l(
-                "monopoly-pass-go",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-pass-go",
+                others_message_id="monopoly-player-pass-go",
+                personal_fallback=f"You passed GO and collected {self._format_money(credited)}.",
+                others_fallback=f"{player.name} passed GO and collected {self._format_money(credited)}.",
                 player=player.name,
                 amount=credited,
                 cash=player.cash,
@@ -2886,8 +5218,14 @@ class MonopolyGame(ActionGuardMixin, Game):
                 self.chance_deck_order = self._manual_deck_ids("chance") or CHANCE_CARD_IDS.copy()
                 if self.chance_deck_order == CHANCE_CARD_IDS:
                     random.shuffle(self.chance_deck_order)
-            card = self.chance_deck_order[self.chance_deck_index % len(self.chance_deck_order)]
-            self.chance_deck_index += 1
+            card_index = self.chance_deck_index % len(self.chance_deck_order)
+            card = self.chance_deck_order[card_index]
+            if self._is_get_out_of_jail_card_id(card):
+                self.chance_deck_order.pop(card_index)
+                if not self.chance_deck_order:
+                    self.chance_deck_index = 0
+            else:
+                self.chance_deck_index += 1
             return card
 
         if not self.community_chest_deck_order:
@@ -2896,10 +5234,14 @@ class MonopolyGame(ActionGuardMixin, Game):
             )
             if self.community_chest_deck_order == COMMUNITY_CHEST_CARD_IDS:
                 random.shuffle(self.community_chest_deck_order)
-        card = self.community_chest_deck_order[
-            self.community_chest_deck_index % len(self.community_chest_deck_order)
-        ]
-        self.community_chest_deck_index += 1
+        card_index = self.community_chest_deck_index % len(self.community_chest_deck_order)
+        card = self.community_chest_deck_order[card_index]
+        if self._is_get_out_of_jail_card_id(card):
+            self.community_chest_deck_order.pop(card_index)
+            if not self.community_chest_deck_order:
+                self.community_chest_deck_index = 0
+        else:
+            self.community_chest_deck_index += 1
         return card
 
     def _send_to_jail(self, player: MonopolyPlayer, *, by_triple_doubles: bool = False) -> None:
@@ -2911,11 +5253,19 @@ class MonopolyGame(ActionGuardMixin, Game):
         self.turn_can_roll_again = False
 
         if by_triple_doubles:
-            self.broadcast_l("monopoly-three-doubles-jail", player=player.name)
+            self.broadcast_personal_l(
+                player,
+                "monopoly-you-three-doubles-jail",
+                "monopoly-player-three-doubles-jail",
+            )
         else:
             jail_space = self._space_at(10)
-            self.broadcast_l(
-                "monopoly-go-to-jail",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-go-to-jail",
+                others_message_id="monopoly-player-go-to-jail",
+                personal_fallback=f"You go to jail (moved to {jail_space.name}).",
+                others_fallback=f"{player.name} goes to jail (moved to {jail_space.name}).",
                 player=player.name,
                 space=jail_space.name,
             )
@@ -2987,16 +5337,24 @@ class MonopolyGame(ActionGuardMixin, Game):
     ) -> None:
         """Broadcast canonical bank-payment messages for taxes/cards."""
         if tax_name:
-            self.broadcast_l(
-                "monopoly-tax-paid",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-tax-paid",
+                others_message_id="monopoly-player-tax-paid",
+                personal_fallback=f"You paid {self._format_money(paid)} for {tax_name}.",
+                others_fallback=f"{player.name} paid {self._format_money(paid)} for {tax_name}.",
                 player=player.name,
                 amount=paid,
                 tax=tax_name,
                 cash=player.cash,
             )
         elif card_reason_key:
-            self.broadcast_l(
-                card_reason_key,
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-card-pay",
+                others_message_id="monopoly-player-card-pay",
+                personal_fallback=f"You paid {self._format_money(paid)}.",
+                others_fallback=f"{player.name} paid {self._format_money(paid)}.",
                 player=player.name,
                 amount=paid,
                 cash=player.cash,
@@ -3031,7 +5389,19 @@ class MonopolyGame(ActionGuardMixin, Game):
             return False
 
         if not manual_core and self._current_liquid_balance(player) < amount:
-            self._liquidate_assets_for_debt(player, amount)
+            if player.is_bot:
+                self._liquidate_assets_for_debt(player, amount)
+            else:
+                self._start_pending_rent_payment(
+                    player,
+                    owner=None,
+                    amount_due=amount,
+                    landed_space=None,
+                    reason=reason,
+                    payment_label=tax_name or card_reason_key or "Bank",
+                )
+                self.rebuild_all_menus()
+                return True
 
         paid = self._debit_player_to_bank(player, amount, reason, allow_partial=True)
         if self._is_free_parking_jackpot_enabled():
@@ -3090,6 +5460,35 @@ class MonopolyGame(ActionGuardMixin, Game):
     def _city_final_value(self, player: MonopolyPlayer) -> int:
         """Return City final value used by anchor-backed winner resolution."""
         return max(0, self._current_liquid_balance(player)) + self._city_rent_value_total(player)
+
+    def _standard_total_asset_value(self, player: MonopolyPlayer) -> int:
+        """Return a standard Monopoly total-asset estimate for endgame scoring."""
+        total = max(0, self._current_liquid_balance(player))
+        for space_id in player.owned_space_ids:
+            space = self._space_by_id_or_none(space_id)
+            if not space:
+                continue
+            if space_id in self.mortgaged_space_ids:
+                total += self._mortgage_value(space)
+            else:
+                total += max(0, space.price)
+            if self._is_street_property(space):
+                total += max(0, space.house_cost // 2) * self._building_level(space_id)
+        return total
+
+    def _sync_total_asset_scores(self) -> None:
+        """Mirror total asset value into team scores for finished standard games."""
+        if self._team_manager.team_mode != "individual":
+            return
+        for team in self._team_manager.teams:
+            if not team.members:
+                continue
+            player = self.get_player_by_name(team.members[0])
+            if player and isinstance(player, MonopolyPlayer):
+                team.total_score = self._standard_total_asset_value(player)
+            else:
+                team.total_score = 0
+            team.round_score = 0
 
     def _finish_city_game_by_value(
         self,
@@ -3238,21 +5637,43 @@ class MonopolyGame(ActionGuardMixin, Game):
         self,
         player: MonopolyPlayer,
         creditor: MonopolyPlayer | None,
-    ) -> None:
+    ) -> tuple[list[str], list[str]]:
         """Transfer/release all player holdings during bankruptcy."""
+        transferred_mortgaged_space_ids: list[str] = []
+        released_space_ids: list[str] = []
         for space_id in list(player.owned_space_ids):
             if self.property_owners.get(space_id) == player.id:
                 if creditor:
+                    space = self._space_by_id_or_none(space_id)
+                    owned_before = False
+                    if space is not None:
+                        if self._is_street_property(space) and space.color_group:
+                            owned_before = self._owner_has_full_color_set(
+                                creditor.id,
+                                space.color_group,
+                            )
+                        elif space.kind in {"railroad", "utility"}:
+                            owned_before = self._owns_all_of_kind(creditor.id, space.kind)
                     self.property_owners[space_id] = creditor.id
                     if space_id not in creditor.owned_space_ids:
                         creditor.owned_space_ids.append(space_id)
+                    if space is not None:
+                        self._announce_completed_collection_if_needed(
+                            creditor,
+                            space,
+                            owned_before=owned_before,
+                        )
+                    if space_id in self.mortgaged_space_ids:
+                        transferred_mortgaged_space_ids.append(space_id)
                 else:
                     del self.property_owners[space_id]
+                    released_space_ids.append(space_id)
             if not creditor and space_id in self.mortgaged_space_ids:
                 self.mortgaged_space_ids.remove(space_id)
             # Buildings are liquidated during bankruptcy transfer/release.
             if space_id in self.building_levels:
                 self.building_levels[space_id] = 0
+        return transferred_mortgaged_space_ids, released_space_ids
 
     def _clear_bankrupt_player_state(
         self,
@@ -3260,8 +5681,17 @@ class MonopolyGame(ActionGuardMixin, Game):
         creditor: MonopolyPlayer | None,
     ) -> None:
         """Zero all transferable state and close banking account for bankrupt player."""
+        if creditor and not self._is_electronic_banking_preset() and player.cash > 0:
+            creditor.cash += player.cash
         if creditor and player.get_out_of_jail_cards > 0:
             creditor.get_out_of_jail_cards += player.get_out_of_jail_cards
+            self._transfer_held_get_out_of_jail_cards(
+                player,
+                creditor,
+                player.get_out_of_jail_cards,
+            )
+        elif player.get_out_of_jail_cards > 0:
+            self._return_player_get_out_of_jail_cards_to_decks(player)
         player.get_out_of_jail_cards = 0
         self._close_bank_account(player, creditor=creditor)
         player.cash = 0
@@ -3290,12 +5720,13 @@ class MonopolyGame(ActionGuardMixin, Game):
             self.status = "finished"
             self.game_active = False
             self.set_turn_players(remaining)
+            self._sync_total_asset_scores()
             if remaining:
                 winner = remaining[0]
                 self.broadcast_l(
                     "monopoly-winner-by-bankruptcy",
                     player=winner.name,
-                    cash=self._current_liquid_balance(winner),
+                    cash=self._standard_total_asset_value(winner),
                 )
             return
 
@@ -3322,7 +5753,10 @@ class MonopolyGame(ActionGuardMixin, Game):
 
         player.bankrupt = True
         creditor = self._resolve_bankruptcy_creditor(player, creditor_id)
-        self._transfer_bankrupt_holdings(player, creditor)
+        (
+            transferred_mortgaged_space_ids,
+            released_space_ids,
+        ) = self._transfer_bankrupt_holdings(player, creditor)
         self._clear_bankrupt_player_state(player, creditor)
         self._cancel_pending_trade_for_bankrupt_player(player)
 
@@ -3332,11 +5766,24 @@ class MonopolyGame(ActionGuardMixin, Game):
             creditor=creditor_name or (creditor.name if creditor else "Bank"),
         )
         self._finalize_turn_order_after_bankruptcy(player)
+        if self.status == "playing" and creditor and transferred_mortgaged_space_ids:
+            self._settle_transferred_mortgage_interest(
+                creditor,
+                transferred_mortgaged_space_ids,
+                allow_bankruptcy=True,
+            )
+        if not creditor and released_space_ids:
+            self._auction_released_bankrupt_properties(
+                released_space_ids,
+                bankrupt_player=player,
+            )
 
     def _resolve_card_draw_text(
         self,
         manual_card: dict[str, object] | None,
         card_id: str,
+        *,
+        locale: str = "en",
     ) -> str:
         """Resolve display text for one drawn card."""
         if isinstance(manual_card, dict):
@@ -3348,17 +5795,60 @@ class MonopolyGame(ActionGuardMixin, Game):
 
             manual_text_key = manual_card.get("text_key")
             if isinstance(manual_text_key, str):
-                resolved_manual = Localization.get("en", manual_text_key)
+                resolved_manual = Localization.get(locale, manual_text_key)
                 # When a manual-specific key is missing, fall back to classic card text.
                 if resolved_manual and resolved_manual != manual_text_key:
                     return resolved_manual
 
         default_text_key = CARD_DESCRIPTION_KEYS.get(card_id, card_id)
-        return Localization.get("en", default_text_key)
+        return self._monopoly_text(
+            locale,
+            default_text_key,
+            **self._card_draw_text_kwargs(card_id),
+        )
 
-    def _resolve_card_deck_label(self, deck_type: str) -> str:
+    def _card_draw_text_kwargs(self, card_id: str) -> dict[str, int]:
+        """Return localization kwargs for classic card text that includes money."""
+        if card_id == "advance_to_go":
+            pass_go_cash = max(0, self.rule_profile.pass_go_cash)
+            if self._is_electronic_banking_preset() and self.banking_profile:
+                pass_go_cash = max(0, self.banking_profile.pass_go_credit)
+            return {"amount": self._resolve_board_pass_go_credit(pass_go_cash)}
+
+        amount_defaults = {
+            "bank_dividend_50": 50,
+            "poor_tax_15": 15,
+            "chairman_of_the_board_pay_50_each": 50,
+            "building_loan_matures_150": 150,
+            "crossword_competition_100": 100,
+            "bank_error_collect_200": 200,
+            "doctor_fee_pay_50": 50,
+            "from_sale_of_stock_50": 50,
+            "holiday_fund_matures_100": 100,
+            "income_tax_refund_20": 20,
+            "its_your_birthday_collect_10_each": 10,
+            "life_insurance_matures_100": 100,
+            "hospital_fees_pay_100": 100,
+            "school_fees_pay_50": 50,
+            "consultancy_fee_collect_25": 25,
+            "beauty_contest_second_prize_10": 10,
+            "inherit_100": 100,
+        }
+        if card_id in amount_defaults:
+            return {"amount": self._resolve_board_card_cash(card_id, amount_defaults[card_id])}
+        if card_id == "general_repairs":
+            return {"per_house": 25, "per_hotel": 100}
+        if card_id == "street_repairs":
+            return {"per_house": 40, "per_hotel": 115}
+        return {}
+
+    def _resolve_card_deck_label(self, deck_type: str, *, locale: str = "en") -> str:
         """Resolve deck label for card draw announcements."""
-        default_label = "Chance" if deck_type == "chance" else "Community Chest"
+        default_label = self._monopoly_text(
+            locale,
+            "monopoly-deck-chance" if deck_type == "chance" else "monopoly-deck-community-chest",
+            fallback="Chance" if deck_type == "chance" else "Community Chest",
+        )
         if deck_type not in {"chance", "community_chest"}:
             return default_label
         if self.active_manual_rule_set is None:
@@ -3375,6 +5865,36 @@ class MonopolyGame(ActionGuardMixin, Game):
             return default_label
         return normalized
 
+    def _broadcast_card_draw(
+        self,
+        player: MonopolyPlayer,
+        deck_type: str,
+        manual_card: dict[str, object] | None,
+        card_id: str,
+    ) -> None:
+        """Broadcast one card draw with per-user localized deck/card text."""
+        for recipient in self.players:
+            user = self.get_user(recipient)
+            locale = user.locale if user else "en"
+            deck_label = self._resolve_card_deck_label(deck_type, locale=locale)
+            card_text = self._resolve_card_draw_text(manual_card, card_id, locale=locale)
+            localized = Localization.get(
+                locale,
+                "monopoly-card-drawn",
+                player=player.name,
+                deck=deck_label,
+                card=card_text,
+            )
+            if hasattr(self, "record_transcript_event"):
+                self.record_transcript_event(recipient, localized, "table")
+            if user:
+                user.speak_l(
+                    "monopoly-card-drawn",
+                    player=player.name,
+                    deck=deck_label,
+                    card=card_text,
+                )
+
     def _resolve_card_collect_effect(
         self,
         player: MonopolyPlayer,
@@ -3382,8 +5902,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         reason: str,
     ) -> str:
         credited = self._credit_player(player, amount, reason)
-        self.broadcast_l(
-            "monopoly-card-collect",
+        self._broadcast_monopoly_personal(
+            player,
+            personal_message_id="monopoly-you-card-collect",
+            others_message_id="monopoly-player-card-collect",
+            personal_fallback=f"You collected {self._format_money(credited)}.",
+            others_fallback=f"{player.name} collected {self._format_money(credited)}.",
             player=player.name,
             amount=credited,
             cash=player.cash,
@@ -3405,8 +5929,12 @@ class MonopolyGame(ActionGuardMixin, Game):
         if self._is_electronic_banking_preset() and self.banking_profile:
             pass_go_cash = max(0, self.banking_profile.pass_go_credit)
         credited = self._credit_player(player, pass_go_cash, "chance_advance_to_go")
-        self.broadcast_l(
-            "monopoly-pass-go",
+        self._broadcast_monopoly_personal(
+            player,
+            personal_message_id="monopoly-you-pass-go",
+            others_message_id="monopoly-player-pass-go",
+            personal_fallback=f"You passed GO and collected {self._format_money(credited)}.",
+            others_fallback=f"{player.name} passed GO and collected {self._format_money(credited)}.",
             player=player.name,
             amount=credited,
             cash=player.cash,
@@ -3422,8 +5950,12 @@ class MonopolyGame(ActionGuardMixin, Game):
     ) -> str:
         player.position = (player.position - 3) % self.active_board_size
         landed_space = self._space_at(player.position)
-        self.broadcast_l(
-            "monopoly-card-move",
+        self._broadcast_monopoly_personal(
+            player,
+            personal_message_id="monopoly-you-card-move",
+            others_message_id="monopoly-player-card-move",
+            personal_fallback=f"You moved to {landed_space.name}.",
+            others_fallback=f"{player.name} moved to {landed_space.name}.",
             player=player.name,
             space=landed_space.name,
         )
@@ -3445,12 +5977,55 @@ class MonopolyGame(ActionGuardMixin, Game):
         if card_id == "advance_to_go":
             return self._resolve_card_advance_to_go_effect(player)
 
+        if card_id == "advance_to_illinois_avenue":
+            return self._resolve_card_move_to_space_effect(
+                player,
+                destination_space_id="illinois_avenue",
+                depth=depth,
+                dice_total=dice_total,
+            )
+
+        if card_id == "advance_to_st_charles_place":
+            return self._resolve_card_move_to_space_effect(
+                player,
+                destination_space_id="st_charles_place",
+                depth=depth,
+                dice_total=dice_total,
+            )
+
+        if card_id == "advance_to_nearest_utility":
+            destination = self._next_space_of_kind(player.position, "utility")
+            return self._resolve_card_move_to_space_effect(
+                player,
+                destination_space_id=destination.space_id,
+                depth=depth,
+                dice_total=dice_total,
+                arrival_mode="nearest_utility",
+            )
+
+        if card_id == "advance_to_nearest_railroad":
+            destination = self._next_space_of_kind(player.position, "railroad")
+            return self._resolve_card_move_to_space_effect(
+                player,
+                destination_space_id=destination.space_id,
+                depth=depth,
+                dice_total=dice_total,
+                arrival_mode="nearest_railroad",
+            )
+
         if card_id == "bank_dividend_50":
             amount = self._resolve_board_card_cash(card_id, 50)
             return self._resolve_card_collect_effect(
                 player,
                 amount,
                 "chance_bank_dividend_50",
+            )
+
+        if card_id == "get_out_of_jail_free_chance":
+            return self._grant_get_out_of_jail_card(
+                player,
+                deck_type="chance",
+                card_id=card_id,
             )
 
         if card_id == "go_back_three":
@@ -3468,6 +6043,49 @@ class MonopolyGame(ActionGuardMixin, Game):
             amount = self._resolve_board_card_cash(card_id, 15)
             return self._resolve_card_pay_effect(player, amount)
 
+        if card_id == "general_repairs":
+            amount = self._building_repair_cost(player, per_house=25, per_hotel=100)
+            return self._resolve_card_pay_effect(player, amount)
+
+        if card_id == "take_trip_to_reading_railroad":
+            return self._resolve_card_move_to_space_effect(
+                player,
+                destination_space_id="reading_railroad",
+                depth=depth,
+                dice_total=dice_total,
+            )
+
+        if card_id == "take_walk_on_boardwalk":
+            return self._resolve_card_move_to_space_effect(
+                player,
+                destination_space_id="boardwalk",
+                depth=depth,
+                dice_total=dice_total,
+            )
+
+        if card_id == "chairman_of_the_board_pay_50_each":
+            return self._pay_each_other_player(
+                player,
+                50,
+                reason="card_chairman_of_the_board",
+            )
+
+        if card_id == "building_loan_matures_150":
+            amount = self._resolve_board_card_cash(card_id, 150)
+            return self._resolve_card_collect_effect(
+                player,
+                amount,
+                "chance_building_loan_matures_150",
+            )
+
+        if card_id == "crossword_competition_100":
+            amount = self._resolve_board_card_cash(card_id, 100)
+            return self._resolve_card_collect_effect(
+                player,
+                amount,
+                "chance_crossword_competition_100",
+            )
+
         if card_id == "bank_error_collect_200":
             amount = self._resolve_board_card_cash(card_id, 200)
             return self._resolve_card_collect_effect(
@@ -3480,6 +6098,33 @@ class MonopolyGame(ActionGuardMixin, Game):
             amount = self._resolve_board_card_cash(card_id, 50)
             return self._resolve_card_pay_effect(player, amount)
 
+        if card_id == "from_sale_of_stock_50":
+            amount = self._resolve_board_card_cash(card_id, 50)
+            return self._resolve_card_collect_effect(
+                player,
+                amount,
+                "community_chest_from_sale_of_stock_50",
+            )
+
+        if card_id in {"get_out_of_jail_free", "get_out_of_jail_free_community_chest"}:
+            return self._grant_get_out_of_jail_card(
+                player,
+                deck_type="community_chest",
+                card_id=(
+                    "get_out_of_jail_free_community_chest"
+                    if card_id == "get_out_of_jail_free"
+                    else card_id
+                ),
+            )
+
+        if card_id == "holiday_fund_matures_100":
+            amount = self._resolve_board_card_cash(card_id, 100)
+            return self._resolve_card_collect_effect(
+                player,
+                amount,
+                "community_chest_holiday_fund_matures_100",
+            )
+
         if card_id == "income_tax_refund_20":
             amount = self._resolve_board_card_cash(card_id, 20)
             return self._resolve_card_collect_effect(
@@ -3488,8 +6133,56 @@ class MonopolyGame(ActionGuardMixin, Game):
                 "community_chest_income_tax_refund_20",
             )
 
-        if card_id == "get_out_of_jail_free":
-            return self._grant_get_out_of_jail_card(player)
+        if card_id == "its_your_birthday_collect_10_each":
+            return self._collect_from_each_other_player(
+                player,
+                10,
+                reason="card_birthday",
+            )
+
+        if card_id == "life_insurance_matures_100":
+            amount = self._resolve_board_card_cash(card_id, 100)
+            return self._resolve_card_collect_effect(
+                player,
+                amount,
+                "community_chest_life_insurance_matures_100",
+            )
+
+        if card_id == "hospital_fees_pay_100":
+            amount = self._resolve_board_card_cash(card_id, 100)
+            return self._resolve_card_pay_effect(player, amount)
+
+        if card_id == "school_fees_pay_50":
+            amount = self._resolve_board_card_cash(card_id, 50)
+            return self._resolve_card_pay_effect(player, amount)
+
+        if card_id == "consultancy_fee_collect_25":
+            amount = self._resolve_board_card_cash(card_id, 25)
+            return self._resolve_card_collect_effect(
+                player,
+                amount,
+                "community_chest_consultancy_fee_collect_25",
+            )
+
+        if card_id == "street_repairs":
+            amount = self._building_repair_cost(player, per_house=40, per_hotel=115)
+            return self._resolve_card_pay_effect(player, amount)
+
+        if card_id == "beauty_contest_second_prize_10":
+            amount = self._resolve_board_card_cash(card_id, 10)
+            return self._resolve_card_collect_effect(
+                player,
+                amount,
+                "community_chest_beauty_contest_second_prize_10",
+            )
+
+        if card_id == "inherit_100":
+            amount = self._resolve_board_card_cash(card_id, 100)
+            return self._resolve_card_collect_effect(
+                player,
+                amount,
+                "community_chest_inherit_100",
+            )
 
         return None
 
@@ -3505,14 +6198,7 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Apply one Chance/Community Chest card and return resolution state."""
         card_id = self._resolve_board_card_id(deck_type, card_id)
         manual_card = self._manual_card_definition(deck_type, card_id)
-        deck_label = self._resolve_card_deck_label(deck_type)
-        card_text = self._resolve_card_draw_text(manual_card, card_id)
-        self.broadcast_l(
-            "monopoly-card-drawn",
-            player=player.name,
-            deck=deck_label,
-            card=card_text,
-        )
+        self._broadcast_card_draw(player, deck_type, manual_card, card_id)
         hardware_event_id = self._resolve_card_hardware_event_id(deck_type)
         if hardware_event_id is not None:
             self._emit_board_hardware_event(
@@ -3525,6 +6211,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             if isinstance(effect_spec, dict):
                 manual_result = self._apply_manual_card_effect(
                     player,
+                    deck_type,
                     effect_spec,
                     depth=depth,
                     dice_total=dice_total,
@@ -3578,8 +6265,12 @@ class MonopolyGame(ActionGuardMixin, Game):
     ) -> str | None:
         """Resolve owned-space outcomes where no rent transfer is required."""
         if owner_id == player.id:
-            self.broadcast_l(
-                "monopoly-landed-owned",
+            self._broadcast_monopoly_personal(
+                player,
+                personal_message_id="monopoly-you-landed-owned",
+                others_message_id="monopoly-player-landed-owned",
+                personal_fallback="You own it.",
+                others_fallback=f"{player.name} owns it.",
                 player=player.name,
                 property=landed_space.name,
             )
@@ -3669,15 +6360,56 @@ class MonopolyGame(ActionGuardMixin, Game):
         ):
             return "bankrupt" if player.bankrupt else "resolved"
         if not manual_core and self._current_liquid_balance(player) < rent_due:
-            self._liquidate_assets_for_debt(player, rent_due)
+            if player.is_bot:
+                self._liquidate_assets_for_debt(player, rent_due)
+            if self._current_liquid_balance(player) < rent_due and not player.is_bot:
+                self._start_pending_rent_payment(
+                    player,
+                    owner=owner,
+                    amount_due=rent_due,
+                    landed_space=landed_space,
+                    reason=rent_reason,
+                )
+                self.rebuild_all_menus()
+                return "resolved"
+        if not manual_core and self._current_liquid_balance(player) < rent_due and not player.is_bot:
+            self._start_pending_rent_payment(
+                player,
+                owner=owner,
+                amount_due=rent_due,
+                landed_space=landed_space,
+                reason=rent_reason,
+            )
+            self.rebuild_all_menus()
+            return "resolved"
         paid = self._pay_rent_to_owner_or_bank(player, owner, rent_due, rent_reason)
 
-        self.broadcast_l(
-            "monopoly-rent-paid",
+        owner_name = owner.name if owner else "Bank"
+        detail = self._rent_detail_text(
+            landed_space,
+            owner_id=owner_id,
+            dice_total=dice_total,
+        )
+        self._broadcast_monopoly_transaction(
+            player,
+            owner,
+            actor_message_id="monopoly-you-rent-paid",
+            recipient_message_id="monopoly-player-paid-you-rent",
+            others_message_id="monopoly-player-rent-paid",
+            actor_fallback=(
+                f"You paid {self._format_money(paid)} in rent to {owner_name} for {landed_space.name}."
+            ),
+            recipient_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to you for {landed_space.name}."
+            ),
+            others_fallback=(
+                f"{player.name} paid {self._format_money(paid)} in rent to {owner_name} for {landed_space.name}."
+            ),
             player=player.name,
-            owner=owner.name if owner else "Bank",
+            owner=owner_name,
             amount=paid,
             property=landed_space.name,
+            detail=detail,
         )
         self._apply_sore_loser_rebate(player, paid)
         if not self._apply_cheaters_payment_result(
@@ -3906,13 +6638,29 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Menu options for mortgaged owned properties."""
         return action_options.options_for_unmortgage_property(self, player)
 
+    def _mortgage_space_ids(self, player: Player) -> list[str]:
+        """Return raw mortgage-eligible property ids."""
+        return action_options.mortgage_space_ids(self, player)
+
+    def _unmortgage_space_ids(self, player: Player) -> list[str]:
+        """Return raw unmortgage-eligible property ids."""
+        return action_options.unmortgage_space_ids(self, player)
+
     def _options_for_build_house(self, player: Player) -> list[str]:
         """Menu options for buildable street properties."""
         return action_options.options_for_build_house(self, player)
 
+    def _build_house_space_ids(self, player: Player) -> list[str]:
+        """Return buildable street-property ids in board order."""
+        return action_options.build_house_space_ids(self, player)
+
     def _options_for_sell_house(self, player: Player) -> list[str]:
         """Menu options for sellable street properties."""
         return action_options.options_for_sell_house(self, player)
+
+    def _sell_house_space_ids(self, player: Player) -> list[str]:
+        """Return sellable street-property ids in board order."""
+        return action_options.sell_house_space_ids(self, player)
 
     def _is_mortgage_property_enabled(self, player: Player) -> str | None:
         """Enable mortgage action when player owns eligible properties."""
@@ -4002,6 +6750,10 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Parse one banking transfer option from menu input."""
         return action_options.parse_banking_transfer_option(self, option)
 
+    def _parse_property_amount_option(self, option: str) -> str | None:
+        """Parse one encoded property/cost option from menu input."""
+        return action_options.parse_property_amount_option(self, option)
+
     def _options_for_banking_transfer(self, player: Player) -> list[str]:
         """Menu options for player-to-player transfers in electronic mode."""
         return action_options.options_for_banking_transfer(self, player)
@@ -4078,6 +6830,19 @@ class MonopolyGame(ActionGuardMixin, Game):
         """Unmortgage one owned property."""
         action_handlers.action_unmortgage_property(self, player, space_id, action_id)
 
+    def _action_read_cash(self, player: Player, action_id: str) -> None:
+        """Speak the current player's own cash balance."""
+        _ = action_id
+        user = self.get_user(player)
+        if not user:
+            return
+        mono_player = player  # type: ignore[assignment]
+        self._speak_monopoly_l(
+            user,
+            "monopoly-cash-report",
+            cash=self._current_liquid_balance(mono_player),
+        )
+
     def _action_build_house(self, player: Player, space_id: str, action_id: str) -> None:
         """Build one house/hotel on an owned eligible street property."""
         action_handlers.action_build_house(self, player, space_id, action_id)
@@ -4133,9 +6898,15 @@ class MonopolyGame(ActionGuardMixin, Game):
     def on_tick(self) -> None:
         """Run per-tick updates (bot actions)."""
         super().on_tick()
+        self.process_scheduled_sounds()
+        self.process_scheduled_events()
         if self._run_auction_bot_tick():
             return
         BotHelper.on_tick(self)
+
+    def on_game_event(self, event_type: str, data: dict) -> None:
+        """Handle Monopoly scheduled animation events."""
+        action_handlers.handle_scheduled_event(self, event_type, data)
 
     def _run_auction_bot_tick(self) -> bool:
         """Handle the dedicated per-tick bot path while an interactive auction is active."""
@@ -4201,7 +6972,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             return pending_action
         if self.turn_can_roll_again:
             return "roll_dice"
-        return "end_turn"
+        return None
 
     def _bot_think_pending_trade(self, player: MonopolyPlayer) -> str | None:
         pending_offer = self._pending_trade_for_target(player)
@@ -4263,11 +7034,7 @@ class MonopolyGame(ActionGuardMixin, Game):
             return pending_action
         if self.turn_can_roll_again:
             return "roll_dice"
-        if self._current_liquid_balance(player) >= 450 and self._options_for_build_house(player):
-            return "build_house"
-        if self._current_liquid_balance(player) >= 900 and self._options_for_unmortgage_property(player):
-            return "unmortgage_property"
-        return "end_turn"
+        return None
 
     def _initialize_start_runtime(self) -> list[Player]:
         """Initialize generic game runtime state and return active players."""
@@ -4326,11 +7093,13 @@ class MonopolyGame(ActionGuardMixin, Game):
             self.active_board_deck_mode,
         ).mode
         self.active_manual_rule_set = self._load_active_manual_rule_set()
+        self.active_currency_name = self._resolve_active_currency_name()
         (
             self.active_board_spaces,
             self.active_space_by_id,
             self.active_color_group_to_space_ids,
         ) = self._resolve_active_board_structures()
+        self._sync_active_space_names_from_locale()
         self.active_board_size = len(self.active_board_spaces)
         self.active_sound_mode = "none"
         self.last_hardware_event_id = ""
@@ -4398,8 +7167,10 @@ class MonopolyGame(ActionGuardMixin, Game):
             space.space_id: 0 for space in self.active_board_spaces if self._is_street_property(space)
         }
         self.pending_trade_offer = None
+        self.held_get_out_of_jail_cards_by_player_id.clear()
         self.free_parking_pool = 0
         self._clear_pending_auction()
+        self._clear_pending_rent_payment()
         self.junior_endgame_evaluating = False
         self.city_endgame_evaluating = False
         self._reset_turn_state()

@@ -231,6 +231,40 @@
         "title": "ClientOptionsPacket",
         "type": "object"
       },
+      "DocumentEditorResponsePacket": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "save",
+              "cancel"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "content": {
+            "default": "",
+            "title": "Content",
+            "type": "string"
+          },
+          "dialog_id": {
+            "title": "Dialog Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "document_editor",
+            "default": "document_editor",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dialog_id",
+          "action"
+        ],
+        "title": "DocumentEditorResponsePacket",
+        "type": "object"
+      },
       "EditboxPacket": {
         "additionalProperties": false,
         "properties": {
@@ -707,6 +741,7 @@
         "check_table_pw_cmd": "#/$defs/CheckTablePasswordCommandPacket",
         "check_table_visibility_cmd": "#/$defs/CheckTableVisibilityCommandPacket",
         "client_options": "#/$defs/ClientOptionsPacket",
+        "document_editor": "#/$defs/DocumentEditorResponsePacket",
         "editbox": "#/$defs/EditboxPacket",
         "escape": "#/$defs/EscapePacket",
         "keybind": "#/$defs/KeybindPacket",
@@ -745,6 +780,9 @@
       },
       {
         "$ref": "#/$defs/EditboxPacket"
+      },
+      {
+        "$ref": "#/$defs/DocumentEditorResponsePacket"
       },
       {
         "$ref": "#/$defs/ChatPacket"
@@ -1042,6 +1080,65 @@
           }
         },
         "title": "DisconnectPacket",
+        "type": "object"
+      },
+      "DocumentEditorPacket": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "default": "",
+            "title": "Content",
+            "type": "string"
+          },
+          "content_label": {
+            "default": "",
+            "title": "Content Label",
+            "type": "string"
+          },
+          "dialog_id": {
+            "title": "Dialog Id",
+            "type": "string"
+          },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "source_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Content"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Label"
+          },
+          "type": {
+            "const": "document_editor",
+            "default": "document_editor",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dialog_id"
+        ],
+        "title": "DocumentEditorPacket",
         "type": "object"
       },
       "GameInfo": {
@@ -1822,6 +1919,7 @@
         "chat": "#/$defs/ChatBroadcastPacket",
         "clear_ui": "#/$defs/ClearUIPacket",
         "disconnect": "#/$defs/DisconnectPacket",
+        "document_editor": "#/$defs/DocumentEditorPacket",
         "game_list": "#/$defs/GameListPacket",
         "get_playlist_duration": "#/$defs/GetPlaylistDurationPacket",
         "menu": "#/$defs/MenuPacket",
@@ -1878,6 +1976,9 @@
       },
       {
         "$ref": "#/$defs/RequestInputPacket"
+      },
+      {
+        "$ref": "#/$defs/DocumentEditorPacket"
       },
       {
         "$ref": "#/$defs/ClearUIPacket"

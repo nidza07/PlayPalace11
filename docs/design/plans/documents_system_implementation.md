@@ -17,6 +17,7 @@ via two hooks — **do not add individual entries to `server.py`**:
 
 - **Menu dispatch**: `_get_document_menu_handlers(user, selection_id, state)` on `DocumentBrowsingMixin` returns a dict of all document + transcriber menu handlers. It is unpacked into the `handlers` dict inside `_dispatch_menu_selection`.
 - **Editbox dispatch**: `_handle_document_editbox(user, current_menu, packet, state)` on `DocumentBrowsingMixin` is called early in `_handle_editbox` and returns `True` if handled.
+- **Document editor dispatch**: `_handle_document_editor_response(user, packet, state)` on `DocumentBrowsingMixin` handles the `document_editor` packet type (a dedicated client dialog, not an editbox). Wired via a minimal `_handle_document_editor_packet` in `server.py`.
 
 New document menus or editboxes should be added to these methods (or to `_get_transcriber_menu_handlers` for transcriber-specific menus), never directly to `server.py`.
 
@@ -74,6 +75,19 @@ New document menus or editboxes should be added to these methods (or to `_get_tr
 - Menu and editbox dispatch entries moved entirely out of `server/core/server.py` via `_get_document_menu_handlers()` and `_handle_document_editbox()` on the browsing mixin
 - Transcriber menu dispatch entries also moved out via `_get_transcriber_menu_handlers()` on the transcriber role mixin
 
+### Document Editing & Add Translation (session 6)
+- **New `document_editor` packet type**: bidirectional packet for the document editor dialog (server→client opens editor, client→server sends save/cancel response)
+  - `DocumentEditorPacket` (server→client): dialog_id, content, source_content, source_label, prompt
+  - `DocumentEditorResponsePacket` (client→server): dialog_id, action (save/cancel), content
+- **Desktop client**: `DocumentEditorDialog(wx.Dialog)` in `clients/desktop/ui/document_editor_dialog.py` — read-only source panel + editable content area + save/cancel buttons, cancel confirms if content changed
+- **Web client**: `createDocumentEditor` in `clients/web/ui/document_editor.js` — `<dialog>` modal with same layout, wired in `app.js` and `index.html`
+- **Edit flow**: language selection menu → acquire lock → open editor dialog → save (backup + lock release) or cancel (lock release)
+- **Add translation flow**: language selection (untranslated languages filtered to assigned) → title editbox → open editor dialog → save creates translation (private by default)
+- **Shared title editbox handler**: flow-aware — `change_title` saves immediately, `add_translation` stores title and opens editor for content
+- **Shared helpers**: `_get_user_assigned_languages(username)`, `_get_user_accessible_locales(user, folder_name)` — consolidated locale filtering from Chunk 4
+- **Server dispatch**: `_handle_document_editor_packet` in `server.py` forwards to `_handle_document_editor_response` on the browsing mixin
+- 4 new locale strings: `documents-locked`, `documents-content-saved`, `documents-editor-prompt`, `documents-source-label`
+
 ---
 
 ## Chunk 4: Document Actions (Admin & Transcriber)
@@ -102,13 +116,13 @@ The action menu that appears when a transcriber or admin clicks a document.
 
 ---
 
-## Chunk 5: Document Editing & Add Translation
+## Chunk 5: Document Editing & Add Translation ✓
 
 The document contents dialog — used any time document content is shown for editing (editing an existing document, adding a translation, creating a new document). Also includes the "Add translation" flow deferred from Chunk 4, since the content entry step should reuse this same dialog. Read-only viewing remains a simple editbox.
 
 ### Scope
-- **Document contents dialog**: multiline editbox with current content, edit locks, save/cancel
-- Side-by-side source display: if editing a non-source locale, show source content in a read-only editbox
+- **Document contents dialog** (new client UI dialog — see platform notes below): multiline editbox with current content, edit locks, save/cancel
+- Source reference display: if editing a non-source locale, a read-only panel shows the source content alongside the editor
 - Save handler: calls `DocumentManager.save_document_content()` (handles backup + lock release)
 - Cancel handler: release edit lock, return to document actions
 - Escape = cancel, with confirmation if content changed
@@ -117,20 +131,73 @@ The document contents dialog — used any time document content is shown for edi
 - Locale strings for editor prompts, save/cancel confirmations, lock conflict messages
 - Tests for edit flow, lock integration, save with version backup
 
+### Platform constraint: new dialog type required
+
+The existing client UI supports only one editbox at a time (via `request_input` packets), and cannot display menus and editboxes simultaneously. This makes the side-by-side source comparison impossible with the current editbox system — it would require two text fields (one editable, one read-only) plus save/cancel controls all visible at once.
+
+**Solution**: Introduce a new `document_editor` packet type and corresponding dialog implementation in both clients. This dedicated dialog handles all document content editing needs and provides a foundation for future editing features.
+
+#### New packet: `document_editor`
+
+**Server → Client** (`document_editor` packet):
+- `dialog_id`: str — identifier for response routing
+- `content`: str — current document content (empty string for new translations)
+- `source_content`: str | None — source locale content for reference (None if editing the source locale or if source has no content)
+- `source_label`: str | None — label for the source panel (e.g. "English (source)")
+- `prompt`: str — accessible label/title for the editor (e.g. "Edit: Uno Rules (Spanish)")
+
+**Client → Server** (`document_editor` packet):
+- `dialog_id`: str — matches the server's dialog_id
+- `action`: str — "save" or "cancel"
+- `content`: str | None — the edited text (only present when action is "save")
+
+#### Desktop client (`clients/desktop/`)
+
+Create a new `DocumentEditorDialog(wx.Dialog)` class. Layout:
+- If `source_content` is provided: a read-only multiline `wx.TextCtrl` labeled with `source_label`, followed by the editable multiline `wx.TextCtrl`
+- If `source_content` is None: only the editable multiline `wx.TextCtrl`
+- Save and Cancel buttons at the bottom
+- Dialog title set from `prompt`
+- Escape key triggers cancel (with confirmation if content changed)
+- The handler in `main_window.py` listens for the `document_editor` packet, opens the dialog modally, and sends the response packet
+
+#### Web client (`clients/web/`)
+
+Create a `<dialog>` element for the document editor. Layout:
+- If `source_content` is provided: a read-only `<textarea>` labeled with `source_label`, followed by the editable `<textarea>`
+- If `source_content` is None: only the editable `<textarea>`
+- Save and Cancel buttons
+- Escape key triggers cancel (with confirmation if content changed)
+- The handler in `app.js` listens for the `document_editor` packet, opens the dialog as a modal, and sends the response packet
+
+#### Server side
+
+- Add `DocumentEditorPacket` to `server/network/packet_models.py`
+- Add `show_document_editor(dialog_id, content, source_content, source_label, prompt)` to `NetworkUser`
+- Add `_handle_document_editor_response(user, packet, state)` dispatch in `browsing.py`, wired into the server dispatch (following the same pattern as `_handle_document_editbox`)
+
 ### Design notes: shared handlers and reuse
 
 **Shared title editbox**: The title editbox handler must be a single reusable handler used by all flows that set a document title: changing an existing title, naming a new translation, and naming a new document. Do not duplicate the title prompt/save logic across these flows.
 
-**Shared document contents dialog**: The document contents dialog (multiline editbox with save/cancel/lock) must be a single reusable flow. Callers: edit existing document, add translation (after title entry), create new document (Chunk 6). Each caller passes context (folder_name, locale, whether it's a new translation/document) and the dialog handles save uniformly.
+**Shared document contents dialog**: The document contents dialog (the new `document_editor` dialog described above) must be a single reusable flow on the server. Callers: edit existing document, add translation (after title entry), create new document (Chunk 6). Each caller passes context (folder_name, locale, whether it's a new translation/document) and the dialog handles save uniformly.
 
 **Shared locale picker for document operations**: Change title, manage visibility, remove translation, and add translation all need to show the document's locales filtered by the user's assigned transcriber languages. This should be a single helper (e.g. `_get_user_accessible_locales(user, folder_name)`) rather than repeating the filter logic in each handler. Note: Chunk 4's implementation currently repeats this filter — consolidate when implementing Chunk 5.
 
 **Shared category toggle list**: Chunk 4's "modify categories" and Chunk 6's "new document category selection" both present a toggle list of categories. Reuse the same display/toggle handler for both.
 
 ### Files to modify
-- `server/core/documents/browsing.py` — editor handlers (or a new `document_editor.py` mixin); add new editbox entries to `_handle_document_editbox`
+- `server/network/packet_models.py` — new `DocumentEditorPacket` model
+- `server/core/users/network_user.py` — new `show_document_editor()` method
+- `server/core/documents/browsing.py` — editor handlers, document_editor response dispatch; add new entries to `_handle_document_editbox` and new `_handle_document_editor_response`
+- `server/core/server.py` — wire `document_editor` response packets to the browsing mixin dispatch (minimal: call `_handle_document_editor_response`)
+- `clients/desktop/ui/document_editor_dialog.py` — new `DocumentEditorDialog` class
+- `clients/desktop/ui/main_window.py` — handler for `document_editor` packet
+- `clients/web/app.js` — handler for `document_editor` packet
+- `clients/web/ui/document_editor.js` — new document editor dialog module
+- `clients/web/index.html` — new `<dialog>` element for the editor
 - `server/locales/en/main.ftl` — locale strings
-- **Not** `server/core/server.py` — see Architecture Rule above
+- **Not** `server/core/server.py` for document logic — see Architecture Rule above (only the packet dispatch wire goes there)
 
 ---
 

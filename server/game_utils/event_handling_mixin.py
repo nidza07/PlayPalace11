@@ -173,7 +173,12 @@ class EventHandlingMixin:
             action_id = self._pending_actions.pop(player.id)
             if selection_id != "_cancel":
                 self.execute_action(player, action_id, selection_id)
-        self.rebuild_player_menu(player)
+        if (
+            player.id not in self._pending_actions
+            and player.id not in self._status_box_open
+            and player.id not in self._actions_menu_open
+        ):
+            self.rebuild_player_menu(player)
 
     def _handle_leave_game_confirm(self, player: "Player", event: dict, selection_id: str) -> None:
         user = self.get_user(player)

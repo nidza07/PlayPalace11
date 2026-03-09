@@ -327,6 +327,28 @@ class NetworkUser(User):
             }
         )
 
+    def show_document_editor(
+        self,
+        dialog_id: str,
+        content: str = "",
+        content_label: str = "",
+        source_content: str | None = None,
+        source_label: str | None = None,
+        prompt: str = "",
+    ) -> None:
+        """Open the document editor dialog on the client."""
+        packet: dict[str, Any] = {
+            "type": "document_editor",
+            "dialog_id": dialog_id,
+            "content": content,
+            "content_label": content_label,
+            "prompt": prompt,
+        }
+        if source_content is not None:
+            packet["source_content"] = source_content
+            packet["source_label"] = source_label
+        self._queue_packet(packet)
+
     def remove_editbox(self, input_id: str) -> None:
         """Remove an editbox from the client UI."""
         self._current_editboxes.pop(input_id, None)

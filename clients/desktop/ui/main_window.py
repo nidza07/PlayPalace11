@@ -2198,6 +2198,48 @@ class MainWindow(wx.Frame):
 
         self.switch_to_edit_mode(prompt, on_submit, default_value, multiline, read_only)
 
+    def on_server_document_editor(self, packet):
+        """Handle document_editor packet from server — open the editor dialog."""
+        from .document_editor_dialog import DocumentEditorDialog
+
+        dialog_id = packet.get("dialog_id", "")
+        content = packet.get("content", "")
+        content_label = packet.get("content_label")
+        source_content = packet.get("source_content")
+        source_label = packet.get("source_label")
+        prompt = packet.get("prompt", "Edit document")
+
+        def on_save(text):
+            self.network.send_packet({
+                "type": "document_editor",
+                "dialog_id": dialog_id,
+                "action": "save",
+                "content": text,
+            })
+
+        def on_cancel():
+            self.network.send_packet({
+                "type": "document_editor",
+                "dialog_id": dialog_id,
+                "action": "cancel",
+                "content": "",
+            })
+
+        dlg = DocumentEditorDialog(
+            self, prompt, content,
+            content_label=content_label,
+            source_content=source_content,
+            source_label=source_label,
+            on_save=on_save,
+            on_cancel=on_cancel,
+        )
+        result = dlg.ShowModal()
+        dlg.Destroy()
+        # If the dialog was closed without triggering save or cancel callbacks
+        # (shouldn't happen with current flow, but safety net)
+        if result not in (wx.ID_SAVE, wx.ID_CANCEL):
+            on_cancel()
+
     def on_server_clear_ui(self, packet):
         """Handle clear_ui packet from server."""
         # Clear menu

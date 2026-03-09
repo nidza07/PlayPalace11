@@ -103,6 +103,13 @@ class EditboxPacket(BasePacket):
     input_id: str | None = None
 
 
+class DocumentEditorResponsePacket(BasePacket):
+    type: Literal["document_editor"] = "document_editor"
+    dialog_id: str
+    action: Literal["save", "cancel"]
+    content: str = ""
+
+
 class ChatPacket(BasePacket):
     type: Literal["chat"] = "chat"
     convo: Literal["local", "global"] = "local"
@@ -181,6 +188,7 @@ ClientToServerPacket = Annotated[
         KeybindPacket,
         EscapePacket,
         EditboxPacket,
+        DocumentEditorResponsePacket,
         ChatPacket,
         PingPacket,
         ListOnlinePacket,
@@ -286,6 +294,16 @@ class RequestInputPacket(BasePacket):
     default_value: str = ""
     multiline: bool = False
     read_only: bool = False
+
+
+class DocumentEditorPacket(BasePacket):
+    type: Literal["document_editor"] = "document_editor"
+    dialog_id: str
+    content: str = ""
+    content_label: str = ""
+    source_content: str | None = None
+    source_label: str | None = None
+    prompt: str = ""
 
 
 class ClearUIPacket(BasePacket):
@@ -404,6 +422,7 @@ ServerToClientPacket = Annotated[
         StopAmbiencePacket,
         MenuPacket,
         RequestInputPacket,
+        DocumentEditorPacket,
         ClearUIPacket,
         DisconnectPacket,
         ServerStatusPacket,
