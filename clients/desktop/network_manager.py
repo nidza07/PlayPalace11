@@ -617,6 +617,7 @@ _PACKET_DISPATCH = {
     "get_playlist_duration": lambda window, pkt: window.on_server_get_playlist_duration(pkt),
     "menu": lambda window, pkt: window.on_server_menu(pkt),
     "request_input": lambda window, pkt: window.on_server_request_input(pkt),
+    "document_editor": lambda window, pkt: window.on_server_document_editor(pkt),
     "clear_ui": lambda window, pkt: window.on_server_clear_ui(pkt),
     "game_list": lambda window, pkt: window.on_server_game_list(pkt),
     "disconnect": lambda window, pkt: window.on_server_disconnect(pkt),

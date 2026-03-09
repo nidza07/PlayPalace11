@@ -5,6 +5,7 @@ import { createHistoryView } from "./ui/history.js";
 import { createMenuView } from "./ui/menus.js";
 import { createChat } from "./ui/chat.js";
 import { installKeybinds } from "./keybinds.js";
+import { createDocumentEditor } from "./ui/document_editor.js";
 import { createNetworkClient, loadPacketValidator } from "./network.js";
 
 const REMEMBERED_USERNAME_KEY = "playpalace.web.remembered_username";
@@ -230,6 +231,7 @@ const elements = {
   inputCancel: document.getElementById("input-cancel"),
   inputSubmit: document.getElementById("input-submit"),
   appVersion: document.getElementById("app-version"),
+  documentEditorDialog: document.getElementById("document-editor-dialog"),
 };
 
 const store = createStore();
@@ -274,6 +276,14 @@ const menuView = createMenuView({
   },
   onActivate: (_, selectionIndex) => {
     sendMenuSelection(selectionIndex);
+  },
+});
+const documentEditor = createDocumentEditor({
+  dialogEl: elements.documentEditorDialog,
+  onSubmit: (response) => {
+    if (network) {
+      network.send({ type: "document_editor", ...response });
+    }
   },
 });
 let pendingInlineInput = null;
@@ -1315,6 +1325,10 @@ function handlePacket(packet) {
     }
     case "request_input": {
       showInlineInput(packet);
+      break;
+    }
+    case "document_editor": {
+      documentEditor.show(packet);
       break;
     }
     case "clear_ui": {

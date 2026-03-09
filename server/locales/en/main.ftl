@@ -397,11 +397,20 @@ documents-translation-added = Translation added for { $language }.
 documents-no-languages-available = No languages available for translation.
 documents-remove-translation-confirm = Remove the { $language } translation? This cannot be undone.
 documents-remove-translation-source = The source translation cannot be removed.
+documents-remove-title-confirm = Also remove the { $language } title? Choose no to keep it for a future translation.
 documents-translation-removed = { $language } translation removed.
 documents-delete-confirm = Delete this document? It has { $count } translations. This cannot be undone.
 documents-deleted = Document deleted.
 documents-no-permission = You do not have any relevant assigned languages for this document.
 documents-visibility-count = Manage visibility ({ $public }/{ $total } languages public)
+documents-locked = This document is currently being edited by { $username }. You cannot edit it right now.
+documents-remove-translation-locked = The { $language } translation is currently being edited by { $username } and cannot be removed.
+documents-delete-locked = This document cannot be deleted because the { $language } translation is currently being edited by { $username }.
+documents-content-saved = Document content saved for { $language }.
+documents-content-unchanged = No changes to save.
+documents-editor-prompt = Edit: { $title } ({ $language })
+documents-source-label = { $language } (source)
+documents-content-label = { $language } Contents
 
 # Transcriber management
 transcribers-by-language = View transcribers by language

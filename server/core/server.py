@@ -983,6 +983,8 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
 
             if packet_type == "keybind":
                 await self._handle_keybind(client, packet)
+            elif packet_type == "document_editor":
+                await self._handle_document_editor_packet(client, packet)
             elif packet_type == "editbox":
                 await self._handle_editbox(client, packet)
             elif packet_type == "chat":
@@ -3650,6 +3652,19 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
                 if game_user is not user:
                     table.remove_member(username)
                     self._show_main_menu(user, reset_history=True)
+
+    async def _handle_document_editor_packet(
+        self, client: ClientConnection, packet: dict
+    ) -> None:
+        """Forward document editor responses to the browsing mixin."""
+        username = client.username
+        if not username:
+            return
+        user = self._users.get(username)
+        if not user:
+            return
+        state = self._user_states.get(username, {})
+        await self._handle_document_editor_response(user, packet, state)
 
     async def _handle_editbox(self, client: ClientConnection, packet: dict) -> None:
         """Handle editbox submissions.

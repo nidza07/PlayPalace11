@@ -325,8 +325,13 @@ class DocumentManager:
         self._save_document_metadata(folder_name)
         return True
 
-    def remove_document_translation(self, folder_name: str, locale: str) -> bool:
+    def remove_document_translation(
+        self, folder_name: str, locale: str, *, remove_title: bool = True,
+    ) -> bool:
         """Delete a locale entry, its .md file, and history backups.
+
+        When *remove_title* is ``False`` the title for the locale is kept
+        in metadata so it can be reused if the translation is re-added later.
 
         Returns ``False`` if the locale is the source locale or doesn't exist.
         """
@@ -339,7 +344,8 @@ class DocumentManager:
         if locale not in locales:
             return False
         del locales[locale]
-        meta.get("titles", {}).pop(locale, None)
+        if remove_title:
+            meta.get("titles", {}).pop(locale, None)
         md_path = self._dir / folder_name / f"{locale}.md"
         if md_path.exists():
             md_path.unlink()
@@ -349,6 +355,12 @@ class DocumentManager:
             for backup in history_dir.glob(f"{locale}_*.md"):
                 backup.unlink()
         self._save_document_metadata(folder_name)
+        # Fail-safe: clean up orphaned locks.  The browsing layer checks
+        # for active locks *before* calling this method and blocks the
+        # removal when someone is editing.  This cleanup handles cases
+        # where the data is removed outside the UI (e.g. filesystem
+        # deletion, or a reconnected client whose lock was already stale).
+        self._edit_locks.pop((folder_name, locale), None)
         return True
 
     def delete_document(self, folder_name: str) -> bool:
@@ -362,6 +374,14 @@ class DocumentManager:
         if doc_dir.exists():
             shutil.rmtree(doc_dir)
         del self._documents[folder_name]
+        # Fail-safe: clean up orphaned locks.  The browsing layer checks
+        # for active locks *before* calling this method and blocks the
+        # deletion when someone is editing.  This cleanup handles cases
+        # where the document is removed outside the UI (e.g. filesystem
+        # deletion, or a reconnected client whose lock was already stale).
+        stale = [key for key in self._edit_locks if key[0] == folder_name]
+        for key in stale:
+            del self._edit_locks[key]
         return True
 
     def create_category(self, slug: str, name: str, locale: str) -> bool:
@@ -405,6 +425,23 @@ class DocumentManager:
         existing = self._edit_locks.get(key)
         if existing and existing["user"] == username:
             del self._edit_locks[key]
+
+    def get_edit_lock_holder(
+        self, folder_name: str, locale: str
+    ) -> str | None:
+        """Return the username holding the lock, or ``None``."""
+        self.cleanup_stale_locks()
+        lock = self._edit_locks.get((folder_name, locale))
+        return lock["user"] if lock else None
+
+    def get_document_lock_holders(self, folder_name: str) -> dict[str, str]:
+        """Return ``{locale: username}`` for every active lock on *folder_name*."""
+        self.cleanup_stale_locks()
+        return {
+            locale: lock["user"]
+            for (doc, locale), lock in self._edit_locks.items()
+            if doc == folder_name
+        }
 
     def cleanup_stale_locks(self, timeout_seconds: int = 1800) -> None:
         """Remove locks older than *timeout_seconds*."""
