@@ -76,17 +76,16 @@ chess-no-moves-to-undo = Nema poteza koji mogu da se ponište.
 chess-already-requested-undo = Već ste zahtevali poništavanje.
 chess-undo-applied = Poslednji potez poništen.  { $player } je na potezu.
 
-# Promotion choices
-chess-promote-queen = Kraljica
-chess-promote-rook = Top
-chess-promote-bishop = Lovac
-chess-promote-knight = Konj
+# Promotion
 chess-select-promotion = Izaberite figuru za promociju
 
 # View board
 chess-view-board = Prikaži tablu
 chess-flip-board = Okreni tablu
-chess-board-flipped = Tabla okrenuta.
+chess-viewer-own = vašoj
+chess-viewer-opponent = protivničkoj
+chess-board-flipped = Tabla okrenuta u { $viewer }  perspektivi ({ $color }).
+
 chess-board-rank = Rang { $rank }: { $pieces }
 chess-empty = Prazno
 chess-board-header = Stanje table:

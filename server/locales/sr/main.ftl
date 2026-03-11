@@ -73,6 +73,8 @@ goodbye = Doviđenja!
 # Visibility control
 visibility-public = Javno
 visibility-private = Privatno
+visibility-available = Dostupno
+visibility-unavailable = Nedostupno
 
 # User presence announcements
 user-online = { $player } je na mreži.
