@@ -286,13 +286,14 @@ class ChessGame(Game):
                     is_hidden="_is_square_hidden",
                     get_label="_get_square_label",
                     show_in_actions_menu=False,
+                    show_disabled_label=False,
                 ))
 
         # Promotion actions (only visible during promotion)
         for piece in ("queen", "rook", "bishop", "knight"):
             action_set.add(Action(
                 id=f"promote_{piece}",
-                label=Localization.get(locale, f"chess-promote-{piece}"),
+                label=Localization.get(locale, f"chess-piece-{piece}"),
                 handler="_action_promote",
                 is_enabled="_is_promote_enabled",
                 is_hidden="_is_promote_hidden",
@@ -453,7 +454,7 @@ class ChessGame(Game):
         other_items: list[MenuItem] = []
         for resolved in self.get_all_visible_actions(player):
             label = resolved.label
-            if not resolved.enabled:
+            if not resolved.enabled and resolved.action.show_disabled_label:
                 unavailable = Localization.get(user.locale, "visibility-unavailable")
                 label = f"{label}; {unavailable}"
             item = MenuItem(text=label, id=resolved.action.id, sound=resolved.sound)
@@ -505,10 +506,6 @@ class ChessGame(Game):
 
         white_player = self._get_player_by_color("white")
         black_player = self._get_player_by_color("black")
-
-        # Auto-flip board for black player
-        if black_player:
-            self.board_flipped[black_player.id] = True
 
         # Initialize board
         self._init_board()
@@ -1099,7 +1096,6 @@ class ChessGame(Game):
         target = self.board[to_sq]
         from_notation = index_to_notation(from_sq)
         to_notation = index_to_notation(to_sq)
-        locale = self._player_locale(player)
 
         # Check for castling
         is_castle, castle_type = self._is_castling_move(from_sq, to_sq, piece["color"])
@@ -1134,23 +1130,23 @@ class ChessGame(Game):
 
         # Broadcast and play sounds
         if not en_passant:
-            p_name = piece_name(piece["piece"], locale)
             if target:
-                cap_name = piece_name(target["piece"], locale)
                 self.play_sound(f"game_chess/capture{random.randint(1, 2)}.ogg")  # nosec B311
-                self.broadcast_personal_l(
+                self._broadcast_move(
                     player,
                     "chess-you-capture",
                     "chess-player-captures",
-                    piece=p_name, captured=cap_name, to=to_notation, **{"from": from_notation},
+                    pieces={"piece": piece["piece"], "captured": target["piece"]},
+                    to=to_notation, **{"from": from_notation},
                 )
             else:
                 self._play_piece_sound(piece["piece"])
-                self.broadcast_personal_l(
+                self._broadcast_move(
                     player,
                     "chess-you-move",
                     "chess-player-moves",
-                    piece=p_name, to=to_notation, **{"from": from_notation},
+                    pieces={"piece": piece["piece"]},
+                    to=to_notation, **{"from": from_notation},
                 )
 
         # Mark as moved
@@ -1653,11 +1649,9 @@ class ChessGame(Game):
         self.promotion_pending = False
         self.promotion_square = -1
 
-        locale = self._player_locale(player)
-        p_name = piece_name(piece_type, locale)
         notation = index_to_notation(sq)
         self.play_sound("game_chess/promote.ogg")
-        self.broadcast_personal_l(player, "chess-you-promote", "chess-player-promotes", piece=p_name, square=notation)
+        self._broadcast_move(player, "chess-you-promote", "chess-player-promotes", pieces={"piece": piece_type}, square=notation)
 
         self._post_move_checks(player)
 
@@ -1797,7 +1791,14 @@ class ChessGame(Game):
         self.board_flipped[player.id] = not flipped
         user = self.get_user(player)
         if user:
-            user.speak_l("chess-board-flipped")
+            locale = user.locale
+            # Non-flipped = white's perspective, flipped = black's perspective
+            viewing_color = "black" if not flipped else "white"
+            color_name = Localization.get(locale, f"color-{viewing_color}")
+            is_own = isinstance(player, ChessPlayer) and player.color == viewing_color
+            viewer_key = "chess-viewer-own" if is_own else "chess-viewer-opponent"
+            viewer = Localization.get(locale, viewer_key)
+            user.speak_l("chess-board-flipped", viewer=viewer, color=color_name)
         self.rebuild_player_menu(player)
 
     def _action_check_status(self, player: Player, action_id: str) -> None:
@@ -2028,68 +2029,68 @@ class ChessGame(Game):
 
     def _end_game(self, winner: ChessPlayer) -> None:
         """End the game with a winner."""
-        self.status = "finished"
-        self.game_active = False
+        self._winner_id = winner.id
         self.timer.clear()
-
-        results = []
-        for p in self.players:
-            if not isinstance(p, ChessPlayer) or p.is_spectator:
-                continue
-            results.append(PlayerResult(
-                player_id=p.id,
-                player_name=p.name,
-                is_bot=p.is_bot,
-                is_virtual_bot=p.is_virtual_bot,
-            ))
-
-        game_result = GameResult.create(
-            game_type=self.get_type(),
-            duration_ticks=0,
-            players=[(p.player_id, p.player_name, p.is_bot) for p in results],
-            custom_data={
-                "total_moves": len(self.move_history),
-                "winner_color": self.winner_color,
-                "winner_id": winner.id,
-                "draw_reason": self.draw_reason,
-            },
-        )
-        if self._table:
-            self._table.save_game_result(game_result)
-
-        self.rebuild_all_menus()
+        self.finish_game()
 
     def _end_game_draw(self) -> None:
         """End the game as a draw."""
-        self.status = "finished"
-        self.game_active = False
+        self._winner_id = ""
         self.timer.clear()
+        self.finish_game()
 
-        results = []
-        for p in self.players:
-            if not isinstance(p, ChessPlayer) or p.is_spectator:
-                continue
-            results.append(PlayerResult(
-                player_id=p.id,
-                player_name=p.name,
-                is_bot=p.is_bot,
-                is_virtual_bot=p.is_virtual_bot,
-            ))
-
-        game_result = GameResult.create(
+    def build_game_result(self) -> GameResult:
+        from datetime import datetime
+        return GameResult(
             game_type=self.get_type(),
-            duration_ticks=0,
-            players=[(p.player_id, p.player_name, p.is_bot) for p in results],
+            timestamp=datetime.now().isoformat(),
+            duration_ticks=self.sound_scheduler_tick,
+            player_results=[
+                PlayerResult(
+                    player_id=p.id,
+                    player_name=p.name,
+                    is_bot=p.is_bot,
+                    is_virtual_bot=p.is_virtual_bot,
+                )
+                for p in self.players
+                if isinstance(p, ChessPlayer) and not p.is_spectator
+            ],
             custom_data={
                 "total_moves": len(self.move_history),
-                "winner_color": "",
+                "winner_color": self.winner_color,
+                "winner_id": getattr(self, "_winner_id", ""),
                 "draw_reason": self.draw_reason,
             },
         )
-        if self._table:
-            self._table.save_game_result(game_result)
 
-        self.rebuild_all_menus()
+    def format_end_screen(self, result: GameResult, locale: str) -> list[str]:
+        lines = []
+        winner_color = result.custom_data.get("winner_color", "")
+        draw_reason = result.custom_data.get("draw_reason", "")
+        total_moves = result.custom_data.get("total_moves", 0)
+
+        draw_keys = {
+            "stalemate": "chess-stalemate",
+            "fifty_move_rule": "chess-draw-fifty",
+            "threefold_repetition": "chess-draw-repetition",
+            "insufficient_material": "chess-draw-material",
+            "agreement": "chess-draw-agreement",
+        }
+
+        if winner_color:
+            winner_name = ""
+            for p in result.player_results:
+                player = self.get_player_by_id(p.player_id)
+                if isinstance(player, ChessPlayer) and player.color == winner_color:
+                    winner_name = p.player_name
+                    break
+            lines.append(Localization.get(locale, "chess-checkmate", winner=winner_name))
+        elif draw_reason:
+            key = draw_keys.get(draw_reason, "chess-stalemate")
+            lines.append(Localization.get(locale, key))
+
+        lines.append(Localization.get(locale, "chess-status-move-count", count=total_moves))
+        return lines
 
     # ==========================================================================
     # Helpers
@@ -2104,3 +2105,34 @@ class ChessGame(Game):
     def _player_locale(self, player: Player) -> str:
         user = self.get_user(player)
         return user.locale if user else "en"
+
+    def _broadcast_move(
+        self,
+        player: Player,
+        personal_msg: str,
+        others_msg: str,
+        pieces: dict[str, str] | None = None,
+        **kwargs,
+    ) -> None:
+        """Like broadcast_personal_l but resolves piece names per-user locale.
+
+        Args:
+            player: The acting player.
+            personal_msg: Message ID for the acting player.
+            others_msg: Message ID for everyone else.
+            pieces: Mapping of kwarg name to raw piece type (e.g. {"piece": "pawn"}).
+                    Each value is resolved via piece_name() per recipient locale.
+            **kwargs: Other arguments passed through unchanged.
+        """
+        pieces = pieces or {}
+        for p in self.players:
+            u = self.get_user(p)
+            if not u:
+                continue
+            locale = u.locale
+            resolved = {k: piece_name(v, locale) for k, v in pieces.items()}
+            resolved.update(kwargs)
+            if p is player:
+                u.speak_l(personal_msg, **resolved)
+            else:
+                u.speak_l(others_msg, player=player.name, **resolved)

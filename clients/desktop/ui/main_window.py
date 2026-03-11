@@ -1880,6 +1880,16 @@ class MainWindow(wx.Frame):
         inserted_ids = new_id_set - old_id_set
         common_ids = old_id_set & new_id_set
 
+        # If all IDs are common (no inserts/deletes) but reordered,
+        # fall back to position-based text comparison so the ListBox
+        # actually reflects the new order.
+        if not deleted_ids and not inserted_ids and old_ids != new_ids:
+            operations = []
+            for i, (old_text, new_text) in enumerate(zip(old_items, new_items)):
+                if old_text != new_text:
+                    operations.append(("update", i, new_text))
+            return operations
+
         # Generate delete operations (using old indices)
         for item_id in deleted_ids:
             old_index = old_map[item_id][0]

@@ -134,7 +134,7 @@ class LudoGame(Game):
                     label=Localization.get(locale, "ludo-move-token"),
                     handler="_action_move_token",
                     is_enabled=f"_is_move_token_{token_number}_enabled",
-                    is_hidden="_is_move_token_hidden",
+                    is_hidden=f"_is_move_token_{token_number}_hidden",
                     get_label="_get_move_token_label",
                 )
             )
@@ -429,12 +429,27 @@ class LudoGame(Game):
     def _is_check_board_hidden(self, player: Player) -> Visibility:
         return Visibility.HIDDEN
 
-    def _is_move_token_hidden(self, player: Player) -> Visibility:
+    def _is_move_token_hidden(self, player: Player, token_index: int) -> Visibility:
         if self.status != "playing":
             return Visibility.HIDDEN
         if self.current_player != player:
             return Visibility.HIDDEN
+        ludo_player: LudoPlayer = player  # type: ignore
+        if token_index not in ludo_player.move_options:
+            return Visibility.HIDDEN
         return Visibility.VISIBLE
+
+    def _is_move_token_1_hidden(self, player: Player) -> Visibility:
+        return self._is_move_token_hidden(player, 0)
+
+    def _is_move_token_2_hidden(self, player: Player) -> Visibility:
+        return self._is_move_token_hidden(player, 1)
+
+    def _is_move_token_3_hidden(self, player: Player) -> Visibility:
+        return self._is_move_token_hidden(player, 2)
+
+    def _is_move_token_4_hidden(self, player: Player) -> Visibility:
+        return self._is_move_token_hidden(player, 3)
 
     def _get_move_token_label(self, player: Player, action_id: str) -> str:
         ludo_player: LudoPlayer = player  # type: ignore

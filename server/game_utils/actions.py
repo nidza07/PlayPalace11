@@ -81,6 +81,7 @@ class Action(DataClassJSONMixin):
     input_request: MenuInput | EditboxInput | None = None
     show_in_actions_menu: bool = True
     disabled_message: str = ""  # Locale key spoken when activated while disabled
+    show_disabled_label: bool = True  # Append "unavailable" suffix when disabled but visible
 
 
 @dataclass

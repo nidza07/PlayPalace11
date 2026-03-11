@@ -51,7 +51,7 @@ class MenuManagementMixin:
         items: list[MenuItem] = []
         for resolved in self.get_all_visible_actions(player):
             label = resolved.label
-            if not resolved.enabled:
+            if not resolved.enabled and resolved.action.show_disabled_label:
                 unavailable = Localization.get(user.locale, "visibility-unavailable")
                 label = f"{label}; {unavailable}"
             items.append(MenuItem(text=label, id=resolved.action.id, sound=resolved.sound))
@@ -88,7 +88,7 @@ class MenuManagementMixin:
         items: list[MenuItem] = []
         for resolved in self.get_all_visible_actions(player):
             label = resolved.label
-            if not resolved.enabled:
+            if not resolved.enabled and resolved.action.show_disabled_label:
                 unavailable = Localization.get(user.locale, "visibility-unavailable")
                 label = f"{label}; {unavailable}"
             items.append(MenuItem(text=label, id=resolved.action.id, sound=resolved.sound))

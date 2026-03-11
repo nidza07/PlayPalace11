@@ -76,17 +76,15 @@ chess-no-moves-to-undo = There are no moves to undo.
 chess-already-requested-undo = You have already requested an undo.
 chess-undo-applied = Last move undone. It is now { $player }'s turn.
 
-# Promotion choices
-chess-promote-queen = Queen
-chess-promote-rook = Rook
-chess-promote-bishop = Bishop
-chess-promote-knight = Knight
+# Promotion
 chess-select-promotion = Select promotion piece
 
 # View board
 chess-view-board = View board
 chess-flip-board = Flip board
-chess-board-flipped = Board flipped.
+chess-viewer-own = your
+chess-viewer-opponent = opponent's
+chess-board-flipped = Flipped board to view { $viewer } perspective ({ $color }).
 chess-board-rank = Rank { $rank }: { $pieces }
 chess-empty = empty
 chess-board-header = Board state:
