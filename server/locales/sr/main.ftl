@@ -401,6 +401,40 @@ documents-delete-confirm = Obrisati ovaj dokument? Ima { $count } prevoda. Ovo s
 documents-deleted = Dokument je obrisan.
 documents-no-permission = Nemate nijedan aktuelan dodeljen jezik za ovaj dokument.
 documents-visibility-count = Promeni vidljivost ({ $public }/{ $total } javnih jezika)
+documents-locked = Ovaj dokument trenutno uređuje { $username }. Ne možete trenutno da ga uredite.
+documents-remove-translation-locked = { $language } prevod trenutno uređuje { $username } i ne može se ukloniti.
+documents-delete-locked = Ovaj dokument se ne može obrisati zato što  { $language } prevod uređuje { $username }.
+documents-content-saved = Sadržaj dokumenta sačuvan za { $language }.
+documents-content-unchanged = Nema promena za čuvanje.
+documents-editor-prompt = Uredi: { $title } ({ $language })
+documents-source-label = { $language } (izvorni)
+documents-content-label = { $language } sadržaj
+
+# Document & category creation
+documents-new-document = Novi dokument
+documents-new-category = Nova kategorija
+documents-select-categories = Izaberite kategorije za novi dokument.
+documents-new-document-slug-prompt = Upišite identifikator na engleskom. Ovo je interni identifikator dokumenta, na primer my_game_rules:
+documents-document-created = Dokument napravljen.
+documents-slug-exists = Dokument sa ovim identifikatorom već postoji.
+documents-slug-invalid = Neispravan identifikator. Koristite samo mala slova, brojeve i donje crte.
+documents-new-category-slug-prompt = Upišite identifikator na engleskom. Ovo je interni identifikator kategorije, na primer game_rules:
+documents-category-created = Kategorija napravljena.
+documents-slug-exists-category = Kategorija sa ovim identifikatorom već postoji.
+
+# Category management
+documents-rename-category = Preimenuj kategoriju
+documents-category-settings = Podešavanja kategorije
+documents-delete-category = Obriši kategoriju
+documents-category-name-prompt = Upišite ime koje će se prikazivati za ovu kategoriju za  { $language } prevod:
+documents-category-renamed = Kategorija preimenovana.
+documents-sort-method = Način sortiranja
+documents-sort-alphabetical = Abecedni
+documents-sort-date-created = Po datumu kreiranja
+documents-sort-date-modified = Po datumu izmene
+documents-sort-changed = Način sortiranja ažuriran.
+documents-delete-category-confirm = Da li želite da obrišete ovu kategoriju? Dokumenti u njoj neće biti obrisani, ali će izgubiti ovu dodeljenu kategoriju.
+documents-category-deleted = Kategorija je obrisana.
 
 # Transcriber management
 transcribers-by-language = Prikaži prepisivače po jezicima
