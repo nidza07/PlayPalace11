@@ -952,18 +952,16 @@ class MainWindow(wx.Frame):
             multiline: Whether to use a multiline editbox
             read_only: Whether the editbox is read-only
         """
-        if self.current_mode == "edit":
-            return  # Already in edit mode
+        already_in_edit = self.current_mode == "edit"
 
-        # Hide menu list and label
-        self.menu_list.Hide()
-        self.menu_label.Hide()
+        if not already_in_edit:
+            # Hide menu list and label
+            self.menu_list.Hide()
+            self.menu_label.Hide()
 
         # Set the edit label to the prompt
-        if prompt:
-            self.edit_label.SetLabel(prompt)
-        else:
-            self.edit_label.SetLabel("&Edit")
+        label = prompt or "&Edit"
+        self.edit_label.SetLabel(label)
 
         # Choose which edit control to use
         if multiline:
@@ -972,6 +970,7 @@ class MainWindow(wx.Frame):
             self.edit_input_multiline.Clear()
             self.edit_input_multiline.SetValue(default_value)
             self.edit_input_multiline.SetEditable(not read_only)
+            self.edit_input_multiline.SetName(label)
             self.edit_input_multiline.SetFocus()
             self.current_edit_multiline = True
             self._schedule_pending_clear(self.edit_input_multiline, True, default_value, read_only)
@@ -981,6 +980,7 @@ class MainWindow(wx.Frame):
             self.edit_input.Clear()
             self.edit_input.SetValue(default_value)
             self.edit_input.SetEditable(not read_only)
+            self.edit_input.SetName(label)
             self.edit_input.SetFocus()
             self.current_edit_multiline = False
             self._schedule_pending_clear(self.edit_input, False, default_value, read_only)
@@ -990,8 +990,6 @@ class MainWindow(wx.Frame):
         self.current_mode = "edit"
         self.edit_mode_callback = callback
         self.current_edit_read_only = read_only
-
-        # Don't speak prompt - screen reader will announce it when focusing the editbox
 
     def switch_to_list_mode(self):
         """Switch from edit mode back to list mode."""
