@@ -2,6 +2,8 @@
 # Important: Copy this file to config.toml first. Ccustomize as needed.
 
 [auth]
+#should new accounts have to be admin approved? If set to false, the upstream default, where players must wait for admin approval, will be used
+default_approval = false
 # These limits are enforced during both login and registration.
 username_min_length = 3
 username_max_length = 32
