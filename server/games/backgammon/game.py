@@ -1282,6 +1282,24 @@ class BackgammonGame(Game):
             },
         )
 
+    def format_end_screen(self, result: GameResult, locale: str) -> list[str]:
+        """Format the match result for the end screen."""
+        d = result.custom_data
+        lines = []
+        if d.get("winner_name"):
+            lines.append(Localization.get(
+                locale, "backgammon-match-winner", player=d["winner_name"],
+            ))
+        lines.append(Localization.get(
+            locale, "backgammon-end-score",
+            red=d.get("red_name", "Red"),
+            red_score=d.get("score_red", 0),
+            white=d.get("white_name", "White"),
+            white_score=d.get("score_white", 0),
+            match_length=d.get("match_length", 1),
+        ))
+        return lines
+
     # ==========================================================================
     # Leave handling
     # ==========================================================================

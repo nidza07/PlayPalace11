@@ -104,6 +104,7 @@ backgammon-wins-game = { $player } wins { $points } point{ $points ->
 }.
 backgammon-new-game = Starting game { $number }.
 backgammon-match-winner = { $player } wins the match!
+backgammon-end-score = { $red } { $red_score } - { $white } { $white_score }. Match to { $match_length }.
 backgammon-crawford = Crawford game: no doubling this game.
 # Difficulty levels
 backgammon-difficulty-random = Random
