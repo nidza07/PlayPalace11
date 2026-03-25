@@ -539,7 +539,7 @@ def test_try_join_game_rejects_full_table(monkeypatch):
     class FullGame(DummyGameForJoin):
         def __init__(self):
             super().__init__("Host")
-            self.players = [SimpleNamespace(name=f"P{i}") for i in range(4)]
+            self.players = [SimpleNamespace(name=f"P{i}", is_spectator=False) for i in range(4)]
 
         def get_max_players(self):
             return 4
@@ -799,8 +799,8 @@ def test_guided_bot_waits_when_table_full(tmp_path):
         def __init__(self):
             self.status = "waiting"
             self.players = [
-                SimpleNamespace(name="Host"),
-                SimpleNamespace(name="Human"),
+                SimpleNamespace(name="Host", is_spectator=False),
+                SimpleNamespace(name="Human", is_spectator=False),
             ]
             self.host = "Host"
 

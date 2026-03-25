@@ -107,6 +107,10 @@ Now you select a checker on point 13 and then select point 8. Your checker moves
 Shortcuts specific to the game of Backgammon:
 
 * **Enter (on any grid point):** Roll dice (before rolling) or select/move a checker (during movement).
+* **Ctrl+Backspace:** Deselect the currently selected checker.
+* **Ctrl+Arrow (Up/Down/Left/Right):** Cycle between navigation targets. With a checker selected, cycles between available destinations (blots first). Without a selection, cycles between source points that have legal moves.
+* **Alt+Arrow:** Jump to the edge of the current grid row or column (left/right for row edges, up/down for column edges).
+* **Home / End:** Equivalent to Alt+Left / Right.
 * **Shift+D:** Offer to double the stakes (match play only, before rolling).
 * **Y:** Accept an opponent's double.
 * **N:** Drop (decline) an opponent's double.
