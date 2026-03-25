@@ -1720,10 +1720,10 @@ class ChessGame(Game):
           - pe2-e4 / Pe2-E4            piece-prefixed coordinate move (prefix ignored)
           - e2xe4                      capture notation (x treated like -)
           - e7-e8=q                    promotion, piece appended after =
-          - e1-g1 / e1-h1             remapped to kingside castle for white
-          - e1-c1 / e1-d1 / e1-a1     remapped to queenside castle for white
-          - e8-g8 / e8-h8             remapped to kingside castle for black
-          - e8-c8 / e8-d8 / e8-a8     remapped to queenside castle for black
+          - e1-g1 / e1-h1             remapped to kingside castle for white (king must be on e1)
+          - e1-c1 / e1-a1             remapped to queenside castle for white (king must be on e1)
+          - e8-g8 / e8-h8             remapped to kingside castle for black (king must be on e8)
+          - e8-c8 / e8-a8             remapped to queenside castle for black (king must be on e8)
 
         Returns (None, None, "") on parse failure.
         """
@@ -1771,17 +1771,21 @@ class ChessGame(Game):
         if from_sq is None or to_sq is None:
             return None, None, ""
 
-        # Remap castling shorthands where the player typed the rook square or
-        # an intermediate square instead of the king's destination.
+        # Remap castling shorthands where the player typed the rook square
+        # instead of the king's destination.  Only applies when the king is
+        # actually on e1/e8 — if it has moved, treat it as a normal move.
+        # Accepted: e1/e8 -> g (kingside dest), h (kingside rook sq),
+        #           e1/e8 -> c (queenside dest), a (queenside rook sq).
+        # NOT remapped: d-file, so e1-d1 / e1-d2 work as plain king moves.
         king_file = 4  # e-file
         if from_sq % 8 == king_file and from_sq // 8 == rank:
-            to_file = to_sq % 8
-            if to_file == 7:   # h-file  ->  kingside (g-file)
-                to_sq = rank * 8 + 6
-            elif to_file == 0:  # a-file  ->  queenside (c-file)
-                to_sq = rank * 8 + 2
-            elif to_file == 3:  # d-file  ->  queenside (c-file)
-                to_sq = rank * 8 + 2
+            piece_on_sq = self.board[from_sq]
+            if piece_on_sq and piece_on_sq["piece"] == "king" and piece_on_sq["color"] == color:
+                to_file = to_sq % 8
+                if to_file == 7:    # h-file -> kingside (g-file)
+                    to_sq = rank * 8 + 6
+                elif to_file == 0:  # a-file -> queenside (c-file)
+                    to_sq = rank * 8 + 2
 
         return from_sq, to_sq, promotion
 
