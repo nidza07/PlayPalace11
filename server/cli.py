@@ -31,10 +31,11 @@ import json
 import sys
 from dataclasses import dataclass, field
 from getpass import getpass
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
-from getpass import getpass
+import pyperclip
 
 # Allow running as standalone script (uv run cli.py)
 _MODULE_DIR = Path(__file__).parent
@@ -291,6 +292,18 @@ class GameSimulator:
                 f"\n=== {self.game.get_name()} ({len(self.bot_names)} bots){mode_str} ===\n"
             )
 
+        # Validate before starting
+        errors = self.game.prestart_validate()
+        if errors:
+            for err in errors:
+                if isinstance(err, tuple):
+                    key, kwargs = err
+                    msg = Localization.get("en", key, **kwargs)
+                else:
+                    msg = Localization.get("en", err)
+                print(f"Error: {msg}")
+            return {"error": "prestart validation failed", "messages": [str(e) for e in errors]}
+
         # Start the game
         self.game.setup_keybinds()
         self.game.on_start()
@@ -437,6 +450,39 @@ def cmd_show_options(args):
 
 def cmd_simulate(args):
     """Simulate a game with bots."""
+    if args.clip:
+        capture = StringIO()
+        original_stdout = sys.stdout
+        sys.stdout = _TeeWriter(original_stdout, capture)
+        try:
+            _run_simulate(args)
+        finally:
+            sys.stdout = original_stdout
+        output = capture.getvalue()
+        if output:
+            pyperclip.copy(output)
+            print("(Output copied to clipboard.)")
+    else:
+        _run_simulate(args)
+
+
+class _TeeWriter:
+    """Write to two streams simultaneously."""
+
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, text):
+        for s in self.streams:
+            s.write(text)
+
+    def flush(self):
+        for s in self.streams:
+            s.flush()
+
+
+def _run_simulate(args):
+    """Core simulate logic."""
     # Parse bot names
     if args.bots.isdigit():
         num_bots = int(args.bots)
@@ -467,6 +513,11 @@ def cmd_simulate(args):
         sys.exit(1)
 
     results = simulator.run()
+
+    if results.get("error"):
+        if args.json:
+            print(json.dumps(results, indent=2))
+        sys.exit(1)
 
     if args.json:
         print(json.dumps(results, indent=2))
@@ -637,6 +688,11 @@ def main():
         "-s",
         action="store_true",
         help="Save and restore game state after each tick to test serialization",
+    )
+    sim_parser.add_argument(
+        "--clip",
+        action="store_true",
+        help="Copy all output to clipboard on completion",
     )
 
     # bootstrap-owner command
