@@ -104,6 +104,7 @@ language-changed = Language set to { $language }.
 fluent-languages-option = Fluent languages ({ $count })
 
 # Preference categories
+pref-category-display = Display
 pref-category-sounds = Sounds
 pref-category-dice = Dice Behaviour
 

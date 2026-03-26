@@ -38,10 +38,13 @@ class TestDefaults:
             fields = UserPreferences.get_fields_for_category(cat_key)
             assert fields, f"Category {cat_key} has no fields"
 
+    def test_display_category_fields(self):
+        names = [n for n, _ in UserPreferences.get_fields_for_category("display")]
+        assert "brief_announcements" in names
+
     def test_sounds_category_fields(self):
         names = [n for n, _ in UserPreferences.get_fields_for_category("sounds")]
         assert "play_turn_sound" in names
-        assert "brief_announcements" in names
 
     def test_dice_category_fields(self):
         names = [n for n, _ in UserPreferences.get_fields_for_category("dice")]

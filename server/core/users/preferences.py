@@ -82,6 +82,7 @@ def pref_field(meta: PrefMeta) -> Any:
 # ---------------------------------------------------------------------------
 
 PREF_CATEGORIES: list[tuple[str, str]] = [
+    ("display", "pref-category-display"),
     ("sounds", "pref-category-sounds"),
     ("dice", "pref-category-dice"),
 ]
@@ -100,6 +101,16 @@ class UserPreferences:
     Metadata on each field drives menu generation and serialization.
     """
 
+    # --- Display category ---
+    brief_announcements: bool = pref_field(PrefMeta(
+        category="display",
+        label="pref-set-brief-announcements",
+        change_msg="pref-changed-brief-announcements",
+        description="pref-desc-brief-announcements",
+        kind="bool",
+        default=False,
+    ))
+
     # --- Sounds category ---
     play_turn_sound: bool = pref_field(PrefMeta(
         category="sounds",
@@ -108,15 +119,6 @@ class UserPreferences:
         description="pref-desc-play-turn-sound",
         kind="bool",
         default=True,
-    ))
-
-    brief_announcements: bool = pref_field(PrefMeta(
-        category="sounds",
-        label="pref-set-brief-announcements",
-        change_msg="pref-changed-brief-announcements",
-        description="pref-desc-brief-announcements",
-        kind="bool",
-        default=False,
     ))
 
     # --- Dice category ---
