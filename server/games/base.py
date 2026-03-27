@@ -46,9 +46,7 @@ class ActionContext:
 
     menu_item_id: str | None = None  # ID of selected menu item when keybind pressed
     menu_index: int | None = None  # 1-based index of selected menu item
-    from_keybind: bool = (
-        False  # True if triggered by keybind, False if by menu selection
-    )
+    from_keybind: bool = False  # True if triggered by keybind, False if by menu selection
 
 
 @dataclass
@@ -147,9 +145,7 @@ class Game(
     round_timer_state: str = "idle"  # idle, counting, paused
     round_timer_ticks: int = 0  # Remaining ticks in countdown
     # Sound scheduler state (serialized for persistence)
-    scheduled_sounds: list = field(
-        default_factory=list
-    )  # [[tick, sound, vol, pan, pitch], ...]
+    scheduled_sounds: list = field(default_factory=list)  # [[tick, sound, vol, pan, pitch], ...]
     sound_scheduler_tick: int = 0  # Current tick counter
     # Event queue state (serialized for persistence)
     event_queue: list[tuple[int, str, dict]] = field(
@@ -169,9 +165,7 @@ class Game(
         self._keybinds: dict[
             str, list[Keybind]
         ] = {}  # key -> list of Keybinds (allows same key for different states)
-        self._pending_actions: dict[
-            str, str
-        ] = {}  # player_id -> action_id (waiting for input)
+        self._pending_actions: dict[str, str] = {}  # player_id -> action_id (waiting for input)
         self._action_context: dict[
             str, ActionContext
         ] = {}  # player_id -> context during action execution
@@ -368,13 +362,11 @@ class Game(
 
     def _reset_transcripts(self) -> None:
         """Initialize transcript storage for seated players."""
-        self._transcripts = {
-            player.id: []
-            for player in self.players
-            if not player.is_spectator
-        }
+        self._transcripts = {player.id: [] for player in self.players if not player.is_spectator}
 
-    def record_transcript_event(self, player: Player | None, text: str, buffer: str = "table") -> None:
+    def record_transcript_event(
+        self, player: Player | None, text: str, buffer: str = "table"
+    ) -> None:
         """Store a transcript entry for a player."""
         if not player or player.is_spectator:
             return

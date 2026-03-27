@@ -66,7 +66,6 @@ __all__ = [
     "FiveCardDrawGame",
     "HoldemGame",
     "CrazyEightsGame",
-
     "SnakesAndLaddersGame",
     "RollingBallsGame",
     "SorryGame",
@@ -77,7 +76,6 @@ __all__ = [
     "TwentyOneGame",
     "ChessGame",
     "BackgammonGame",
-
     "BattleshipGame",
     "CoupGame",
     "DominosGame",

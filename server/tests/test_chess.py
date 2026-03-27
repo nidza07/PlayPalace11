@@ -4,8 +4,11 @@ import pytest
 import json
 
 from server.games.chess.game import (
-    ChessGame, ChessPlayer, ChessOptions,
-    index_to_notation, notation_to_index,
+    ChessGame,
+    ChessPlayer,
+    ChessOptions,
+    index_to_notation,
+    notation_to_index,
 )
 from server.core.users.test_user import MockUser
 from server.core.users.bot import Bot

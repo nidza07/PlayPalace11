@@ -116,7 +116,6 @@ class AccountEditorDialog(wx.Dialog):
         # Buttons
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-
         close_btn = wx.Button(panel, wx.ID_CANCEL, "&Close")
         button_sizer.Add(close_btn, 0)
 
@@ -194,7 +193,7 @@ class AccountEditorDialog(wx.Dialog):
             return True  # Empty is allowed
         # Lowercase and validate against pattern
         email_lower = email.lower()
-        pattern = r'^[a-z0-9_.+-]+@[a-z0-9_.-]+$'
+        pattern = r"^[a-z0-9_.+-]+@[a-z0-9_.-]+$"
         return bool(re.match(pattern, email_lower))
 
     def _validate_for_close(self) -> bool:
@@ -384,7 +383,9 @@ class TrustedCertificateDialog(wx.Dialog):
             details.append("PEM Certificate:")
             details.append(cert["pem"])
 
-        self.details_text.SetValue("\n".join(details) if details else "Certificate data unavailable.")
+        self.details_text.SetValue(
+            "\n".join(details) if details else "Certificate data unavailable."
+        )
 
     def _update_forget_button_state(self):
         """Enable/disable forget button based on certificate existence."""
@@ -787,7 +788,9 @@ class ServerEditorDialog(wx.Dialog):
             self._save_if_needed()
             if not self.server_id:
                 wx.MessageBox(
-                    "Please enter a server name first", "Server Name Required", wx.OK | wx.ICON_WARNING
+                    "Please enter a server name first",
+                    "Server Name Required",
+                    wx.OK | wx.ICON_WARNING,
                 )
                 self.name_input.SetFocus()
                 return
@@ -938,9 +941,7 @@ class ServerManagerDialog(wx.Dialog):
         """Handle edit server button click."""
         server_id = self._get_selected_server_id()
         if not server_id:
-            wx.MessageBox(
-                "Please select a server to edit", "No Selection", wx.OK | wx.ICON_WARNING
-            )
+            wx.MessageBox("Please select a server to edit", "No Selection", wx.OK | wx.ICON_WARNING)
             return
 
         dlg = ServerEditorDialog(self, self.config_manager, server_id)
@@ -990,9 +991,7 @@ class ServerManagerDialog(wx.Dialog):
             )
             return
 
-        dlg = ConfigSharingDialog(
-            self, self.config_manager, ConfigSharingDialog.MODE_EXPORT
-        )
+        dlg = ConfigSharingDialog(self, self.config_manager, ConfigSharingDialog.MODE_EXPORT)
         dlg.ShowModal()
         dlg.Destroy()
 
@@ -1003,7 +1002,9 @@ class ServerManagerDialog(wx.Dialog):
             return
 
         dlg = ConfigSharingDialog(
-            self, self.config_manager, ConfigSharingDialog.MODE_IMPORT,
+            self,
+            self.config_manager,
+            ConfigSharingDialog.MODE_IMPORT,
             imported_data=imported_data,
         )
         if dlg._no_data:
@@ -1081,9 +1082,7 @@ class ServerManagerDialog(wx.Dialog):
             desc = data.get("description", "")
             ts = format_export_timestamp(data.get("timestamp", 0))
             result = wx.MessageBox(
-                f"Description: {desc}\n"
-                f"Date: {ts}\n\n"
-                f"Would you like to import this file?",
+                f"Description: {desc}\nDate: {ts}\n\nWould you like to import this file?",
                 "Confirm Import File",
                 wx.YES_NO | wx.ICON_QUESTION,
             )

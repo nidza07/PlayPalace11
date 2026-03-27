@@ -74,7 +74,9 @@ def test_twentyone_creation() -> None:
     assert game.get_min_players() == 2
     assert game.get_max_players() == 2
     assert Localization.get("en", MODIFIER_LABELS[MODIFIER_RAISE_1]) == "raise one"
-    assert Localization.get("en", MODIFIER_LABELS[MODIFIER_RAISE_2_PLUS]) == "withdraw and raise two"
+    assert (
+        Localization.get("en", MODIFIER_LABELS[MODIFIER_RAISE_2_PLUS]) == "withdraw and raise two"
+    )
     assert Localization.get("en", MODIFIER_LABELS[MODIFIER_GUARD]) == "defend"
     assert Localization.get("en", MODIFIER_LABELS[MODIFIER_LOCKDOWN]) == "delete double enhanced"
 
@@ -91,7 +93,9 @@ def test_twentyone_modifier_draw_weights_apply_enhanced_tiers() -> None:
     assert MODIFIER_DRAW_WEIGHTS[MODIFIER_BREAK_PLUS] == ENHANCED_MODIFIER_DRAW_WEIGHT
     assert MODIFIER_DRAW_WEIGHTS[MODIFIER_LOCKDOWN] == DOUBLE_ENHANCED_MODIFIER_DRAW_WEIGHT
     assert MODIFIER_DRAW_WEIGHTS[MODIFIER_PRECISION_DRAW] == DEFAULT_MODIFIER_DRAW_WEIGHT
-    assert MODIFIER_DRAW_WEIGHTS[MODIFIER_PRECISION_DRAW_PLUS] == DOUBLE_ENHANCED_MODIFIER_DRAW_WEIGHT
+    assert (
+        MODIFIER_DRAW_WEIGHTS[MODIFIER_PRECISION_DRAW_PLUS] == DOUBLE_ENHANCED_MODIFIER_DRAW_WEIGHT
+    )
     assert MODIFIER_DRAW_WEIGHTS[MODIFIER_PRIME_DRAW] == ENHANCED_MODIFIER_DRAW_WEIGHT
     assert MODIFIER_DRAW_WEIGHTS[MODIFIER_BREAK_SHIELDS] == DEFAULT_MODIFIER_DRAW_WEIGHT
     assert MODIFIER_DRAW_WEIGHTS[MODIFIER_BREAK_SHIELDS_PLUS] == ENHANCED_MODIFIER_DRAW_WEIGHT
@@ -402,9 +406,9 @@ def test_twentyone_hides_opponent_hole_card_on_round_start() -> None:
         game.deck = Deck(
             cards=[
                 make_card(1, 11),  # Host hidden
-                make_card(2, 3),   # Guest hidden
-                make_card(3, 4),   # Host shown
-                make_card(4, 5),   # Guest shown
+                make_card(2, 3),  # Guest hidden
+                make_card(3, 4),  # Host shown
+                make_card(4, 5),  # Guest shown
             ]
         )
 
@@ -1054,7 +1058,13 @@ def test_twentyone_lockdown_expire_plays_end_sound() -> None:
     p1.hp = 10
     p2.hp = 10
     p1.modifiers = [MODIFIER_TARGET_24]
-    p1.table_modifiers = [MODIFIER_LOCKDOWN, MODIFIER_GUARD, MODIFIER_GUARD, MODIFIER_GUARD, MODIFIER_GUARD]
+    p1.table_modifiers = [
+        MODIFIER_LOCKDOWN,
+        MODIFIER_GUARD,
+        MODIFIER_GUARD,
+        MODIFIER_GUARD,
+        MODIFIER_GUARD,
+    ]
 
     host_user.clear_messages()
     guest_user.clear_messages()

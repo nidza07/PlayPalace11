@@ -94,9 +94,7 @@ class SpectatorUser(User):
     def speak(self, text: str, buffer: str = "misc") -> None:
         self._log(text)
 
-    def play_sound(
-        self, name: str, volume: int = 100, pan: int = 0, pitch: int = 100
-    ) -> None:
+    def play_sound(self, name: str, volume: int = 100, pan: int = 0, pitch: int = 100) -> None:
         pass  # Ignore sounds
 
     def play_music(self, name: str, looping: bool = True) -> None:
@@ -135,9 +133,7 @@ class SpectatorUser(User):
     def remove_menu(self, menu_id: str) -> None:
         self._menus.pop(menu_id, None)
 
-    def show_editbox(
-        self, input_id: str, prompt: str, default_value: str = "", **kwargs
-    ) -> None:
+    def show_editbox(self, input_id: str, prompt: str, default_value: str = "", **kwargs) -> None:
         pass
 
     def remove_editbox(self, input_id: str) -> None:
@@ -188,9 +184,7 @@ class GameSimulator:
 
         if len(self.bot_names) < min_players:
             if not self.json_mode:
-                print(
-                    f"Error: {self.game_type} requires at least {min_players} players"
-                )
+                print(f"Error: {self.game_type} requires at least {min_players} players")
             return False
 
         if len(self.bot_names) > max_players:
@@ -235,7 +229,9 @@ class GameSimulator:
             self.game.setup_player_actions(player)
 
         # Add spectator as a player to receive broadcasts
-        spectator_player = self.game.create_player(self.spectator.uuid, "__spectator__", is_bot=False)
+        spectator_player = self.game.create_player(
+            self.spectator.uuid, "__spectator__", is_bot=False
+        )
         spectator_player.is_spectator = True
         self.game.players.append(spectator_player)
         self.game.attach_user(spectator_player.id, self.spectator)
@@ -288,9 +284,7 @@ class GameSimulator:
 
         if not self.json_mode and not self.quiet:
             mode_str = " [testing serialization]" if self.test_serialization else ""
-            print(
-                f"\n=== {self.game.get_name()} ({len(self.bot_names)} bots){mode_str} ===\n"
-            )
+            print(f"\n=== {self.game.get_name()} ({len(self.bot_names)} bots){mode_str} ===\n")
 
         # Validate before starting
         errors = self.game.prestart_validate()
@@ -331,9 +325,7 @@ class GameSimulator:
             print(f"\nWarning: Game timed out after {self.max_ticks} ticks")
 
         # Build results - filter out spectator references
-        filtered_messages = [
-            m for m in self.spectator._messages if "__spectator__" not in m
-        ]
+        filtered_messages = [m for m in self.spectator._messages if "__spectator__" not in m]
         filtered_menu = [
             item
             for item in self.spectator._menus.get("game_over", [])
@@ -384,9 +376,7 @@ def cmd_list_games(args):
             print(f"  {game_class.get_type()}")
             print(f"    Name: {game_class.get_name()}")
             print(f"    Category: {game_class.get_category()}")
-            print(
-                f"    Players: {game_class.get_min_players()}-{game_class.get_max_players()}"
-            )
+            print(f"    Players: {game_class.get_min_players()}-{game_class.get_max_players()}")
             print()
 
 
@@ -435,9 +425,7 @@ def cmd_show_options(args):
         options_list.append(option_data)
 
     if args.json:
-        print(
-            json.dumps({"game_type": args.game_type, "options": options_list}, indent=2)
-        )
+        print(json.dumps({"game_type": args.game_type, "options": options_list}, indent=2))
     else:
         print(f"Options for {args.game_type}:\n")
         for opt in options_list:
@@ -522,9 +510,7 @@ def _run_simulate(args):
     if args.json:
         print(json.dumps(results, indent=2))
     elif not args.quiet:
-        print(
-            f"\n=== Finished: {results['ticks']} ticks, {results['rounds']} rounds ==="
-        )
+        print(f"\n=== Finished: {results['ticks']} ticks, {results['rounds']} rounds ===")
         if results.get("final_menu"):
             print("\nFinal standings:")
             for line in results["final_menu"]:
@@ -652,9 +638,7 @@ def main():
     list_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # show-options command
-    options_parser = subparsers.add_parser(
-        "show-options", help="Show options for a game"
-    )
+    options_parser = subparsers.add_parser("show-options", help="Show options for a game")
     options_parser.add_argument("game_type", help="Game type (e.g., lightturret, pig)")
     options_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
@@ -674,9 +658,7 @@ def main():
         help="Set game option (e.g., -o starting_power=15)",
     )
     sim_parser.add_argument("--json", action="store_true", help="Output as JSON")
-    sim_parser.add_argument(
-        "--quiet", "-q", action="store_true", help="Suppress game output"
-    )
+    sim_parser.add_argument("--quiet", "-q", action="store_true", help="Suppress game output")
     sim_parser.add_argument(
         "--max-ticks",
         type=int,

@@ -111,9 +111,7 @@ class EventHandlingMixin:
             from_keybind=True,
         )
 
-        executed_any = self._execute_keybinds(
-            player, keybinds, is_spectator, menu_item_id, context
-        )
+        executed_any = self._execute_keybinds(player, keybinds, is_spectator, menu_item_id, context)
 
         if self._should_rebuild_after_keybind(player, executed_any):
             self.rebuild_all_menus()
@@ -132,10 +130,7 @@ class EventHandlingMixin:
             if resolved.enabled:
                 self.execute_action(player, action_id)
         # Don't rebuild if action is waiting for input or status box is open
-        if (
-            player.id not in self._pending_actions
-            and player.id not in self._status_box_open
-        ):
+        if player.id not in self._pending_actions and player.id not in self._status_box_open:
             self.rebuild_player_menu(player)
 
     def _handle_turn_menu_selection(self, player: "Player", event: dict, selection_id: str) -> None:

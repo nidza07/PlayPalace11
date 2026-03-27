@@ -42,7 +42,10 @@ class StubConfigManager:
 
     def add_account(self, server_id, username, password, email="", notes=""):
         self.add_calls.append(
-            (server_id, {"username": username, "password": password, "email": email, "notes": notes})
+            (
+                server_id,
+                {"username": username, "password": password, "email": email, "notes": notes},
+            )
         )
         return "acct-new"
 
@@ -72,9 +75,7 @@ def test_login_dialog_populates_servers(wx_app, monkeypatch):
     dlg = LoginDialog(None)
     try:
         assert dlg.server_combo.GetCount() == len(stub.servers)
-        assert dlg.accounts_list.GetCount() == len(
-            stub.servers[stub.last_server]["accounts"]
-        )
+        assert dlg.accounts_list.GetCount() == len(stub.servers[stub.last_server]["accounts"])
         # selecting server without accounts should clear list
         dlg.server_combo.SetSelection(1)
         dlg.on_server_change(wx.CommandEvent())

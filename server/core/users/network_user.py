@@ -163,9 +163,7 @@ class NetworkUser(User):
             packet["buffer"] = buffer
         self._queue_packet(packet)
 
-    def play_sound(
-        self, name: str, volume: int = 100, pan: int = 0, pitch: int = 100
-    ) -> None:
+    def play_sound(self, name: str, volume: int = 100, pan: int = 0, pitch: int = 100) -> None:
         """Queue a sound effect for the client."""
         self._queue_packet(
             {

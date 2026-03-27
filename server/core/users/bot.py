@@ -57,9 +57,7 @@ class Bot(User):
         """No-op: bots do not receive speech."""
         pass
 
-    def play_sound(
-        self, name: str, volume: int = 100, pan: int = 0, pitch: int = 100
-    ) -> None:
+    def play_sound(self, name: str, volume: int = 100, pan: int = 0, pitch: int = 100) -> None:
         """No-op: bots do not play sounds."""
         pass
 

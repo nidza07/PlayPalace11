@@ -202,8 +202,10 @@ async def test_preload_locales_if_requested_runs(monkeypatch, server):
 async def test_start_localization_warmup_schedules(monkeypatch, server):
     server._preload_locales = False
     server._localization_warmup_task = None
+
     async def dummy():
         return None
+
     monkeypatch.setattr(server, "_warm_locales_async", dummy)
     loop = FakeLoop()
     monkeypatch.setattr(asyncio, "get_running_loop", lambda: loop)

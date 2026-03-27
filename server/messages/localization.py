@@ -310,9 +310,7 @@ class Localization:
         to call during warmup.
         """
         if cls._locales_dir is None:
-            raise RuntimeError(
-                "Localization not initialized. Call Localization.init() first."
-            )
+            raise RuntimeError("Localization not initialized. Call Localization.init() first.")
         return sorted(
             locale_dir.name
             for locale_dir in cls._locales_dir.iterdir()
@@ -338,9 +336,7 @@ class Localization:
             Dictionary mapping language codes to language names.
         """
         if cls._locales_dir is None:
-            raise RuntimeError(
-                "Localization not initialized. Call Localization.init() first."
-            )
+            raise RuntimeError("Localization not initialized. Call Localization.init() first.")
 
         result = {}
 
@@ -362,7 +358,7 @@ class Localization:
                 name = cls.get(locale_code, message_id)
 
             # If translation not found, try fallback locale
-            if name == message_id  and fallback != display_language:
+            if name == message_id and fallback != display_language:
                 name = cls.get(fallback, message_id)
 
             # If fallback is not "en" and still not found, try "en"

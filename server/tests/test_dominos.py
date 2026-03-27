@@ -132,7 +132,9 @@ def test_round_winner_opening_rule_uses_previous_round_winner() -> None:
 
 
 def test_option_labels_localize_choice_values() -> None:
-    options = DominosOptions(domino_set="double9", opening_rule="set_max_double", spinner_enabled=True)
+    options = DominosOptions(
+        domino_set="double9", opening_rule="set_max_double", spinner_enabled=True
+    )
     summary = options.format_options_summary("en")
 
     # Summary should contain localized labels, not raw field names
@@ -452,7 +454,9 @@ def test_round_wait_advances_to_next_round_after_five_seconds() -> None:
     game._finish_round_from_empty_hand(player1)
 
     assert game.round_wait_ticks == 100
-    reached = advance_until(game, lambda: game.round == current_round + 1 and game.round_wait_ticks == 0, max_ticks=120)
+    reached = advance_until(
+        game, lambda: game.round == current_round + 1 and game.round_wait_ticks == 0, max_ticks=120
+    )
     assert reached is True
 
 
@@ -488,6 +492,8 @@ def test_bot_turn_uses_advance_until_to_act() -> None:
     bot.bot_pending_action = None
     game._update_all_turn_actions()
 
-    reached = advance_until(game, lambda: game.current_player == human and game.open_ends["right"] == 4)
+    reached = advance_until(
+        game, lambda: game.current_player == human and game.open_ends["right"] == 4
+    )
 
     assert reached is True

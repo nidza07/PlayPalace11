@@ -197,9 +197,7 @@ class TeamManager(DataClassJSONMixin):
         # For actual teams, could use localization
         return f"Team {team.index + 1}"
 
-    def get_sorted_teams(
-        self, by_score: bool = True, descending: bool = True
-    ) -> list[Team]:
+    def get_sorted_teams(self, by_score: bool = True, descending: bool = True) -> list[Team]:
         """
         Get teams sorted by score or index.
 
@@ -322,9 +320,7 @@ class TeamManager(DataClassJSONMixin):
         return modes
 
     @staticmethod
-    def get_team_modes_for_player_count(
-        num_players: int, locale: str = "en"
-    ) -> list[str]:
+    def get_team_modes_for_player_count(num_players: int, locale: str = "en") -> list[str]:
         """
         Get valid team mode options for a given number of players.
         Returns localized display strings.
@@ -336,13 +332,8 @@ class TeamManager(DataClassJSONMixin):
         Returns:
             List of valid team mode strings in user-friendly localized format.
         """
-        internal_modes = TeamManager.get_team_modes_for_player_count_internal(
-            num_players
-        )
-        return [
-            TeamManager.format_team_mode_for_display(mode, locale)
-            for mode in internal_modes
-        ]
+        internal_modes = TeamManager.get_team_modes_for_player_count_internal(num_players)
+        return [TeamManager.format_team_mode_for_display(mode, locale) for mode in internal_modes]
 
     @staticmethod
     def get_all_team_modes(min_players: int, max_players: int) -> list[str]:

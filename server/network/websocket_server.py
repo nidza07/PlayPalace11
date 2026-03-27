@@ -180,9 +180,7 @@ class WebSocketServer:
             if self._on_disconnect:
                 await self._on_disconnect(client)
 
-    async def broadcast(
-        self, packet: dict, exclude: ClientConnection | None = None
-    ) -> None:
+    async def broadcast(self, packet: dict, exclude: ClientConnection | None = None) -> None:
         """Broadcast a packet to all authenticated clients."""
         for client in self._clients.values():
             if client.authenticated and client != exclude:

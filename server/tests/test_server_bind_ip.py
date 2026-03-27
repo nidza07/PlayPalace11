@@ -16,7 +16,7 @@ class _DummyDB:
         return 1
 
     def get_server_owner(self) -> str:
-        return 'owner'
+        return "owner"
 
     def close(self) -> None:
         return None

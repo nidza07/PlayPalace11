@@ -226,17 +226,13 @@ class LoginDialog(wx.Dialog):
         """Handle create account button click."""
         server_id = self._get_selected_server_id()
         if not server_id:
-            wx.MessageBox(
-                "Please select a server first", "Error", wx.OK | wx.ICON_ERROR
-            )
+            wx.MessageBox("Please select a server first", "Error", wx.OK | wx.ICON_ERROR)
             self.server_combo.SetFocus()
             return
 
         server_url = self.config_manager.get_server_url(server_id)
         if not server_url:
-            wx.MessageBox(
-                "Could not determine server URL", "Error", wx.OK | wx.ICON_ERROR
-            )
+            wx.MessageBox("Could not determine server URL", "Error", wx.OK | wx.ICON_ERROR)
             return
 
         from .registration_dialog import RegistrationDialog

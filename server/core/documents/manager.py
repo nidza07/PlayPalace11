@@ -197,9 +197,7 @@ class DocumentManager:
                 counts[slug] = counts.get(slug, 0) + 1
         return counts
 
-    def get_documents_in_category(
-        self, category_slug: str | None, locale: str
-    ) -> list[dict]:
+    def get_documents_in_category(self, category_slug: str | None, locale: str) -> list[dict]:
         """Return documents in a category.
 
         Args:
@@ -226,12 +224,14 @@ class DocumentManager:
             # Include sort-relevant timestamps from source locale.
             source = meta.get("source_locale", "en")
             loc_info = meta.get("locales", {}).get(source, {})
-            results.append({
-                "folder_name": folder_name,
-                "title": title,
-                "created": loc_info.get("created", ""),
-                "modified": loc_info.get("modified_contents", ""),
-            })
+            results.append(
+                {
+                    "folder_name": folder_name,
+                    "title": title,
+                    "created": loc_info.get("created", ""),
+                    "modified": loc_info.get("modified_contents", ""),
+                }
+            )
 
         sort_method = self.get_category_sort(category_slug) if category_slug else "alphabetical"
         if sort_method == "date_created":
@@ -319,7 +319,11 @@ class DocumentManager:
         # Track changeset for shared documents
         if self._scopes.get(folder_name) == SCOPE_SHARED:
             self._record_pending_change(
-                folder_name, locale, editor_username, "edit", content,
+                folder_name,
+                locale,
+                editor_username,
+                "edit",
+                content,
             )
 
         # Release edit lock
@@ -377,14 +381,16 @@ class DocumentManager:
         # Track changeset for shared documents
         if scope == SCOPE_SHARED:
             self._record_pending_change(
-                folder_name, locale, "", "create", content,
+                folder_name,
+                locale,
+                "",
+                "create",
+                content,
             )
 
         return True
 
-    def set_document_title(
-        self, folder_name: str, locale: str, title: str
-    ) -> bool:
+    def set_document_title(self, folder_name: str, locale: str, title: str) -> bool:
         """Update the title for a locale in document metadata.
 
         Titles are stored separately from locale entries, so setting a title
@@ -400,9 +406,7 @@ class DocumentManager:
         self._save_document_metadata(folder_name)
         return True
 
-    def set_document_visibility(
-        self, folder_name: str, locale: str, public: bool
-    ) -> bool:
+    def set_document_visibility(self, folder_name: str, locale: str, public: bool) -> bool:
         """Update the public flag for a locale in document metadata.
 
         Returns ``True`` on success, ``False`` if document or locale not found.
@@ -417,9 +421,7 @@ class DocumentManager:
         self._save_document_metadata(folder_name)
         return True
 
-    def set_document_categories(
-        self, folder_name: str, categories: list[str]
-    ) -> bool:
+    def set_document_categories(self, folder_name: str, categories: list[str]) -> bool:
         """Replace the category list for a document.
 
         Returns ``True`` on success, ``False`` if document not found.
@@ -462,13 +464,21 @@ class DocumentManager:
         # Track changeset for shared documents
         if self._scopes.get(folder_name) == SCOPE_SHARED:
             self._record_pending_change(
-                folder_name, locale, "", "translation_add", content,
+                folder_name,
+                locale,
+                "",
+                "translation_add",
+                content,
             )
 
         return True
 
     def remove_document_translation(
-        self, folder_name: str, locale: str, *, remove_title: bool = True,
+        self,
+        folder_name: str,
+        locale: str,
+        *,
+        remove_title: bool = True,
     ) -> bool:
         """Delete a locale entry, its .md file, and history backups.
 
@@ -604,9 +614,7 @@ class DocumentManager:
     # Edit locks
     # ------------------------------------------------------------------
 
-    def acquire_edit_lock(
-        self, folder_name: str, locale: str, username: str
-    ) -> str | None:
+    def acquire_edit_lock(self, folder_name: str, locale: str, username: str) -> str | None:
         """Attempt to acquire an edit lock.
 
         Returns ``None`` on success, or the locking username on failure.
@@ -619,18 +627,14 @@ class DocumentManager:
         self._edit_locks[key] = {"user": username, "timestamp": time.time()}
         return None
 
-    def release_edit_lock(
-        self, folder_name: str, locale: str, username: str
-    ) -> None:
+    def release_edit_lock(self, folder_name: str, locale: str, username: str) -> None:
         """Release an edit lock if held by *username*."""
         key = (folder_name, locale)
         existing = self._edit_locks.get(key)
         if existing and existing["user"] == username:
             del self._edit_locks[key]
 
-    def get_edit_lock_holder(
-        self, folder_name: str, locale: str
-    ) -> str | None:
+    def get_edit_lock_holder(self, folder_name: str, locale: str) -> str | None:
         """Return the username holding the lock, or ``None``."""
         self.cleanup_stale_locks()
         lock = self._edit_locks.get((folder_name, locale))
@@ -680,16 +684,19 @@ class DocumentManager:
         now = datetime.now(timezone.utc).isoformat()
         # Remove any existing entry for the same folder+locale (latest wins)
         manifest["changes"] = [
-            c for c in manifest["changes"]
+            c
+            for c in manifest["changes"]
             if not (c["folder_name"] == folder_name and c["locale"] == locale)
         ]
-        manifest["changes"].append({
-            "folder_name": folder_name,
-            "locale": locale,
-            "editor": editor_username,
-            "timestamp": now,
-            "change_type": change_type,
-        })
+        manifest["changes"].append(
+            {
+                "folder_name": folder_name,
+                "locale": locale,
+                "editor": editor_username,
+                "timestamp": now,
+                "change_type": change_type,
+            }
+        )
         self._save_pending_manifest(manifest)
 
     def _load_pending_manifest(self) -> dict:
@@ -852,7 +859,8 @@ class DocumentManager:
         dest = self._shared_dir / folder_name
         if dest.exists():
             LOG.warning(
-                "Cannot promote '%s': already exists in shared/", folder_name,
+                "Cannot promote '%s': already exists in shared/",
+                folder_name,
             )
             return False
 
@@ -871,7 +879,10 @@ class DocumentManager:
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
     def set_based_on(
-        self, folder_name: str, shared_slug: str, locale: str,
+        self,
+        folder_name: str,
+        shared_slug: str,
+        locale: str,
     ) -> bool:
         """Set the ``based_on`` field for an independent document.
 

@@ -59,9 +59,7 @@ class TickScheduler:
     or passed directly to the constructor.
     """
 
-    def __init__(
-        self, on_tick: Callable[[], None], tick_interval_ms: int | None = None
-    ):
+    def __init__(self, on_tick: Callable[[], None], tick_interval_ms: int | None = None):
         """
         Initialize the tick scheduler.
 

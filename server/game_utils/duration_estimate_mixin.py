@@ -61,10 +61,14 @@ class DurationEstimateMixin:
         # Build CLI command
         cli_path = Path(__file__).parent.parent / "cli.py"
         base_cmd = [
-            sys.executable, str(cli_path), "simulate",
+            sys.executable,
+            str(cli_path),
+            "simulate",
             self.get_type(),
-            "--bots", str(num_bots),
-            "--json", "--quiet"
+            "--bots",
+            str(num_bots),
+            "--json",
+            "--quiet",
         ] + options_args
 
         # Reset results
@@ -142,7 +146,9 @@ class DurationEstimateMixin:
 
             # Format outlier info
             if outliers:
-                outlier_info = f"{len(outliers)} outlier{'s' if len(outliers) > 1 else ''} removed. "
+                outlier_info = (
+                    f"{len(outliers)} outlier{'s' if len(outliers) > 1 else ''} removed. "
+                )
             else:
                 outlier_info = ""
 
@@ -165,7 +171,7 @@ class DurationEstimateMixin:
         if len(values) < 2:
             return 0.0
         variance = sum((x - mean) ** 2 for x in values) / len(values)
-        return variance ** 0.5
+        return variance**0.5
 
     def _detect_outliers(self, values: list[int]) -> list[int]:
         """Detect outliers using IQR method. Returns list of outlier values."""

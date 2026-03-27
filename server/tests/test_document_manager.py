@@ -32,8 +32,16 @@ def manager(docs_dir):
 # Helper to create documents in shared/ or independent/
 # ------------------------------------------------------------------
 
-def _create_doc_on_disk(docs_dir, folder_name, content="Hello", locale="en",
-                        scope="shared", categories=None, meta_override=None):
+
+def _create_doc_on_disk(
+    docs_dir,
+    folder_name,
+    content="Hello",
+    locale="en",
+    scope="shared",
+    categories=None,
+    meta_override=None,
+):
     """Create a document directly on disk in the given scope directory."""
     scope_dir = docs_dir / scope
     scope_dir.mkdir(exist_ok=True)
@@ -86,9 +94,7 @@ class TestLoad:
 
     def test_load_with_existing_root_metadata(self, manager, docs_dir):
         root_meta = {
-            "categories": {
-                "rules": {"sort": "alphabetical", "name": {"en": "Game Rules"}}
-            }
+            "categories": {"rules": {"sort": "alphabetical", "name": {"en": "Game Rules"}}}
         }
         with open(docs_dir / "_metadata.json", "w", encoding="utf-8") as f:
             json.dump(root_meta, f)
@@ -256,11 +262,7 @@ class TestGetCategories:
 class TestGetDocumentsInCategory:
     def _setup_docs(self, docs_dir):
         """Create two docs, one categorized and one not."""
-        root_meta = {
-            "categories": {
-                "rules": {"sort": "alphabetical", "name": {"en": "Rules"}}
-            }
-        }
+        root_meta = {"categories": {"rules": {"sort": "alphabetical", "name": {"en": "Rules"}}}}
         with open(docs_dir / "_metadata.json", "w", encoding="utf-8") as f:
             json.dump(root_meta, f)
 
@@ -413,9 +415,7 @@ class TestVersionHistory:
         history_dir = docs_dir / "shared" / "capped" / "_history"
         history_dir.mkdir()
         for i in range(6):
-            (history_dir / f"en_20260101T0000{i:02d}Z.md").write_text(
-                f"old_v{i}", encoding="utf-8"
-            )
+            (history_dir / f"en_20260101T0000{i:02d}Z.md").write_text(f"old_v{i}", encoding="utf-8")
         assert len(list(history_dir.glob("en_*.md"))) == 6
 
         # One more save triggers backup + prune
@@ -488,7 +488,12 @@ class TestCreateOperations:
     def test_create_document_shared(self, manager, docs_dir):
         manager.load()
         result = manager.create_document(
-            "shared_new", [], "en", "Shared", "content", scope=SCOPE_SHARED,
+            "shared_new",
+            [],
+            "en",
+            "Shared",
+            "content",
+            scope=SCOPE_SHARED,
         )
         assert result is True
         assert (docs_dir / "shared" / "shared_new" / "en.md").exists()
@@ -644,13 +649,21 @@ class TestCategorySort:
         manager.create_category("rules", "Rules", "en")
         manager.set_category_sort("rules", "date_created")
         manager.create_document(
-            "old_doc", ["rules"], "en", "Old Doc", "old",
+            "old_doc",
+            ["rules"],
+            "en",
+            "Old Doc",
+            "old",
         )
         # Manually set timestamps to control ordering
         meta = manager.get_document_metadata("old_doc")
         meta["locales"]["en"]["created"] = "2026-01-01T00:00:00Z"
         manager.create_document(
-            "new_doc", ["rules"], "en", "New Doc", "new",
+            "new_doc",
+            ["rules"],
+            "en",
+            "New Doc",
+            "new",
         )
         meta2 = manager.get_document_metadata("new_doc")
         meta2["locales"]["en"]["created"] = "2026-06-01T00:00:00Z"

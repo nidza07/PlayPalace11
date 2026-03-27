@@ -104,6 +104,7 @@ def make_server(monkeypatch, tmp_path):
         monkeypatch.setattr(srv, "_send_game_list", no_game_list)
         monkeypatch.setattr(srv, "_show_main_menu", lambda user: None)
         monkeypatch.setattr(srv, "_broadcast_login_presence", lambda user: None)
+
         # make packet validation a no-op for routing tests
         class FakeAdapter:
             def validate_python(self, pkt):
@@ -172,7 +173,9 @@ async def test_disconnect_clients_for_status_sends_and_closes(make_server):
     c2 = DummyClient()
     srv._ws_server = FakeWSS({"a": c1, "b": c2})
 
-    snapshot = ModeSnapshot(ServerMode.MAINTENANCE, "maint", datetime(2025, 1, 1, tzinfo=timezone.utc))
+    snapshot = ModeSnapshot(
+        ServerMode.MAINTENANCE, "maint", datetime(2025, 1, 1, tzinfo=timezone.utc)
+    )
     await srv._disconnect_clients_for_status(snapshot)
 
     for client in (c1, c2):
