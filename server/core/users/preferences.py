@@ -87,6 +87,7 @@ def pref_field(meta: PrefMeta) -> Any:
 PREF_CATEGORIES: list[tuple[str, str]] = [
     ("display", "pref-category-display"),
     ("sounds", "pref-category-sounds"),
+    ("gameplay", "pref-category-gameplay"),
     ("dice", "pref-category-dice"),
 ]
 """(category_key, fluent_key) in display order."""
@@ -124,6 +125,18 @@ class UserPreferences:
             label="pref-set-play-turn-sound",
             change_msg="pref-changed-play-turn-sound",
             description="pref-desc-play-turn-sound",
+            kind="bool",
+            default=True,
+        )
+    )
+
+    # --- Gameplay category ---
+    confirm_destructive_actions: bool = pref_field(
+        PrefMeta(
+            category="gameplay",
+            label="pref-set-confirm-destructive-actions",
+            change_msg="pref-changed-confirm-destructive-actions",
+            description="pref-desc-confirm-destructive-actions",
             kind="bool",
             default=True,
         )

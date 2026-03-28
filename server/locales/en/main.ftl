@@ -107,6 +107,7 @@ fluent-languages-option = Fluent languages ({ $count })
 pref-category-display = Display
 pref-category-sounds = Sounds
 pref-category-dice = Dice Behaviour
+pref-category-gameplay = Gameplay
 
 # Preference labels (shown in menus)
 pref-set-play-turn-sound = Turn sound: { $status }
@@ -127,6 +128,10 @@ pref-select-dice-keeping-style = Select dice keeping style:
 pref-changed-dice-keeping-style = Dice keeping style set to { $choice }.
 pref-dice-keeping-style-playpalace = Dice indexes
 pref-dice-keeping-style-quentin_c = Dice values
+
+pref-set-confirm-destructive-actions = Confirm destructive actions: { $status }
+pref-desc-confirm-destructive-actions = Request confirmation when performing destructive actions like passing your turn
+pref-changed-confirm-destructive-actions = Confirm destructive actions { $status }.
 
 # Preference system
 pref-back = Back

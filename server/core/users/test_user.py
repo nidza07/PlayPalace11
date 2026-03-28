@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .base import User, MenuItem, EscapeBehavior, generate_uuid
+from .preferences import UserPreferences
 
 
 @dataclass
@@ -33,6 +34,7 @@ class MockUser(User):
         self._connected_at: float = time.time()
         self._client_type: str = ""
         self._platform: str = ""
+        self._preferences: UserPreferences = UserPreferences()
         self.messages: list[Message] = []
         self.menus: dict[str, dict[str, Any]] = {}
         self.editboxes: dict[str, dict[str, Any]] = {}
@@ -56,6 +58,11 @@ class MockUser(User):
     def approved(self) -> bool:
         """Return whether the mock user is approved."""
         return self._approved
+
+    @property
+    def preferences(self) -> UserPreferences:
+        """Return the mock user's preferences."""
+        return self._preferences
 
     @property
     def client_type(self) -> str:

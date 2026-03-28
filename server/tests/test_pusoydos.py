@@ -379,6 +379,113 @@ class TestPlayValidation:
         assert "cannot pass" in user.get_last_spoken().lower()
 
 
+class TestConfirmToPass:
+    def _setup_mid_game(self):
+        game, players = _make_game(4, instant_wins=False)
+        game.on_start()
+        game.is_first_turn = False
+        return game, players
+
+    def test_first_pass_asks_for_confirmation(self):
+        game, players = self._setup_mid_game()
+        current = game.current_player
+        game.current_combo = Combo("single", [Card(99, 5, 1)], 5, 4)
+        game.trick_cards = game.current_combo.cards
+
+        old_turn = current.id
+        game.execute_action(current, "pass")
+
+        # Should NOT have advanced turn
+        assert game.current_player.id == old_turn
+        assert not current.passed_this_trick
+
+        user = game.get_user(current)
+        assert "again to confirm" in user.get_last_spoken().lower()
+        assert current.pass_confirm_ticks == 200
+
+    def test_second_pass_confirms(self):
+        game, players = self._setup_mid_game()
+        current = game.current_player
+        game.current_combo = Combo("single", [Card(99, 5, 1)], 5, 4)
+        game.trick_cards = game.current_combo.cards
+
+        # First press — sets confirmation
+        game.execute_action(current, "pass")
+        assert current.pass_confirm_ticks == 200
+
+        # Second press — confirms and passes
+        game.execute_action(current, "pass")
+        assert current.passed_this_trick
+        assert current.pass_confirm_ticks == 0
+
+    def test_confirm_expires_after_200_ticks(self):
+        game, players = self._setup_mid_game()
+        current = game.current_player
+        game.current_combo = Combo("single", [Card(99, 5, 1)], 5, 4)
+        game.trick_cards = game.current_combo.cards
+
+        game.execute_action(current, "pass")
+        assert current.pass_confirm_ticks == 200
+
+        # Tick down 200 times
+        for _ in range(200):
+            game.on_tick()
+
+        assert current.pass_confirm_ticks == 0
+
+        # Now pressing pass again should ask for confirmation anew
+        user = game.get_user(current)
+        user.clear_messages()
+        game.execute_action(current, "pass")
+        assert "again to confirm" in user.get_last_spoken().lower()
+
+    def test_confirm_disabled_by_preference(self):
+        game, players = self._setup_mid_game()
+        current = game.current_player
+        game.current_combo = Combo("single", [Card(99, 5, 1)], 5, 4)
+        game.trick_cards = game.current_combo.cards
+
+        user = game.get_user(current)
+        user._preferences.confirm_destructive_actions = False
+
+        # Single press should pass immediately
+        game.execute_action(current, "pass")
+        assert current.passed_this_trick
+
+    def test_bot_skips_confirmation(self):
+        game, players = _make_game(4, instant_wins=False)
+        game.on_start()
+        game.is_first_turn = False
+
+        # Find a bot player and make it current
+        current = game.current_player
+        game.current_combo = Combo("single", [Card(99, 2, 1)], 15, 4)  # 2 of Diamonds
+        current.hand = [Card(0, 3, 2)]  # Only a 3 of Clubs — cannot beat
+
+        # Bot think returns pass
+        ids = bot_think(game, current)
+        assert ids == []
+
+        # Execute pass directly — should work without confirmation
+        current.is_bot = True
+        game.execute_action(current, "pass")
+        assert current.passed_this_trick
+
+    def test_new_turn_resets_confirm(self):
+        game, players = self._setup_mid_game()
+        current = game.current_player
+        game.current_combo = Combo("single", [Card(99, 5, 1)], 5, 4)
+        game.trick_cards = game.current_combo.cards
+
+        game.execute_action(current, "pass")
+        assert current.pass_confirm_ticks == 200
+
+        # Simulate a new turn starting (e.g., another player plays)
+        current.pass_confirm_ticks = 200
+        game._start_turn()
+        assert current.pass_confirm_ticks == 0
+
+
 class TestEliminationMode:
     def test_player_eliminated_after_winning_rounds(self):
         game, players = _make_game(4, game_mode="elimination", rounds_to_win=1)

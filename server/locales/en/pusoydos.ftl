@@ -181,6 +181,7 @@ pusoydos-error-wrong-length = You must play exactly { $count } { $count ->
 } to beat the current trick.
 pusoydos-error-lower-combo = Your combination is lower than the current trick.
 pusoydos-error-must-play = You cannot pass when starting a new trick.
+pusoydos-confirm-pass = Use the pass action again to confirm.
 
 # =============================================================================
 # Broadcasts
