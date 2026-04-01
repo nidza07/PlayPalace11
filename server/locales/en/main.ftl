@@ -453,6 +453,9 @@ documents-content-label = { $language } Contents
 # Document & category creation
 documents-new-document = New document
 documents-new-category = New category
+documents-scope-prompt = Choose the scope for this document.
+documents-scope-shared = Shared (all servers)
+documents-scope-independent = Independent (this server only)
 documents-select-categories = Select categories for the new document.
 documents-new-document-slug-prompt = Enter the sluggified title in English. This is the internal identifier for the document, for example my_game_rules:
 documents-document-created = Document created.
@@ -476,15 +479,36 @@ documents-sort-changed = Sort method updated.
 documents-delete-category-confirm = Delete this category? Documents will not be deleted, but will lose this category association.
 documents-category-deleted = Category deleted.
 
-# Document infrastructure (sync, export, promote)
+# Document infrastructure (sync, export, promote, contribution)
 documents-sync = Sync shared documents
 documents-sync-success = Shared documents synced successfully.
 documents-sync-failed = Sync failed: { $reason }
-documents-sync-pending-warning = Warning: { $count } pending changes exist. Export them before syncing to avoid losing local edits.
+documents-sync-pending-warning = Warning: { $count } uncommitted changes to shared documents exist. Export them before syncing to avoid losing local edits.
+documents-sync-local-changes = { $count } documents have local changes. Select which to discard before syncing.
+documents-sync-discard-label = { $title } (discard); ({ $description })
+documents-sync-keep-label = { $title } (keep); ({ $description })
+documents-sync-confirm = Sync now
+documents-sync-discard-all = Discard all
+documents-sync-keep-all = Keep all
+documents-sync-tag-absent = item is absent from local: keep = don't add from upstream, discard = add from upstream
+documents-sync-tag-present = item is only present on local: keep = don't delete from local, discard = delete from local
+documents-sync-tag-content = content changes
+documents-sync-tag-metadata = metadata changes
+documents-sync-tag-content-and-metadata = content and metadata changes
+documents-commit-message-prompt = Describe your changes (optional):
+documents-commit-success = Changes committed.
+documents-commit-failed = Commit failed: { $reason }
 documents-export-pending = Export pending changes ({ $count })
 documents-export-success = Exported { $count } changes to { $path }.
 documents-export-no-changes = No pending changes to export.
+documents-pending-commits-button = Pending commits ({ $count })
+documents-pending-commits-info = { $count } commits ahead of upstream. The server owner can push these changes to the repository.
+documents-pr-button = Create pull request ({ $count } commits)
+documents-pr-success = Pull request created: { $url }
+documents-pr-failed = Pull request failed: { $reason }
+documents-pr-no-commits = No commits to include in a pull request.
 documents-promote-to-shared = Promote to shared
+documents-promote-confirm = Are you sure you want to promote this document to shared scope? This makes it visible to all servers syncing from this repository.
 documents-promoted-to-shared = Document promoted to shared scope.
 documents-promote-failed = Failed to promote document. It may already be shared or a conflict exists.
 documents-based-on-stale = Upstream source changed: { $source }

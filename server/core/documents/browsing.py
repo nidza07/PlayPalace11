@@ -9,7 +9,14 @@ from ..users.network_user import NetworkUser
 from ..users.base import MenuItem, EscapeBehavior, TrustLevel
 from ...messages.localization import Localization
 from server.core.ui.common_flows import show_yes_no_menu
-from .manager import DocumentManager, SCOPE_SHARED, SCOPE_INDEPENDENT
+from .manager import (
+    DocumentManager,
+    SCOPE_SHARED,
+    SCOPE_INDEPENDENT,
+    MODE_MANUAL,
+    MODE_AUTO_COMMIT,
+    MODE_AUTO_PR,
+)
 
 if TYPE_CHECKING:
     from ...persistence.database import Database
@@ -82,12 +89,20 @@ class DocumentBrowsingMixin:
                 self._handle_delete_document_confirm,
                 (user, selection_id, state),
             ),
+            "promote_to_shared_confirm": (
+                self._handle_promote_confirm,
+                (user, selection_id, state),
+            ),
             "document_edit_lang_menu": (
                 self._handle_edit_lang_selection,
                 (user, selection_id, state),
             ),
             "add_translation_lang_menu": (
                 self._handle_add_translation_lang_selection,
+                (user, selection_id, state),
+            ),
+            "new_document_scope_menu": (
+                self._handle_new_document_scope_selection,
                 (user, selection_id, state),
             ),
             "new_document_categories_menu": (
@@ -104,6 +119,10 @@ class DocumentBrowsingMixin:
             ),
             "delete_category_confirm": (
                 self._handle_delete_category_confirm,
+                (user, selection_id, state),
+            ),
+            "sync_discard_menu": (
+                self._handle_sync_discard_selection,
                 (user, selection_id, state),
             ),
         }
@@ -150,6 +169,11 @@ class DocumentBrowsingMixin:
         if current_menu == "rename_category_editbox":
             text = packet.get("text", "")
             self._handle_rename_category(user, text, state)
+            return True
+
+        if current_menu == "commit_message_editbox":
+            text = packet.get("text", "")
+            self._handle_commit_message(user, text, state)
             return True
 
         return False
@@ -234,7 +258,7 @@ class DocumentBrowsingMixin:
                     id="new_category",
                 )
             )
-            # Sync and export admin actions
+            # Sync and export/pending admin actions
             items.append(
                 MenuItem(
                     text=Localization.get(user.locale, "documents-sync"),
@@ -242,12 +266,29 @@ class DocumentBrowsingMixin:
                 )
             )
             pending_count = self._documents.get_pending_change_count()
-            export_label = Localization.get(
-                user.locale,
-                "documents-export-pending",
-                count=str(pending_count),
-            )
-            items.append(MenuItem(text=export_label, id="export_pending"))
+            mode = self._documents.contribution_mode
+            if mode == MODE_MANUAL:
+                pending_label = Localization.get(
+                    user.locale,
+                    "documents-export-pending",
+                    count=str(pending_count),
+                )
+                items.append(MenuItem(text=pending_label, id="export_pending"))
+            elif mode == MODE_AUTO_PR:
+                pending_label = Localization.get(
+                    user.locale,
+                    "documents-pr-button",
+                    count=str(pending_count),
+                )
+                items.append(MenuItem(text=pending_label, id="create_pr"))
+            else:
+                # auto_commit — informational button
+                pending_label = Localization.get(
+                    user.locale,
+                    "documents-pending-commits-button",
+                    count=str(pending_count),
+                )
+                items.append(MenuItem(text=pending_label, id="pending_info"))
         items.append(
             MenuItem(
                 text=Localization.get(user.locale, "transcribers-by-language"),
@@ -280,13 +321,17 @@ class DocumentBrowsingMixin:
         elif selection_id == "uncategorized":
             self._show_documents_list(user, "")
         elif selection_id == "new_document":
-            self._show_new_document_categories(user)
+            self._show_new_document_scope(user)
         elif selection_id == "new_category":
             self._show_new_category_slug_editbox(user)
         elif selection_id == "sync_documents":
             await self._handle_sync_documents(user)
         elif selection_id == "export_pending":
             await self._handle_export_pending(user)
+        elif selection_id == "create_pr":
+            await self._handle_create_pr(user)
+        elif selection_id == "pending_info":
+            self._handle_pending_info(user)
         elif selection_id == "transcribers_by_language":
             self._show_transcribers_by_language(user)
         elif selection_id == "transcribers_by_user":
@@ -299,11 +344,145 @@ class DocumentBrowsingMixin:
     # Sync and export
     # ------------------------------------------------------------------
 
+    _CHANGE_TAG_KEYS = {
+        "absent": "documents-sync-tag-absent",
+        "present": "documents-sync-tag-present",
+        "content": "documents-sync-tag-content",
+        "metadata": "documents-sync-tag-metadata",
+        "content_and_metadata": "documents-sync-tag-content-and-metadata",
+    }
+
     async def _handle_sync_documents(self, user: NetworkUser) -> None:
-        """Sync shared documents from the git repository."""
-        pending = self._documents.get_pending_change_count()
-        if pending > 0:
-            user.speak_l("documents-sync-pending-warning", count=str(pending))
+        """Sync shared documents from the git repository.
+
+        If there are uncommitted local changes to shared documents, the
+        admin is shown a per-document toggle list to choose which to
+        discard before syncing.
+        """
+        changed_docs = self._documents.get_uncommitted_shared_documents()
+        if changed_docs:
+            self._show_sync_discard_menu(user, changed_docs)
+        else:
+            self._do_sync(user)
+
+    def _show_sync_discard_menu(
+        self,
+        user: NetworkUser,
+        changed_docs: list[dict],
+        focus_id: str | None = None,
+    ) -> None:
+        """Show per-document discard/keep toggles before syncing."""
+        state = self._user_states.get(user.username, {})
+        discard_set = set(state.get("sync_discard", []))
+
+        user.speak_l(
+            "documents-sync-local-changes",
+            count=str(len(changed_docs)),
+        )
+
+        items: list[MenuItem] = []
+        focus_position = 1
+        for entry in changed_docs:
+            folder = entry["folder_name"]
+            tag = entry["change_tag"]
+            title = self._get_document_title(folder, user.locale)
+            description = Localization.get(
+                user.locale,
+                self._CHANGE_TAG_KEYS.get(tag, "documents-sync-tag-content"),
+            )
+            if folder in discard_set:
+                label = Localization.get(
+                    user.locale, "documents-sync-discard-label",
+                    title=title, description=description,
+                )
+            else:
+                label = Localization.get(
+                    user.locale, "documents-sync-keep-label",
+                    title=title, description=description,
+                )
+            item_id = f"toggle_{folder}"
+            items.append(MenuItem(text=label, id=item_id))
+            if item_id == focus_id:
+                focus_position = len(items)
+
+        items.append(MenuItem(
+            text=Localization.get(user.locale, "documents-sync-discard-all"),
+            id="discard_all",
+        ))
+        items.append(MenuItem(
+            text=Localization.get(user.locale, "documents-sync-keep-all"),
+            id="keep_all",
+        ))
+        items.append(MenuItem(
+            text=Localization.get(user.locale, "documents-sync-confirm"),
+            id="sync_confirm",
+        ))
+        items.append(MenuItem(
+            text=Localization.get(user.locale, "back"),
+            id="back",
+        ))
+        user.show_menu(
+            "sync_discard_menu",
+            items,
+            multiletter=True,
+            escape_behavior=EscapeBehavior.SELECT_LAST,
+            position=focus_position,
+        )
+        self._user_states[user.username] = {
+            "menu": "sync_discard_menu",
+            "sync_changed_docs": changed_docs,
+            "sync_discard": list(discard_set),
+        }
+
+    async def _handle_sync_discard_selection(
+        self, user: NetworkUser, selection_id: str, state: dict
+    ) -> None:
+        """Handle discard/keep toggle and sync confirmation."""
+        changed_docs: list[dict] = state.get("sync_changed_docs", [])
+        all_folders = [d["folder_name"] for d in changed_docs]
+        discard_set = set(state.get("sync_discard", []))
+
+        if selection_id == "back":
+            self._show_documents_menu(user)
+            return
+
+        if selection_id == "discard_all":
+            discard_set = set(all_folders)
+            state["sync_discard"] = list(discard_set)
+            self._user_states[user.username] = state
+            self._show_sync_discard_menu(user, changed_docs)
+            return
+
+        if selection_id == "keep_all":
+            discard_set = set()
+            state["sync_discard"] = []
+            self._user_states[user.username] = state
+            self._show_sync_discard_menu(user, changed_docs)
+            return
+
+        if selection_id == "sync_confirm":
+            # Discard selected documents, then sync
+            for folder in discard_set:
+                self._documents.discard_document_changes(folder)
+            self._do_sync(user)
+            return
+
+        if selection_id.startswith("toggle_"):
+            folder = selection_id[7:]
+            if folder in discard_set:
+                discard_set.remove(folder)
+                user.play_sound("checkbox_list_off.wav")
+            else:
+                discard_set.add(folder)
+                user.play_sound("checkbox_list_on.wav")
+            state["sync_discard"] = list(discard_set)
+            self._user_states[user.username] = state
+            self._show_sync_discard_menu(
+                user, changed_docs, focus_id=selection_id,
+            )
+
+    def _do_sync(self, user: NetworkUser) -> None:
+        """Run the actual sync and report the result."""
         success, message = self._documents.sync_shared_documents()
         if success:
             user.speak_l("documents-sync-success")
@@ -334,6 +513,30 @@ class DocumentBrowsingMixin:
             self._documents.clear_pending_changes()
         else:
             user.speak_l("documents-export-no-changes")
+        self._show_documents_menu(user)
+
+    async def _handle_create_pr(self, user: NetworkUser) -> None:
+        """Create a pull request from pending commits (auto_pr mode)."""
+        pending_count = self._documents.get_pending_change_count()
+        if pending_count == 0:
+            user.speak_l("documents-pr-no-commits")
+            self._show_documents_menu(user)
+            return
+
+        success, result = self._documents.create_pull_request()
+        if success:
+            user.speak_l("documents-pr-success", url=result)
+        else:
+            user.speak_l("documents-pr-failed", reason=result)
+        self._show_documents_menu(user)
+
+    def _handle_pending_info(self, user: NetworkUser) -> None:
+        """Show informational message about pending commits (auto_commit mode)."""
+        pending_count = self._documents.get_pending_change_count()
+        user.speak_l(
+            "documents-pending-commits-info",
+            count=str(pending_count),
+        )
         self._show_documents_menu(user)
 
     def _show_documents_list(self, user: NetworkUser, category_slug: str | None) -> None:
@@ -599,20 +802,47 @@ class DocumentBrowsingMixin:
         elif selection_id == "delete_document":
             self._show_delete_document_confirm(user, folder_name, state)
         elif selection_id == "promote_to_shared":
-            await self._handle_promote_to_shared(user, folder_name, state)
+            self._show_promote_confirm(user, folder_name, state)
         elif selection_id == "based_on_stale_notice":
             # Informational item — just refresh the settings menu
             self._show_document_settings(user, folder_name, state)
 
-    async def _handle_promote_to_shared(
+    def _show_promote_confirm(
         self, user: NetworkUser, folder_name: str, state: dict
     ) -> None:
-        """Promote an independent document to shared scope."""
-        result = self._documents.promote_to_shared(folder_name)
-        if result:
-            user.speak_l("documents-promoted-to-shared")
-        else:
-            user.speak_l("documents-promote-failed")
+        """Show yes/no confirmation for promoting a document to shared."""
+        question = Localization.get(user.locale, "documents-promote-confirm")
+        show_yes_no_menu(user, "promote_to_shared_confirm", question)
+        self._user_states[user.username] = {
+            "menu": "promote_to_shared_confirm",
+            "folder_name": folder_name,
+            "category_slug": state.get("category_slug"),
+        }
+
+    async def _handle_promote_confirm(
+        self, user: NetworkUser, selection_id: str, state: dict
+    ) -> None:
+        """Handle promote-to-shared confirmation."""
+        folder_name = state.get("folder_name", "")
+        if selection_id == "yes":
+            result = self._documents.promote_to_shared(folder_name)
+            if result:
+                user.speak_l("documents-promoted-to-shared")
+                meta = self._documents.get_document_metadata(folder_name)
+                locale_code = meta.get("source_locale", "en") if meta else "en"
+                mode = self._documents.contribution_mode
+                if mode == MODE_MANUAL:
+                    self._documents._log_attribution(
+                        folder_name, locale_code, user.username,
+                        "promote", "",
+                    )
+                else:
+                    self._documents.commit_changes(
+                        folder_name, locale_code, user.username,
+                        f"Add {folder_name} (promoted from independent)",
+                    )
+            else:
+                user.speak_l("documents-promote-failed")
         self._show_document_settings(user, folder_name, state)
 
     # ------------------------------------------------------------------
@@ -1371,6 +1601,7 @@ class DocumentBrowsingMixin:
             "locale_code": locale_code,
             "category_slug": state.get("category_slug"),
             "selected_categories": state.get("selected_categories", []),
+            "new_document_scope": state.get("new_document_scope", SCOPE_INDEPENDENT),
             "flow": flow,
             "pending_title": pending_title,
             "dialog_id": dialog_id,
@@ -1399,14 +1630,21 @@ class DocumentBrowsingMixin:
                 content = packet.get("content", "")
                 pending_title = state.get("pending_title", "")
                 selected_categories = state.get("selected_categories", [])
+                scope = state.get("new_document_scope", SCOPE_INDEPENDENT)
                 self._documents.create_document(
                     folder_name,
                     selected_categories,
                     locale_code,
                     pending_title,
                     content,
+                    scope=scope,
                 )
                 user.speak_l("documents-document-created")
+                if scope == SCOPE_SHARED:
+                    self._show_commit_message_editbox(
+                        user, folder_name, locale_code, flow,
+                    )
+                    return
             self._show_documents_menu(user)
             return
 
@@ -1417,6 +1655,9 @@ class DocumentBrowsingMixin:
 
         if action == "save" and meta is not None:
             content = packet.get("content", "")
+            is_shared = (
+                self._documents.get_document_scope(folder_name) == SCOPE_SHARED
+            )
             if flow == "add_translation":
                 pending_title = state.get("pending_title", "")
                 self._documents.add_document_translation(
@@ -1449,6 +1690,13 @@ class DocumentBrowsingMixin:
                     f"language-{locale_code}",
                 )
                 user.speak_l("documents-content-saved", language=lang_name)
+
+            # Chain to commit message editbox for shared documents
+            if is_shared:
+                self._show_commit_message_editbox(
+                    user, folder_name, locale_code, flow,
+                )
+                return
         else:
             # Cancel — release lock (safe even if already cleared)
             self._documents.release_edit_lock(
@@ -1467,8 +1715,116 @@ class DocumentBrowsingMixin:
             self._show_document_actions(user, folder_name, state)
 
     # ------------------------------------------------------------------
+    # Commit message (shared document saves)
+    # ------------------------------------------------------------------
+
+    def _show_commit_message_editbox(
+        self,
+        user: NetworkUser,
+        folder_name: str,
+        locale_code: str,
+        flow: str,
+    ) -> None:
+        """Show an editbox prompting for a commit/change description.
+
+        Displayed after every save to a shared document, regardless of
+        contribution mode.  The text entered is used differently per mode:
+        manual stores it in the attribution log; auto modes pass it as
+        the git commit message.
+        """
+        prompt = Localization.get(
+            user.locale, "documents-commit-message-prompt",
+        )
+        user.show_editbox("commit_message_editbox", prompt, multiline = True)
+        self._user_states[user.username] = {
+            "menu": "commit_message_editbox",
+            "folder_name": folder_name,
+            "locale_code": locale_code,
+            "flow": flow,
+        }
+
+    def _handle_commit_message(
+        self, user: NetworkUser, text: str, state: dict
+    ) -> None:
+        """Process the commit message after a shared document save."""
+        folder_name = state.get("folder_name", "")
+        locale_code = state.get("locale_code", "")
+        flow = state.get("flow", "edit")
+        message = text.strip()
+
+        mode = self._documents.contribution_mode
+
+        if mode == MODE_MANUAL:
+            # Determine change type from the flow
+            if flow == "new_document":
+                change_type = "create"
+            elif flow == "add_translation":
+                change_type = "translation_add"
+            else:
+                change_type = "edit"
+            self._documents._log_attribution(
+                folder_name, locale_code, user.username, change_type, message,
+            )
+        else:
+            # auto_commit / auto_pr — commit the staged changes
+            success, error = self._documents.commit_changes(
+                folder_name, locale_code, user.username, message,
+            )
+            if success:
+                user.speak_l("documents-commit-success")
+            else:
+                user.speak_l("documents-commit-failed", reason=error)
+
+        # Return to the appropriate menu
+        if flow == "new_document":
+            self._show_documents_menu(user)
+        elif flow == "add_translation":
+            self._show_document_settings(user, folder_name, state)
+        else:
+            self._show_document_actions(user, folder_name, state)
+
+    # ------------------------------------------------------------------
     # New document creation
     # ------------------------------------------------------------------
+
+    def _show_new_document_scope(self, user: NetworkUser) -> None:
+        """Show scope selection menu for a new document."""
+        items = [
+            MenuItem(
+                text=Localization.get(user.locale, "documents-scope-shared"),
+                id="shared",
+            ),
+            MenuItem(
+                text=Localization.get(user.locale, "documents-scope-independent"),
+                id="independent",
+            ),
+            MenuItem(
+                text=Localization.get(user.locale, "back"),
+                id="back",
+            ),
+        ]
+        user.speak_l("documents-scope-prompt")
+        user.show_menu(
+            "new_document_scope_menu",
+            items,
+            multiletter=True,
+            escape_behavior=EscapeBehavior.SELECT_LAST,
+        )
+        self._user_states[user.username] = {"menu": "new_document_scope_menu"}
+
+    async def _handle_new_document_scope_selection(
+        self, user: NetworkUser, selection_id: str, state: dict
+    ) -> None:
+        """Handle scope selection for new document creation."""
+        if selection_id == "back":
+            self._show_documents_menu(user)
+            return
+        scope = SCOPE_SHARED if selection_id == "shared" else SCOPE_INDEPENDENT
+        self._user_states[user.username] = {
+            "menu": "new_document_scope_menu",
+            "new_document_scope": scope,
+        }
+        self._show_new_document_categories(user)
 
     def _show_new_document_categories(
         self,
@@ -1480,13 +1836,17 @@ class DocumentBrowsingMixin:
         If there are no categories, skips straight to the title editbox.
         """
         state = self._user_states.get(user.username, {})
+        scope = state.get("new_document_scope", SCOPE_INDEPENDENT)
         selected = set(state.get("selected_categories", []))
 
         all_cats = self._documents.get_categories(user.locale)
 
         # No categories — skip straight to slug.
         if not all_cats:
-            new_state = {"selected_categories": []}
+            new_state = {
+                "selected_categories": [],
+                "new_document_scope": scope,
+            }
             self._show_new_document_slug_editbox(user, new_state)
             return
 
@@ -1524,6 +1884,7 @@ class DocumentBrowsingMixin:
         self._user_states[user.username] = {
             "menu": "new_document_categories_menu",
             "selected_categories": list(selected),
+            "new_document_scope": scope,
         }
 
     async def _handle_new_document_categories_selection(
@@ -1557,6 +1918,7 @@ class DocumentBrowsingMixin:
         self._user_states[user.username] = {
             "menu": "new_document_slug_editbox",
             "selected_categories": state.get("selected_categories", []),
+            "new_document_scope": state.get("new_document_scope", SCOPE_INDEPENDENT),
         }
 
     def _handle_new_document_slug(self, user: NetworkUser, value: str, state: dict) -> None:
@@ -1589,6 +1951,7 @@ class DocumentBrowsingMixin:
             "folder_name": slug,
             "locale_code": user.locale,
             "selected_categories": state.get("selected_categories", []),
+            "new_document_scope": state.get("new_document_scope", SCOPE_INDEPENDENT),
             "flow": "new_document",
         }
 

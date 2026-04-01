@@ -30,6 +30,7 @@ from .config_paths import (
     get_default_config_path,
     get_example_config_path,
     ensure_default_config_dir,
+    load_full_config,
 )
 from .state import ModeSnapshot, ServerLifecycleState, ServerMode
 from .tick import TickScheduler, load_server_config
@@ -166,7 +167,8 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
         self._users: dict[str, NetworkUser] = {}  # username -> NetworkUser
         self._user_states: dict[str, dict] = {}  # username -> UI state
 
-        # Document manager
+        # Document manager (contribution_mode set by _load_config_settings)
+        self._contribution_mode = "auto_commit"
         self._documents = DocumentManager(_DOCUMENTS_DIR)
 
         # Virtual bot manager
@@ -430,6 +432,15 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
             self._refresh_ip_window = _read_limit(
                 rate_cfg, "refresh_window_seconds", self._refresh_ip_window, minimum=1
             )
+
+        docs_cfg = config.get("documents")
+        if isinstance(docs_cfg, dict):
+            mode = docs_cfg.get("contribution_mode")
+            if isinstance(mode, str) and mode.strip().lower() in (
+                "manual", "auto_commit", "auto_pr",
+            ):
+                self._contribution_mode = mode.strip().lower()
+        self._documents.contribution_mode = self._contribution_mode
 
     def _validate_transport_security(self) -> None:
         """Validate TLS/insecure configuration and exit on invalid combos."""
@@ -4282,7 +4293,7 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
 
 async def run_server(
     host: str | None = None,
-    port: int = 8000,
+    port: int | None = None,
     ssl_cert: str | Path | None = None,
     ssl_key: str | Path | None = None,
     preload_locales: bool = False,
@@ -4290,10 +4301,10 @@ async def run_server(
     """Run the server.
 
     Args:
-        host: Host address to bind to
-        port: Port number to listen on
-        ssl_cert: Path to SSL certificate file (for WSS support)
-        ssl_key: Path to SSL private key file (for WSS support)
+        host: Host address to bind to (falls back to [server].bind_ip in config)
+        port: Port number to listen on (falls back to [server].port in config, then 8000)
+        ssl_cert: Path to SSL certificate file (falls back to [network].ssl_cert in config)
+        ssl_key: Path to SSL private key file (falls back to [network].ssl_key in config)
         preload_locales: Whether to block on localization compilation.
     """
     _configure_logging()
@@ -4311,6 +4322,8 @@ async def run_server(
         _ensure_server_owner(db_path, config_path, db_created)
 
     host = _resolve_bind_host(host, config_path)
+    port = _resolve_port(port, config_path)
+    ssl_cert, ssl_key = _resolve_ssl(ssl_cert, ssl_key, config_path)
 
     print(f"Starting PlayPalace v{VERSION} server...")
     server = Server(
@@ -4519,3 +4532,47 @@ def _resolve_bind_host(host: str | None, config_path: Path) -> str:
     if isinstance(bind_ip, str) and bind_ip.strip():
         return bind_ip.strip()
     return "127.0.0.1"
+
+
+def _resolve_port(port: int | None, config_path: Path) -> int:
+    """Resolve port from config when none provided on the command line."""
+    if port is not None:
+        return port
+    server_config = load_server_config(config_path)
+    cfg_port = server_config.get("port")
+    if isinstance(cfg_port, int) and 1 <= cfg_port <= 65535:
+        return cfg_port
+    if cfg_port is not None:
+        LOG.warning(
+            "Invalid port %r in config.toml [server].port (must be 1–65535). "
+            "Falling back to 8000.",
+            cfg_port,
+        )
+    return 8000
+
+
+def _resolve_ssl(
+    ssl_cert: str | Path | None,
+    ssl_key: str | Path | None,
+    config_path: Path,
+) -> tuple[str | Path | None, str | Path | None]:
+    """Resolve SSL cert/key from config when not provided on the command line.
+
+    CLI arguments take precedence. If neither cert nor key was given via CLI,
+    both are read from [network] in config.toml. A partial CLI override (one
+    but not the other) is caught upstream in main.py before this is called.
+    """
+    if ssl_cert is not None or ssl_key is not None:
+        return ssl_cert, ssl_key
+    cfg = load_full_config(config_path)
+    net_cfg = cfg.get("network", {})
+    cfg_cert = net_cfg.get("ssl_cert")
+    cfg_key = net_cfg.get("ssl_key")
+    if cfg_cert and cfg_key:
+        return cfg_cert, cfg_key
+    if bool(cfg_cert) != bool(cfg_key):
+        LOG.warning(
+            "SSL misconfiguration in config.toml: both [network].ssl_cert and "
+            "[network].ssl_key must be set together. SSL will not be enabled."
+        )
+    return None, None
