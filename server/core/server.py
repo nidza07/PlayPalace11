@@ -1464,6 +1464,18 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
         # All self-registered users require approval.
         needs_approval = not self._auto_approve_new_accounts
         # Try to register the user
+        if self._block_new_accounts:
+            error_message = Localization.get(locale, "accounts-blocked")
+            await client.send({"type": "play_sound", "name": "accounterror.ogg"})
+            await client.send({"type": "speak", "text": error_message, "buffer": "activity"})
+            await client.send({
+                "type": "disconnect",
+                "reconnect": False,
+                "show_message": True,
+                "return_to_login": True,
+                "message": error_message,
+                })
+                return
         if self._auth.register(username, password, approval=self._auto_approve_new_accounts, block_new_accounts=self._block_new_accounts, locale=locale):
             await client.send({
                 "type": "speak",
