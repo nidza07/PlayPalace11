@@ -2178,6 +2178,7 @@ class MainWindow(wx.Frame):
         default_value = packet.get("default_value", "")
         multiline = packet.get("multiline", False)
         read_only = packet.get("read_only", False)
+        content_format = packet.get("content_format", "text")
 
         def on_submit(text):
             # Send editbox event back to server
@@ -2186,9 +2187,9 @@ class MainWindow(wx.Frame):
                 event_packet["input_id"] = input_id
             self.network.send_packet(event_packet)
 
-        # Read-only multiline content is likely markdown (e.g. documents).
-        # Render it in the markdown viewer instead of a plain text control.
-        if read_only and multiline and default_value:
+        # When the server explicitly requests markdown rendering, show the
+        # content in the markdown viewer instead of a plain text control.
+        if content_format == "markdown" and default_value:
             from .markdown_viewer_dialog import MarkdownViewerDialog
 
             dlg = MarkdownViewerDialog(self, prompt, default_value)
