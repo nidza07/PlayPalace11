@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from server.games.base import Player, ActionContext, TransientDisplayState
 
 from server.game_utils.event_handling_mixin import EventHandlingMixin
+from server.game_utils.game_result import GameResult
+from server.game_utils.game_result_mixin import GameResultMixin
 from server.game_utils.menu_management_mixin import TRANSIENT_DISPLAY_MENU_ID
 
 
@@ -23,14 +25,19 @@ class DummyResolved:
 
 class DummyUser:
     def __init__(self):
+        self.locale = "en"
         self.removed = []
         self.spoken = []
+        self.shown_menus = []
 
     def remove_menu(self, menu_id: str) -> None:
         self.removed.append(menu_id)
 
     def speak_l(self, message_id: str, **_: object) -> None:
         self.spoken.append(message_id)
+
+    def show_menu(self, menu_id: str, items, **kwargs) -> None:
+        self.shown_menus.append((menu_id, items, kwargs))
 
 
 class DummyKeybind:
@@ -124,6 +131,65 @@ class DummyGame(EventHandlingMixin):
                 user.remove_menu(TRANSIENT_DISPLAY_MENU_ID)
             self._transient_display_state.pop(player.id, None)
             self.rebuild_player_menu(player)
+
+
+class DummyEndScreenGame(GameResultMixin, EventHandlingMixin):
+    def __init__(self):
+        self.game_active = False
+        self.status = "finished"
+        self.players: list[Player] = []
+        self.sound_scheduler_tick = 0
+        self._table = None
+        self._transient_display_state: dict[str, TransientDisplayState] = {}
+        self._actions_menu_open: set[str] = set()
+        self._pending_actions: dict[str, str] = {}
+        self._keybinds = {}
+        self._users: dict[str, DummyUser] = {}
+        self.executed: list[tuple[str, str, dict]] = []
+
+    def get_user(self, player: Player) -> DummyUser | None:
+        return self._users.get(player.id)
+
+    def get_type(self) -> str:
+        return "dummy"
+
+    def get_active_players(self) -> list[Player]:
+        return self.players
+
+    def destroy(self) -> None:
+        return None
+
+    def get_all_visible_actions(self, _player: Player):
+        return []
+
+    def _is_player_spectator(self, player: Player) -> bool:
+        return player.is_spectator
+
+    def _get_transient_display_state(self, player: Player) -> TransientDisplayState | None:
+        return self._transient_display_state.get(player.id)
+
+    def _is_transient_display_open(self, player: Player) -> bool:
+        return player.id in self._transient_display_state
+
+    def _close_transient_display(
+        self, player: Player, *, speak_key: str | None = None, rebuild_menu: bool = True
+    ) -> None:
+        user = self.get_user(player)
+        if user:
+            user.remove_menu(TRANSIENT_DISPLAY_MENU_ID)
+        self._transient_display_state.pop(player.id, None)
+
+    def execute_action(self, player: Player, action_id: str, input_value=None, context=None) -> None:
+        self.executed.append(
+            (
+                player.id,
+                action_id,
+                {
+                    "input": input_value,
+                    "context": context,
+                },
+            )
+        )
 
 
 def make_player(player_id: str = "p1") -> Player:
@@ -291,3 +357,26 @@ def test_status_box_close_does_not_speak_closed_message():
     assert user.removed == [TRANSIENT_DISPLAY_MENU_ID]
     assert user.spoken == []
     assert game.rebuild_player_calls == 1
+
+
+def test_end_screen_clears_transient_display_and_allows_leave_selection():
+    game = DummyEndScreenGame()
+    player = make_player()
+    user = DummyUser()
+    game.players = [player]
+    game._users[player.id] = user
+    game._transient_display_state[player.id] = TransientDisplayState(kind="game_options")
+
+    result = GameResult.create("dummy", 0, [(player.id, player.name, False)])
+    game._show_end_screen(result)
+
+    assert player.id not in game._transient_display_state
+    assert user.removed == [TRANSIENT_DISPLAY_MENU_ID]
+    assert user.shown_menus[-1][0] == "game_over"
+
+    game.handle_event(
+        player,
+        {"type": "menu", "menu_id": "game_over", "selection_id": "leave_game"},
+    )
+
+    assert game.executed == [(player.id, "leave_game", {"input": None, "context": None})]
