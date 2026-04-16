@@ -1026,7 +1026,7 @@ def test_game_options_back_restores_previous_focus_position(monkeypatch):
     game.players = [player]
 
     game._action_check_game_options(player, "check_game_options")
-    user._current_menus[TRANSIENT_DISPLAY_MENU_ID]["position"] = 2
+    game._transient_display_state[player.id].positions[()] = 2
     game._handle_game_options_display_selection(player, "group_bear_settings")
     game._handle_game_options_display_selection(player, "transient_display_back")
 

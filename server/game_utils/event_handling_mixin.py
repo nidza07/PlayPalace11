@@ -55,6 +55,9 @@ class EventHandlingMixin:
                 self._handle_actions_menu_selection(player, selection_id)
 
         elif menu_id == TRANSIENT_DISPLAY_MENU_ID:
+            remember_position = getattr(self, "_remember_transient_display_position", None)
+            if remember_position:
+                remember_position(player, event)
             handler = getattr(self, "_handle_transient_display_selection", None)
             if handler:
                 handler(player, selection_id)

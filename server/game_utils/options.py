@@ -1065,19 +1065,6 @@ class OptionsHandlerMixin:
         state = self._get_transient_display_state(player)
         if not state or state.kind != "game_options":
             return
-        current_path_key = tuple(state.path)
-        user = self.get_user(player)
-        if user:
-            current_menus = getattr(user, "_current_menus", None)
-            if isinstance(current_menus, dict):
-                current_menu = current_menus.get("transient_display")
-            else:
-                menus = getattr(user, "menus", None)
-                current_menu = menus.get("transient_display") if isinstance(menus, dict) else None
-            if isinstance(current_menu, dict):
-                current_position = current_menu.get("position")
-                if isinstance(current_position, int) and current_position > 0:
-                    state.positions[current_path_key] = current_position
 
         if selection_id == "transient_display_back":
             path = state.path

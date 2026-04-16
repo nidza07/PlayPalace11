@@ -97,6 +97,44 @@ class MenuManagementMixin:
             if handler:
                 handler(player, selection_id)
 
+    def _remember_transient_display_position(self, player: "Player", event: dict) -> None:
+        """Remember the user's current position within an open transient display."""
+        state = self._get_transient_display_state(player)
+        if not state:
+            return
+
+        current_path_key = tuple(state.path)
+        selection = event.get("selection")
+        if isinstance(selection, int) and selection > 0:
+            state.positions[current_path_key] = selection
+            return
+
+        selection_id = event.get("selection_id")
+        if not selection_id:
+            return
+
+        user = self.get_user(player)
+        if not user:
+            return
+
+        current_menus = getattr(user, "_current_menus", None)
+        if isinstance(current_menus, dict):
+            current_menu = current_menus.get(TRANSIENT_DISPLAY_MENU_ID)
+        else:
+            menus = getattr(user, "menus", None)
+            current_menu = menus.get(TRANSIENT_DISPLAY_MENU_ID) if isinstance(menus, dict) else None
+        if not isinstance(current_menu, dict):
+            return
+
+        items = current_menu.get("items", [])
+        for index, item in enumerate(items, start=1):
+            if isinstance(item, dict) and item.get("id") == selection_id:
+                state.positions[current_path_key] = index
+                return
+            if hasattr(item, "id") and getattr(item, "id", None) == selection_id:
+                state.positions[current_path_key] = index
+                return
+
     def rebuild_player_menu(self, player: "Player", *, position: int | None = None) -> None:
         """Rebuild the turn menu for a player.
 
