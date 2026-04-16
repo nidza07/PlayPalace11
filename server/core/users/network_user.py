@@ -317,6 +317,7 @@ class NetworkUser(User):
         *,
         multiline: bool = False,
         read_only: bool = False,
+        content_format: str = "text",
     ) -> None:
         """Show a text input prompt on the client."""
         self._current_editboxes[input_id] = {
@@ -324,17 +325,19 @@ class NetworkUser(User):
             "default_value": default_value,
             "multiline": multiline,
             "read_only": read_only,
+            "content_format": content_format,
         }
-        self._queue_packet(
-            {
-                "type": "request_input",
-                "input_id": input_id,
-                "prompt": prompt,
-                "default_value": default_value,
-                "multiline": multiline,
-                "read_only": read_only,
-            }
-        )
+        packet: dict[str, Any] = {
+            "type": "request_input",
+            "input_id": input_id,
+            "prompt": prompt,
+            "default_value": default_value,
+            "multiline": multiline,
+            "read_only": read_only,
+        }
+        if content_format != "text":
+            packet["content_format"] = content_format
+        self._queue_packet(packet)
 
     def show_document_editor(
         self,

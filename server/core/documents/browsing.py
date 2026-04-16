@@ -628,6 +628,7 @@ class DocumentBrowsingMixin:
             default_value=content,
             multiline=True,
             read_only=True,
+            content_format="markdown",
         )
         self._user_states[user.username] = {
             "menu": "document_view",
