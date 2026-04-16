@@ -69,7 +69,8 @@ def setup_game() -> tuple[TwentyOneGame, object, object]:
 def test_twentyone_creation() -> None:
     game = TwentyOneGame()
     assert game.get_name() == "21 (Survival Rules)"
-    assert game.get_name_key() == "21"
+    assert game.get_name_key() == "game-name-twentyone"
+    assert Localization.get("en", game.get_name_key()) == "21 (Survival Rules)"
     assert game.get_type() == "twentyone"
     assert game.get_min_players() == 2
     assert game.get_max_players() == 2

@@ -5,6 +5,7 @@ Tests for the Mile by Mile game.
 import json
 import random
 
+from server.messages.localization import Localization
 from server.games.milebymile.game import (
     MileByMileGame,
     MileByMilePlayer,
@@ -51,6 +52,17 @@ class TestMileByMileGameUnit:
         game = MileByMileGame(options=options)
         assert game.options.round_distance == 700
         assert game.options.winning_score == 3000
+
+    def test_always_discard_option_localizes_in_english(self):
+        """The always-discard option strings should resolve in English."""
+        assert (
+            Localization.get("en", "milebymile-toggle-always-discard", enabled="yes")
+            == "Always allow discarding: yes"
+        )
+        assert (
+            Localization.get("en", "milebymile-option-changed-always-discard", enabled="off")
+            == "Always allow discarding off."
+        )
 
 
 class TestRightOfWayBehavior:

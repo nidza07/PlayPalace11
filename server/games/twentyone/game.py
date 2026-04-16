@@ -278,7 +278,7 @@ class TwentyOneGame(ActionGuardMixin, Game):
 
     @classmethod
     def get_name_key(cls) -> str:
-        return "21"
+        return "game-name-twentyone"
 
     @classmethod
     def get_type(cls) -> str:
