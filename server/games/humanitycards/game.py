@@ -522,25 +522,13 @@ class HumanityCardsGame(Game):
             )
         )
 
-        # View scores (always visible at bottom)
-        action_set.add(
-            Action(
-                id="view_scores",
-                label=Localization.get(locale, "hc-view-scores"),
-                handler="_action_view_scores",
-                is_enabled="_is_view_scores_enabled",
-                is_hidden="_is_view_scores_hidden",
-                show_in_actions_menu=True,
-            )
-        )
-
         # Whose judge (keybind-only, J key)
         action_set.add(
             Action(
                 id="whose_judge",
                 label=Localization.get(locale, "hc-whose-judge"),
                 handler="_action_whose_judge",
-                is_enabled="_is_view_scores_enabled",
+                is_enabled="_is_playing_enabled",
                 is_hidden="_is_whose_judge_hidden",
             )
         )
@@ -584,15 +572,6 @@ class HumanityCardsGame(Game):
             "View submission",
             ["view_submission"],
             state=KeybindState.ACTIVE,
-        )
-
-        # S to view scores
-        self.define_keybind(
-            "s",
-            "View scores",
-            ["view_scores"],
-            state=KeybindState.ACTIVE,
-            include_spectators=True,
         )
 
         # J to announce judges
@@ -778,35 +757,13 @@ class HumanityCardsGame(Game):
         return options
 
     # ==========================================================================
-    # View scores callbacks
+    # Whose judge / whose turn overrides
     # ==========================================================================
 
-    def _is_view_scores_enabled(self, player: Player) -> str | None:
+    def _is_playing_enabled(self, player: Player) -> str | None:
         if self.status != "playing":
             return "action-not-playing"
         return None
-
-    def _is_view_scores_hidden(self, player: Player) -> Visibility:
-        if self.status != "playing":
-            return Visibility.HIDDEN
-        return Visibility.VISIBLE
-
-    def _action_view_scores(self, player: Player, action_id: str) -> None:
-        """View the current scores."""
-        user = self.get_user(player)
-        if not user:
-            return
-        sorted_players = sorted(
-            self.get_active_players(),
-            key=lambda p: p.score,  # type: ignore
-            reverse=True,
-        )
-        for p in sorted_players:
-            user.speak_l("hc-score-line", player=p.name, score=p.score)  # type: ignore
-
-    # ==========================================================================
-    # Whose judge / whose turn overrides
-    # ==========================================================================
 
     def _is_whose_judge_hidden(self, player: Player) -> Visibility:
         # Keybind-only — always hidden from menu

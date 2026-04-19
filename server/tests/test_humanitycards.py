@@ -483,30 +483,30 @@ def test_game_winner_broadcast():
 # ==========================================================================
 
 
-def test_view_scores_speaks_all_players():
+def test_check_scores_speaks_all_players_v2():
     game, users = _setup_game(num_players=3)
     player0 = _get_player(game, 0)
     player0.score = 3  # type: ignore[union-attr]
     user0 = next(u for u in users if u.username == player0.name)
     user0.clear_messages()
-    game.execute_action(player0, "view_scores")
+    game.execute_action(player0, "check_scores")
     spoken = user0.get_spoken_messages()
     assert any(player0.name in m for m in spoken)
 
 
-def test_view_scores_includes_score_values():
+def test_check_scores_includes_score_values():
     game, users = _setup_game(num_players=3)
     player0 = _get_player(game, 0)
     player0.score = 5  # type: ignore[union-attr]
     user0 = next(u for u in users if u.username == player0.name)
     user0.clear_messages()
-    game.execute_action(player0, "view_scores")
+    game.execute_action(player0, "check_scores")
     spoken = user0.get_spoken_messages()
     # Score "5" or "5 points" should appear
     assert any("5" in m for m in spoken)
 
 
-def test_view_scores_ordered_descending():
+def test_check_scores_ordered_descending():
     game, users = _setup_game(num_players=3)
     active = game.get_active_players()
     active[0].score = 5  # type: ignore[union-attr]
@@ -514,7 +514,7 @@ def test_view_scores_ordered_descending():
     active[2].score = 1  # type: ignore[union-attr]
     user0 = next(u for u in users if u.username == active[0].name)
     user0.clear_messages()
-    game.execute_action(active[0], "view_scores")
+    game.execute_action(active[0], "check_scores")
     spoken = user0.get_spoken_messages()
     # First spoken message should mention the highest scorer
     assert active[0].name in spoken[0]
