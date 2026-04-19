@@ -23,6 +23,7 @@ export function createMarkdownViewer({ dialogEl, onSubmit }) {
   // The content itself needs to be focusable or contain a focusable element
   // for a11y, let's make it tabindex="0"
   contentEl.tabIndex = 0;
+  contentEl.setAttribute("role", "document");
   container.appendChild(contentEl);
 
   // Close button
