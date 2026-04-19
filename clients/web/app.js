@@ -1341,7 +1341,10 @@ function handlePacket(packet) {
       break;
     }
     case "request_input": {
-      if (packet.content_format === "markdown" && packet.default_value) {
+      if (packet.content_format === "markdown") {
+        if (!packet.default_value) {
+          packet.default_value = "*No documentation available.*";
+        }
         markdownViewer.show(packet);
       } else {
         showInlineInput(packet);
