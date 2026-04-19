@@ -15,6 +15,7 @@ from ..base import Game, Player, GameOptions
 from ..registry import register_game
 from ...game_utils.actions import Action, ActionSet, Visibility
 from ...game_utils.bot_helper import BotHelper
+from .bot import bot_think as _bot_think
 from ...game_utils.game_result import GameResult, PlayerResult
 from ...game_utils.options import (
     IntOption,
@@ -1422,24 +1423,7 @@ class HumanityCardsGame(Game):
     # ==========================================================================
 
     def bot_think(self, player: HumanityCardsPlayer) -> str | None:
-        """Bot AI decision making."""
-        if self.phase == "submitting" and (not self._is_judge(player) or self._all_players_are_judges()):
-            if player.submitted_cards is not None:
-                return None
-            required = self.current_black_card["pick"] if self.current_black_card else 1
-
-            # Select random cards if not enough selected
-            if len(player.selected_indices) < required:
-                available = [i for i in range(len(player.hand)) if i not in player.selected_indices]
-                if available:
-                    pick = random.choice(available)  # nosec B311
-                    return f"toggle_card_{pick}"
-
-            # Submit when we have enough
-            if len(player.selected_indices) == required:
-                return "submit_cards"
-
-        return None
+        return _bot_think(self, player)
 
     def on_tick(self) -> None:
         """Called every tick."""
@@ -1462,16 +1446,10 @@ class HumanityCardsGame(Game):
             self._process_judging_bots()
 
     def _process_submission_bots(self) -> None:
-        """Process all bot actions during submission phase."""
         for player in self.players:
             if not player.is_bot or player.is_spectator:
                 continue
             hcp: HumanityCardsPlayer = player  # type: ignore
-            if self._is_judge(hcp) and not self._all_players_are_judges():
-                continue
-            if hcp.submitted_cards is not None:
-                continue
-
             BotHelper.process_bot_action(
                 player,
                 think_fn=lambda p=hcp: self.bot_think(p),
@@ -1479,33 +1457,14 @@ class HumanityCardsGame(Game):
             )
 
     def _process_judging_bots(self) -> None:
-        """Process judge bot actions during judging phase."""
         for judge in self._get_judges():
             if not judge.is_bot:
                 continue
-
-            if judge.bot_think_ticks > 0:
-                judge.bot_think_ticks -= 1
-                continue
-
-            if judge.bot_pending_action:
-                action_id = judge.bot_pending_action
-                judge.bot_pending_action = None
-                self.execute_action(judge, action_id)
-                continue
-
-            # Bot judge picks a random submission (skip own in all-judge mode)
-            if self.submission_order:
-                valid_picks = list(range(len(self.submission_order)))
-                if self._all_players_are_judges():
-                    valid_picks = [
-                        i for i in valid_picks
-                        if self.submission_order[i] < len(self.submissions)
-                        and self.submissions[self.submission_order[i]]["player_id"] != judge.id
-                    ]
-                if valid_picks:
-                    pick = random.choice(valid_picks)  # nosec B311
-                    judge.bot_pending_action = f"judge_pick_{pick}"
+            BotHelper.process_bot_action(
+                judge,
+                think_fn=lambda j=judge: self.bot_think(j),
+                execute_fn=lambda action_id, j=judge: self.execute_action(j, action_id),
+            )
 
     # ==========================================================================
     # Game result
