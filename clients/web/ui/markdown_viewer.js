@@ -83,8 +83,7 @@ export function createMarkdownViewer({ dialogEl, onSubmit }) {
         // Sanitize HTML strictly
         htmlOutput = DOMPurify.sanitize(rawHtml, {
           USE_PROFILES: { html: true },
-          ALLOWED_URI_REGEXP: /^(https?|mailto):/i,
-          ADD_ATTR: ['target']
+          ALLOWED_URI_REGEXP: /^(https?|mailto):/i
         });
       } else {
         // Fallback if parsing libraries fail to load
