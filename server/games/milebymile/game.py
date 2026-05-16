@@ -18,6 +18,7 @@ from ...game_utils.game_result import GameResult, PlayerResult
 from ...game_utils.round_timer import RoundTransitionTimer
 from ...game_utils.teams import Team, TeamManager
 from ...messages.localization import Localization
+from ...game_utils.game_status import GameStatus
 from server.core.ui.keybinds import KeybindState
 
 from .cards import (
@@ -1508,7 +1509,7 @@ class MileByMileGame(Game):
         """Called when the game starts."""
         # Always set up teams with current player list
         self._setup_teams()
-        self.status = "playing"
+        self.status = GameStatus.PLAYING
         self.game_active = True
         self.current_race = 0
 
